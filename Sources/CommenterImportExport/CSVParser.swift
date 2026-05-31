@@ -220,7 +220,10 @@ public enum CSVParser {
             if defaultError == .unterminatedQuotedField {
                 throw error
             }
-            throw defaultError == .missingDataRows(sourceLabel: "CSV file") ? error : defaultError
+            if case .missingDataRows = defaultError {
+                throw error
+            }
+            throw defaultError
         } catch {
             throw defaultError
         }

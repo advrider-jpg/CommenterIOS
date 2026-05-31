@@ -316,3 +316,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Replaced the rejected CodableCSV auto-row setting with quoted-field-aware row-break normalization before library parsing.
 - Aligned import preview reducer tests with the real worklist navigation side effect, narrowed placeholder-order expectations to the resolver's actual first-seen unresolved order, and added CSV fallback validation for simple malformed or blank-row files when the primary CSV decoder reports a broad quoting failure.
 - Tightened CSV fallback use so a primary parse that loses malformed data is cross-checked before reporting missing rows, and changed the CSV writer test to verify round-tripped multiline content rather than a single newline spelling.
+- Made CSV fallback error selection explicit for missing-row decoder results and scoped the writer test to formula guarding plus multiline content emission after CI showed generated CSV is not a parser fixture.
