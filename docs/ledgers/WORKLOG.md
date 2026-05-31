@@ -320,3 +320,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Added a no-quotes CSV width preflight so malformed unquoted rows are rejected before the primary decoder can collapse them into a misleading missing-data result.
 - Switched legacy XLS import to try the app's verified simple compound-file workbook extractor before OLEKit, avoiding the CI crash path while preserving OLEKit as the fallback for files the local extractor cannot read.
 - Made OLE compound `.xls` imports fail closed through the local workbook extractor instead of falling through to OLEKit after extractor rejection, so unsupported compound files surface as unreadable rather than risking a process-level crash.
+- Removed OLEKit from the package manifest and import path after repeated CI signal-5 exits, recorded the fail-closed legacy XLS exception, and updated dependency policy/audit docs to reflect fixture-limited local OLE/BIFF support until a mature iOS parser is proven.

@@ -44,7 +44,7 @@ added by the current worker when possible.
 | TCA architecture | `pointfreeco/swift-composable-architecture` | `.package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0")` | `ComposableArchitecture` | Required; already used by worker | https://github.com/pointfreeco/swift-composable-architecture |
 | CSV import/export | `dehesa/CodableCSV` | `.package(url: "https://github.com/dehesa/CodableCSV.git", from: "0.6.7")` | `CodableCSV` | Required; already used by worker | https://github.com/dehesa/CodableCSV |
 | XLSX import | `CoreOffice/CoreXLSX` | `.package(url: "https://github.com/CoreOffice/CoreXLSX.git", .upToNextMinor(from: "0.14.1"))` | `CoreXLSX` | Required; already used by worker | https://github.com/CoreOffice/CoreXLSX |
-| Legacy XLS/OLE container | `CoreOffice/OLEKit` | `.package(url: "https://github.com/CoreOffice/OLEKit.git", .upToNextMinor(from: "0.2.0"))` | `OLEKit` | Required; already used by worker | https://github.com/CoreOffice/OLEKit |
+| Legacy XLS/OLE container | No current package | N/A | N/A | Exception: OLEKit was removed after CI exposed a process-level crash path; keep only the fixture-limited local extractor until `libxls` or another iOS-compatible parser is proven. | See decision ledger |
 | SQLite project index | `groue/GRDB.swift` | `.package(url: "https://github.com/groue/GRDB.swift.git", from: "7.10.0")` | `GRDB` | Required before further custom SQLite work | https://github.com/groue/GRDB.swift |
 | ZIP/OOXML package assembly | `weichsel/ZIPFoundation` | `.package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0")` | `ZIPFoundation` | Required for any direct ZIP/OOXML package work not fully handled by another dependency | https://github.com/weichsel/ZIPFoundation |
 | DOCX generation | `Techopolis/SwiftDocX` | `.package(url: "https://github.com/Techopolis/SwiftDocX.git", from: "1.0.0")` | `SwiftDocX` | Required evaluation before custom DOCX writer changes | https://github.com/Techopolis/SwiftDocX |
@@ -67,7 +67,7 @@ evaluated before writing or keeping custom generic infrastructure in their area.
 | Area | Candidate | Status | Required proof before use or rejection |
 | --- | --- | --- | --- |
 | XLSX writing | `damuellen/xlsxwriter.swift` or another maintained SwiftPM/libxlsxwriter wrapper | Candidate only | Must build on iOS through SwiftPM without manual host installs, support release CI, and have acceptable license/attribution. If rejected, document why before keeping any custom XLSX writer. |
-| Legacy XLS BIFF parsing/writing | `libxls` or another maintained iOS-compatible option | Candidate only | Must build for iOS, parse BIFF Workbook streams, and pass real fixture tests. If no suitable package exists, keep only the smallest Commenter-specific BIFF adapter on top of OLEKit with fixtures and a decision-ledger exception. |
+| Legacy XLS BIFF parsing/writing | `libxls` or another maintained iOS-compatible option | Candidate only | Must build for iOS, parse BIFF Workbook streams, and pass real fixture tests. If no suitable package exists, keep only the smallest Commenter-specific BIFF/OLE adapter with fixtures and a decision-ledger exception. |
 
 ## Custom-Code Limits
 
@@ -84,7 +84,7 @@ Disallowed custom code unless a decision ledger entry grants an exception:
 
 - New CSV parsers.
 - New XLSX parsers.
-- New OLE container readers.
+- New OLE container readers beyond the recorded fixture-limited legacy XLS exception.
 - New SQLite wrapper layers below GRDB.
 - New DOCX/OOXML ZIP writers when SwiftDocX or ZIPFoundation can cover the
   generic portion.
@@ -95,7 +95,7 @@ Disallowed custom code unless a decision ledger entry grants an exception:
 
 ## Required Adapter Boundaries
 
-- `CommenterImportExport` may adapt CodableCSV, CoreXLSX, OLEKit,
+- `CommenterImportExport` may adapt CodableCSV, CoreXLSX,
   ZIPFoundation, SwiftDocX, or an approved XLSX/XLS writer into Commenter import
   rows and export payloads. It must not own broad generic parser/writer engines.
 - `CommenterPersistence` must use GRDB for SQLite metadata/index work once

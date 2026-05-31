@@ -21,7 +21,6 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/CoreOffice/CoreXLSX.git", .upToNextMinor(from: "0.14.1")),
-        .package(url: "https://github.com/CoreOffice/OLEKit.git", .upToNextMinor(from: "0.2.0")),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.10.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
         .package(url: "https://github.com/dehesa/CodableCSV.git", from: "0.6.7"),
@@ -49,7 +48,6 @@ let package = Package(
                 "CommenterPersistence",
                 .product(name: "CodableCSV", package: "CodableCSV"),
                 .product(name: "CoreXLSX", package: "CoreXLSX"),
-                .product(name: "OLEKit", package: "OLEKit"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation")
             ]
         ),

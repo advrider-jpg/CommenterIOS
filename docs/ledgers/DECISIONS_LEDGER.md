@@ -3,6 +3,35 @@
 Append durable architectural, product, data, testing, and process decisions
 here. Do not rewrite history; supersede entries with dated notes.
 
+## 2026-05-31 - Remove OLEKit after CI crash and fail closed for legacy XLS
+
+Decision:
+Remove `OLEKit` from the Swift package manifest and legacy XLS import path.
+Keep the smallest fixture-limited local OLE compound-file extractor plus narrow
+BIFF decoder for current `.xls` MVP fixtures, and report unsupported or
+unreadable compound files as import failures rather than falling through to a
+process-level dependency crash.
+
+Rationale:
+GitHub Actions repeatedly exited Swift package tests with signal code 5 when
+the legacy XLS import fixture reached the OLEKit-linked path. A crash is less
+truthful than an explicit unreadable-workbook failure. Full `.xls` parity still
+requires a proven iOS-compatible `libxls` or equivalent parser before release
+claims expand beyond fixture-backed support.
+
+Evidence:
+PR CI runs on 2026-05-31 failed during
+`ProjectImportCommitTests.testResultsImportPreviewParsesNarrowLegacyXLSFixture`
+with no XCTest assertion failure and `error: Exited with unexpected signal code
+5`; `Package.swift`; `SpreadsheetImportFile.swift`;
+`docs/OSS_DEPENDENCY_POLICY.md`.
+
+Impact:
+Legacy `.xls` support remains real only for the locally decoded fixture-backed
+OLE/BIFF subset. Unsupported files fail visibly as unreadable. Future work must
+evaluate `libxls` or another mature iOS-compatible parser before claiming broad
+legacy XLS parity.
+
 ## 2026-05-31 - OSS/native-first dependency policy is binding
 
 Decision:

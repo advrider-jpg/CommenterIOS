@@ -1,6 +1,5 @@
 import CoreXLSX
 import Foundation
-import OLEKit
 
 public enum SpreadsheetImportFileError: LocalizedError, Equatable {
     case unsupportedFormat(String)
@@ -105,15 +104,7 @@ public enum SpreadsheetImportFile {
                 throw SpreadsheetImportFileError.unreadableWorkbook(label)
             }
         } else {
-            do {
-                let ole = try OLEFile(url.path)
-                guard let workbook = findOLEEntry(named: "Workbook", in: ole.root) ?? findOLEEntry(named: "Book", in: ole.root) else {
-                    throw LegacyXLSWorkbookError.missingWorkbookStream
-                }
-                stream = try ole.stream(workbook).readDataToEnd()
-            } catch {
-                throw SpreadsheetImportFileError.unreadableWorkbook(label)
-            }
+            throw SpreadsheetImportFileError.unreadableWorkbook(label)
         }
 
         let rows: [[String]]
@@ -281,18 +272,6 @@ private func columnIndex(from column: String) -> Int {
         value = value * 26 + Int(scalar.value - 64)
     }
     return max(0, value - 1)
-}
-
-private func findOLEEntry(named name: String, in entry: DirectoryEntry) -> DirectoryEntry? {
-    if entry.name == name {
-        return entry
-    }
-    for child in entry.children {
-        if let match = findOLEEntry(named: name, in: child) {
-            return match
-        }
-    }
-    return nil
 }
 
 private func parseBIFFRows(_ stream: Data) throws -> [[String]] {
