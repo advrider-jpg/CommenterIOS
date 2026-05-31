@@ -1,0 +1,85 @@
+name: iOS Screenshots
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  screenshots:
+    name: Capture core app screenshots
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      COMMENTER_SCREENSHOT_DIR: ${{ github.workspace }}/build/screenshots
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve packages
+        run: swift package resolve
+
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/simulators.json"
+          udid="$(python3 - "$RUNNER_TEMP/simulators.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              data = json.load(handle)
+          candidates = []
+          for runtime, devices in data.get("devices", {}).items():
+              for device in devices:
+                  name = device.get("name", "")
+                  if device.get("isAvailable") and name.startswith("iPhone"):
+                      candidates.append((runtime, name, device["udid"]))
+
+          if not candidates:
+              raise SystemExit("No available iPhone simulator found.")
+
+          def score(candidate):
+              runtime, name, _ = candidate
+              return (runtime, name)
+
+          print(sorted(candidates, key=score)[-1][2])
+          PY
+          )"
+          xcrun simctl shutdown "$udid" || true
+          xcrun simctl erase "$udid"
+          echo "destination=platform=iOS Simulator,id=$udid" >> "$GITHUB_OUTPUT"
+
+      - name: Run screenshot UI tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$COMMENTER_SCREENSHOT_DIR"
+          xcodebuild test \
+            -project CommenterIOS.xcodeproj \
+            -scheme CommenterIOS \
+            -destination '${{ steps.simulator.outputs.destination }}' \
+            -only-testing:CommenterIOSScreenshotTests/CommenterIOSScreenshotTests/testCoreAppPages \
+            -resultBundlePath build/CommenterIOSScreenshots.xcresult \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Verify screenshot output
+        run: |
+          set -euo pipefail
+          count="$(find "$COMMENTER_SCREENSHOT_DIR" -type f -name '*.png' | wc -l | tr -d ' ')"
+          test "$count" -ge 10
+          find "$COMMENTER_SCREENSHOT_DIR" -type f -name '*.png' | sort
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commenter-ios-core-screenshots
+          path: |
+            build/screenshots/*.png
+            build/CommenterIOSScreenshots.xcresult
+          if-no-files-found: error

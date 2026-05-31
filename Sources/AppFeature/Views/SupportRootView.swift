@@ -79,6 +79,7 @@ struct SupportRootView: View {
                 }
             }
             .navigationTitle("Support")
+            .accessibilityIdentifier("support-page")
         }
     }
 

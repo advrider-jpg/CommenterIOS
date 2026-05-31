@@ -21,6 +21,20 @@
                ReferencedContainer = "container:CommenterIOS.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2B3C4D5E6F70000000000041"
+               BuildableName = "CommenterIOSScreenshotTests.xctest"
+               BlueprintName = "CommenterIOSScreenshotTests"
+               ReferencedContainer = "container:CommenterIOS.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -28,7 +42,29 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
-      shouldAutocreateTestPlan = "YES">
+      shouldAutocreateTestPlan = "NO">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2B3C4D5E6F70000000000041"
+               BuildableName = "CommenterIOSScreenshotTests.xctest"
+               BlueprintName = "CommenterIOSScreenshotTests"
+               ReferencedContainer = "container:CommenterIOS.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "1A2B3C4D5E6F700000000041"
+            BuildableName = "CommenterIOS.app"
+            BlueprintName = "CommenterIOS"
+            ReferencedContainer = "container:CommenterIOS.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

@@ -384,6 +384,17 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   `swift package resolve`, `swift test`, and the unsigned generic iOS Simulator
   app-target `xcodebuild` build with package plugin and macro validation
   skipped for noninteractive CI.
+- Added a separate `iOS Screenshots` GitHub Actions workflow for real simulator
+  screenshot evidence. The intended hosted command is `xcodebuild test -project
+  CommenterIOS.xcodeproj -scheme CommenterIOS -destination <available iPhone
+  simulator> -only-testing:CommenterIOSScreenshotTests/CommenterIOSScreenshotTests/testCoreAppPages
+  -resultBundlePath build/CommenterIOSScreenshots.xcresult
+  -skipPackagePluginValidation -skipMacroValidation ARCHS=arm64
+  CODE_SIGNING_ALLOWED=NO` with `COMMENTER_SCREENSHOT_DIR` set to
+  `build/screenshots`. The workflow verifies at least ten PNG files and uploads
+  them with the `.xcresult` bundle. This live Windows checkout cannot execute
+  the new workflow locally because `swift`, `xcodebuild`, and `xcrun` are not
+  installed.
 
 ## Future Required Gates
 
