@@ -65,6 +65,13 @@
             ReferencedContainer = "container:CommenterIOS.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "COMMENTER_SCREENSHOT_DIR"
+            value = "$(PROJECT_DIR)/build/screenshots"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
