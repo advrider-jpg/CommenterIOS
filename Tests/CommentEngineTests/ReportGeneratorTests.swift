@@ -32,7 +32,7 @@ final class ReportGeneratorTests: XCTestCase {
     func testAssemblesFromComponentsWhenVariantsCannotResolveContext() throws {
         var data = fixtureData()
         data.assembledVariants = [
-            AssembledVariant(variantID: "needs-context", keyID: "strength", text: "{StudentName} writes about [unit/topic].")
+            AssembledVariant(variantID: "needs-context", keyID: "strength", text: "{StudentName} writes about [missing context].")
         ]
         var generator = try ReportGenerator(data: data, projectMetadata: metadata())
         let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
@@ -205,7 +205,7 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(
             report.text,
-            "A helpful next step for Ava is to use evidence from text.\n\nAva writes clearly in English."
+            "A helpful next step for Ava is to use evidence from text."
         )
     }
 

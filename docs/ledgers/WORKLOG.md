@@ -311,3 +311,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Removed the duplicate project-summary helper from the store client and imported CommentEngine where the split project reducer reads readiness.
 - Fixed AppFeatureTests probe assertions so actor-isolated values are awaited before entering XCTest autoclosures.
 - Reordered backup-import test client arguments to match the test helper signature exposed by CI.
+- Tightened CSV row-break detection, note repair separation, spreadsheet import fallbacks, and tests for first-seen placeholder ordering and explicit subject-layout exclusion after CI reached behavioral tests.

@@ -140,7 +140,7 @@ public enum CSVParser {
     private static func csvReaderConfiguration() -> CSVReader.Configuration {
         var configuration = CSVReader.Configuration()
         configuration.headerStrategy = .none
-        configuration.delimiters.row = .standard
+        configuration.delimiters.row = nil
         configuration.presample = true
         return configuration
     }
