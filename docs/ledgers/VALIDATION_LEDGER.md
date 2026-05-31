@@ -407,6 +407,13 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   `build/screenshots` directory was empty. The screenshot workflow now exports
   kept XCTest attachments from `build/CommenterIOSScreenshots.xcresult` into
   stable PNG files before running the existing count check and artifact upload.
+- Manual workflow run `26726339250` on `main` commit
+  `d9d09f63b49a3b62ca3ba79599917cc086feab7f` passed the full screenshot
+  workflow: package resolve, hosted iPhone simulator selection, screenshot UI
+  test, `.xcresult` attachment export, ten-PNG verification, and artifact
+  upload. The `commenter-ios-core-screenshots` artifact ID was `7320654221`;
+  downloading it locally produced exactly ten stable PNG files named
+  `01-projects.png` through `10-support-with-project.png`.
 
 ## Future Required Gates
 
