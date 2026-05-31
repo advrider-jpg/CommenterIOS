@@ -349,3 +349,6 @@ Append material work history here. Keep entries short, dated, and factual.
   simulator instead of a mock preview.
 - Added stable accessibility identifiers to the three root tab pages for
   screenshot/test targeting without changing user-visible product behavior.
+- After the first hosted screenshot run reached the simulator, adjusted the UI
+  test to locate real controls inside each core worklist area instead of
+  SwiftUI section headers that were not exposed as static text in XCUITest.

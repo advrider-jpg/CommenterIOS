@@ -31,11 +31,11 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         waitForPage(named: "Untitled Project")
         capture("04-worklist-project")
 
-        captureSection("Roster", fileName: "05-worklist-roster")
-        captureSection("Subjects", fileName: "06-worklist-subjects")
-        captureSection("Results", fileName: "07-worklist-results")
-        captureSection("Draft Comments", fileName: "08-worklist-draft-comments")
-        captureSection("Export and Backup", fileName: "09-worklist-export-backup")
+        captureArea(anchor: "Import Roster CSV, XLSX, or XLS", fileName: "05-worklist-roster")
+        captureArea(anchor: "English", fileName: "06-worklist-subjects")
+        captureArea(anchor: "Import Results CSV, XLSX, or XLS", fileName: "07-worklist-results")
+        captureArea(anchor: "Generate and Save Reports", fileName: "08-worklist-draft-comments")
+        captureArea(anchor: "Prepare Backup JSON", fileName: "09-worklist-export-backup")
 
         openTab("Support")
         waitForPage(named: "Support")
@@ -63,15 +63,21 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         XCTAssertEqual(result, .completed, "Expected \(name) to become available.")
     }
 
-    private func captureSection(_ section: String, fileName: String) {
-        let label = app.staticTexts[section]
+    private func captureArea(anchor: String, fileName: String) {
         var attempts = 0
-        while !label.exists && attempts < 8 {
+        while !visibleElement(named: anchor) && attempts < 10 {
             app.swipeUp()
             attempts += 1
         }
-        XCTAssertTrue(label.exists, "Expected to find the \(section) section before capturing \(fileName).")
+        XCTAssertTrue(visibleElement(named: anchor), "Expected to find \(anchor) before capturing \(fileName).")
         capture(fileName)
+    }
+
+    private func visibleElement(named name: String) -> Bool {
+        app.buttons[name].exists ||
+            app.staticTexts[name].exists ||
+            app.switches[name].exists ||
+            app.textFields[name].exists
     }
 
     private func capture(_ name: String) {

@@ -395,6 +395,12 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   them with the `.xcresult` bundle. This live Windows checkout cannot execute
   the new workflow locally because `swift`, `xcodebuild`, and `xcrun` are not
   installed.
+- Manual workflow run `26725511774` proved package resolution, simulator
+  selection, app build, launch, project creation, and the first four screenshot
+  captures reached the hosted simulator, then failed because the test looked for
+  the `Roster` SwiftUI section header as a `StaticText`. The screenshot test now
+  anchors worklist captures on real visible controls inside each area instead
+  of section headers.
 
 ## Future Required Gates
 
