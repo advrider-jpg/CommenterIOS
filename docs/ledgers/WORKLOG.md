@@ -312,3 +312,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Fixed AppFeatureTests probe assertions so actor-isolated values are awaited before entering XCTest autoclosures.
 - Reordered backup-import test client arguments to match the test helper signature exposed by CI.
 - Tightened CSV row-break detection, note repair separation, spreadsheet import fallbacks, and tests for first-seen placeholder ordering and explicit subject-layout exclusion after CI reached behavioral tests.
+- Fixed the spreadsheet fallback compile error by unwrapping ZIP entry data before reading worksheet XML.

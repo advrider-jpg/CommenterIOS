@@ -134,7 +134,7 @@ private func parseOOXMLWorksheetRows(_ data: Data, label: String) throws -> CSVP
         .sorted()
 
     for path in worksheetPaths {
-        guard let xml = entries[path].stringValue else { continue }
+        guard let xml = entries[path]?.stringValue else { continue }
         let rows = parseOOXMLRows(xml, sharedStrings: sharedStrings)
         let normalized = normalizeWorksheetRows(rows)
         if !normalized.isEmpty {
