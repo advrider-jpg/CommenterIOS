@@ -2,12 +2,13 @@
 
 ## Epic 0 - Repo Bootstrap
 
-- [ ] Scaffold SwiftUI/TCA app.
-- [ ] Preserve all planning docs in the scaffolded app repo.
-- [ ] Remove sample flows from the template.
-- [ ] Add local Swift package structure.
-- [ ] Add initial CI.
-- [ ] Add `PrivacyInfo.xcprivacy`.
+- [x] Scaffold initial SwiftUI/TCA Swift package app.
+- [x] Preserve all planning docs in the scaffolded app repo.
+- [x] Remove sample flows from the template.
+- [x] Add local Swift package structure.
+- [x] Add minimal native iOS Xcode app host project.
+- [x] Add initial CI.
+- [x] Add `PrivacyInfo.xcprivacy`.
 - [ ] Add dependency/license audit script.
 
 ## Epic 1 - Source Audit and Fixtures
@@ -27,19 +28,19 @@
 - [ ] Port student model.
 - [ ] Port achievement result model.
 - [ ] Port generated report model.
-- [ ] Port backup envelope model.
+- [x] Port backup envelope model.
 - [ ] Port validation issue model.
 - [ ] Port project limits.
 - [ ] Add Codable round-trip tests.
 
 ## Epic 3 - Dataset and Engine
 
-- [ ] Bundle production comment-engine JSON.
-- [ ] Decode dataset.
-- [ ] Validate dataset.
-- [ ] Compute dataset hash.
-- [ ] Port subject mapping.
-- [ ] Port placeholder detection.
+- [x] Bundle production comment-engine JSON.
+- [x] Decode dataset.
+- [x] Validate full dataset contract.
+- [x] Compute dataset hash.
+- [x] Port subject mapping.
+- [x] Port placeholder detection.
 - [ ] Port deterministic generation.
 - [ ] Add golden parity tests.
 
@@ -109,4 +110,3 @@
 - [ ] App Store metadata.
 - [ ] TestFlight upload.
 - [ ] Release checklist.
-

@@ -24,8 +24,14 @@ CommenterIOS must preserve the core CommenterV3 contract:
 
 ## Current Status
 
-This repo is currently a planning and scaffold seed. The SwiftUI/TCA project has
-not yet been generated.
+This repo now contains an initial Swift package scaffold for the native
+SwiftUI/TCA app, including local package targets, a SwiftUI app entry point,
+TCA root feature wiring, a minimal Xcode iOS app project, a privacy manifest,
+CI skeleton, and the bundled production CommenterV3 comment-engine dataset.
+
+`CommenterIOS.xcodeproj` is present and XcodeBuildMCP can discover it in this
+checkout. Local Swift/Xcode builds still require an Apple toolchain on PATH and
+simulator validation on macOS.
 
 Start with:
 
@@ -53,4 +59,3 @@ The current production source of truth is:
 
 Do not port behavior from memory alone. Inspect the live source before
 implementing each feature.
-

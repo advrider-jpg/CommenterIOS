@@ -77,3 +77,93 @@ Rationale:
 The user asked whether the new repo had the same strict setup as other repos.
 The planning seed did not, so the guardrail harness was added before further
 implementation.
+
+## 2026-05-31 - Host the Swift package in a native Xcode app target
+
+Decision:
+Add `CommenterIOS.xcodeproj` as a minimal native iOS app host that compiles the
+SwiftUI app entry and links the local `AppFeature` Swift package product.
+
+Rationale:
+SwiftPM package tests are useful for module validation, but TestFlight,
+simulator, archive, privacy-manifest, signing, and App Store release gates need
+a real iOS app target and shared scheme. The app target should host package
+modules rather than duplicating product behavior outside the TCA/package seams.
+
+Evidence:
+`CommenterIOS.xcodeproj`; `Sources/AppFeature/AppEntryView.swift`;
+`Sources/CommenterIOSApp/CommenterIOSApp.swift`.
+
+## 2026-05-31 - Keep dependency posture minimal and native
+
+Decision:
+Use native Apple APIs and focused OSS packages for generic infrastructure, with
+custom code reserved for Commenter domain/product logic, deterministic
+generation, truthful local persistence, validation, and small adapters around
+native or OSS APIs.
+
+Rationale:
+This keeps the port local-first and production-oriented without taking ownership
+of broad generic infrastructure that mature packages already provide.
+
+Evidence:
+`Package.swift`; `docs/dependencies/DEPENDENCY_AUDIT.md`.
+
+## 2026-05-31 - Do not add SwiftUIX or SwiftUI Introspect yet
+
+Decision:
+Do not add SwiftUIX or SwiftUI Introspect while the current UI can use native
+SwiftUI/HIG controls and no owned wrapper need has been proven.
+
+Rationale:
+Extra UI dependencies should be justified by a real native UX need. If either is
+added later, it should sit behind owned wrappers with tests or simulator
+evidence for the behavior being unlocked.
+
+Evidence:
+`docs/dependencies/DEPENDENCY_AUDIT.md`.
+
+## 2026-05-31 - Keep legacy XLS parity risk open
+
+Decision:
+Do not treat legacy `.xls` parity as complete until full BIFF cell
+decoding/writing is backed by mature `libxls`/`libxlsxwriter` integration or a
+documented production-grade compatibility reason with real fixtures.
+
+Rationale:
+OLE container support alone does not prove complete legacy Excel cell semantics
+or target-app compatibility.
+
+Evidence:
+`docs/dependencies/DEPENDENCY_AUDIT.md`.
+
+## 2026-05-31 - Document package suitability for DOCX, ZIP, XLSX, and XLS
+
+Decision:
+Use the package suitability matrix in
+`docs/dependencies/DEPENDENCY_AUDIT.md` as the current decision record for
+document/workbook dependency work:
+
+- `ZIPFoundation` is suitable generic ZIP/OOXML infrastructure and should
+  replace custom ZIP assembly where a higher-level package does not own the
+  package layer.
+- `SwiftDocX` must be evaluated before further custom DOCX writer work, but it
+  remains proof-gated because the upstream project is young.
+- Direct `jmcnamara/libxlsxwriter` is the preferred XLSX writer candidate over
+  `damuellen/xlsxwriter.swift` unless the wrapper proves a pinned iOS SwiftPM
+  release with no manual native dependency setup.
+- `libxls` is a parser candidate for legacy `.xls` import only. It does not
+  solve legacy `.xls` export.
+- A narrow custom legacy `.xls` writer exception remains temporarily justified
+  because no mature iOS SwiftPM BIFF writer was identified, but the exception is
+  not release-complete without fixtures and target-app open validation.
+
+Rationale:
+The app must keep CSV, XLSX, legacy XLS, DOCX, and backup JSON as real MVP
+formats while avoiding ownership of broad generic infrastructure. The current
+audit separates suitable generic packages from areas where package support is
+not yet proven enough for truthful production behavior.
+
+Evidence:
+`docs/OSS_DEPENDENCY_POLICY.md`; `docs/dependencies/DEPENDENCY_AUDIT.md`;
+upstream package documentation linked in the audit.
