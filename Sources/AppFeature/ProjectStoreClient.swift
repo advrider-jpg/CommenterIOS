@@ -25,6 +25,7 @@ public struct ProjectStoreClient: Sendable {
     public var createProject: @Sendable () async throws -> ProjectSummary
     public var loadProject: @Sendable (_ id: String) async throws -> Project
     public var saveProject: @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project
+    public var deleteProject: @Sendable (_ id: String) async throws -> [ProjectSummary]
     public var importRosterFile: @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview
     public var importResultsFile: @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview
     public var importBackup: @Sendable (_ url: URL) async throws -> Project
@@ -36,6 +37,7 @@ public struct ProjectStoreClient: Sendable {
         createProject: @escaping @Sendable () async throws -> ProjectSummary,
         loadProject: @escaping @Sendable (_ id: String) async throws -> Project,
         saveProject: @escaping @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project,
+        deleteProject: @escaping @Sendable (_ id: String) async throws -> [ProjectSummary],
         importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
         importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
         importBackup: @escaping @Sendable (_ url: URL) async throws -> Project,
@@ -46,6 +48,7 @@ public struct ProjectStoreClient: Sendable {
         self.createProject = createProject
         self.loadProject = loadProject
         self.saveProject = saveProject
+        self.deleteProject = deleteProject
         self.importRosterFile = importRosterFile
         self.importResultsFile = importResultsFile
         self.importBackup = importBackup
@@ -94,6 +97,11 @@ extension ProjectStoreClient: DependencyKey {
                     recoveryReason: recoveryReason
                 )
             )
+        },
+        deleteProject: { id in
+            let store = try FileProjectStore.applicationSupport()
+            try store.deleteProject(id: id)
+            return try await store.listProjects().map(projectSummary).sorted { $0.updatedAt > $1.updatedAt }
         },
         importRosterFile: { url, project in
             try withSecurityScopedAccess(to: url) {
@@ -149,6 +157,9 @@ extension ProjectStoreClient: DependencyKey {
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },
         saveProject: { _, _, _, _ in
+            throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
+        },
+        deleteProject: { _ in
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },
         importRosterFile: { _, _ in

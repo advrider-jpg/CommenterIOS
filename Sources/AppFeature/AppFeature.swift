@@ -43,6 +43,7 @@ public struct AppFeature: Sendable {
         case creating
         case loadingProject
         case saving
+        case deleting
         case preparingFile
         case importing
         case generating
@@ -55,6 +56,7 @@ public struct AppFeature: Sendable {
         case busy(String)
         case saved(String)
         case prepared(String)
+        case shared(String)
         case cancelled(String)
         case failed(String)
     }
@@ -140,9 +142,16 @@ public struct AppFeature: Sendable {
         case prepareReportExportTapped(ImportExportFormat)
         case filePrepared(URL, String)
         case filePreparationFailed(String)
+        case deleteProjectConfirmed(String)
+        case projectDeleted(String, [ProjectSummary], String)
+        case projectDeleteFailed(String)
         case fileExportSaved(URL)
         case fileExportCancelled
         case fileExportFailed(String)
+        case fileShareStarted(URL)
+        case fileShareCompleted(URL)
+        case fileShareCancelled
+        case fileShareFailed(String)
         case preparedFileDismissed
     }
 

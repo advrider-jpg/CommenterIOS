@@ -70,6 +70,12 @@ extension UTType {
     static let commenterBackup = UTType(filenameExtension: "commenter-backup.json") ?? .json
 }
 
+
+struct SharePresentation: Identifiable, Equatable {
+    let id = UUID()
+    let url: URL
+}
+
 func isCancellation(_ error: Error) -> Bool {
     let nsError = error as NSError
     if nsError.domain == NSCocoaErrorDomain, nsError.code == NSUserCancelledError {

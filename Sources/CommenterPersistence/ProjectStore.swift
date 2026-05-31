@@ -203,11 +203,15 @@ public struct FileProjectStore: ProjectStore {
         try ensureStorageLayout()
         let directory = projectDirectoryURL(projectId: id)
         let projectFile = directory.appendingPathComponent("project.json")
-        if let existing = try existingValidProject(at: projectFile) {
-            try createRecoverySnapshot(existing, reason: .beforeDelete)
+        guard let existing = try existingValidProject(at: projectFile) else {
+            throw ProjectStoreError.projectNotFound(id)
         }
+        try createRecoverySnapshot(existing, reason: .beforeDelete)
         if FileManager.default.fileExists(atPath: projectFile.path) {
             try FileManager.default.removeItem(at: projectFile)
+        }
+        guard !FileManager.default.fileExists(atPath: projectFile.path) else {
+            throw ProjectStoreError.verificationFailed
         }
         try SQLiteProjectIndex(indexURL: indexURL).deleteProject(id: id)
     }

@@ -153,6 +153,119 @@ final class AppFeatureTests: XCTestCase {
         XCTAssertEqual(await probe.values(), [])
     }
 
+
+    func testDeleteProjectCreatesRecoverySnapshotThenClearsOpenProject() async {
+        let original = project(id: "p1", name: "Room 5", revision: 3)
+        let other = ProjectSummary(
+            id: "p2",
+            name: "Room 6",
+            term: "Term 2",
+            updatedAt: 20,
+            revision: 2
+        )
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.projects = [projectSummary(original), other]
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        initial.workflowMessage = "Room 5 is open."
+        initial.operationStatus = .saved("Project opened from verified local storage.")
+        initial.selectedTab = .worklist
+        initial.preparedFile = AppFeature.PreparedFile(url: URL(fileURLWithPath: "/tmp/old.docx"), label: "Old file")
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                deleteProject: { id in
+                    XCTAssertEqual(id, "p1")
+                    await probe.record("delete-p1")
+                    return [other]
+                }
+            )
+        }
+
+        await store.send(.deleteProjectConfirmed("p1")) {
+            $0.projectStorageStatus = .deleting
+            $0.preparedFile = nil
+            $0.pendingImport = nil
+            $0.operationStatus = .busy("Creating a recovery snapshot and deleting the local project.")
+            $0.projectStorageMessage = "Creating a recovery snapshot and deleting the local project."
+        }
+        await store.receive(.projectDeleted("p1", [other], "Room 5 was deleted after a verified recovery snapshot was created.")) {
+            $0.projectStorageStatus = .loaded
+            $0.projects = [other]
+            $0.projectStorageMessage = "1 saved project loaded from local storage."
+            $0.selectedProject = nil
+            $0.selectedProjectReadiness = nil
+            $0.workflowMessage = "Open or create a project to manage roster, subjects, results, drafts, backups, and exports."
+            $0.selectedTab = .projects
+            $0.operationStatus = .saved("Room 5 was deleted after a verified recovery snapshot was created.")
+        }
+        XCTAssertEqual(await probe.values(), ["delete-p1"])
+    }
+
+    func testDirtyProjectCannotBeDeletedUntilVerifiedStorageReflectsCurrentState() async {
+        let original = project(id: "p1", name: "Room 5", revision: 3)
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                deleteProject: { _ in
+                    await probe.record("unexpected-delete")
+                    return []
+                }
+            )
+        }
+
+        await store.send(.deleteProjectConfirmed("p1")) {
+            $0.operationStatus = .failed("Save or reopen the project before deleting it so the recovery snapshot reflects verified local storage.")
+        }
+        XCTAssertEqual(await probe.values(), [])
+    }
+
+    func testPendingImportBlocksProjectDeletion() async {
+        let original = project(id: "p1", name: "Room 5", revision: 3)
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        initial.operationStatus = .saved("Project opened from verified local storage.")
+        initial.pendingImport = AppFeature.PendingImport(
+            project: original,
+            title: "Roster import preview",
+            detail: "1 row accepted.",
+            successMessage: "Roster import saved.",
+            expectedRevision: 3,
+            recoveryReason: .beforeImportReplace
+        )
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                deleteProject: { _ in
+                    await probe.record("unexpected-delete")
+                    return []
+                }
+            )
+        }
+
+        await store.send(.deleteProjectConfirmed("p1")) {
+            $0.operationStatus = .failed("Roster import preview is waiting. Confirm or cancel the import before deleting this project.")
+        }
+        XCTAssertEqual(await probe.values(), [])
+    }
+
     func testProjectYearLevelEditMarksProjectDirtyAndSaveUsesVerifiedStorePath() async {
         let original = project(id: "p1", name: "Room 5", revision: 2)
         var edited = original
@@ -1016,7 +1129,7 @@ final class AppFeatureTests: XCTestCase {
         }
     }
 
-    func testFileExporterCompletionStatusesDistinguishSavedCancelledAndFailed() async {
+    func testFileExporterAndShareCompletionStatusesDistinguishCompletedCancelledAndFailed() async {
         let preparedURL = URL(fileURLWithPath: "/tmp/reports.docx")
         var initial = AppFeature.State()
         initial.projectStorageStatus = .loaded
@@ -1034,6 +1147,18 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.send(.fileExportFailed("Disk is full.")) {
             $0.operationStatus = .failed("File export failed: Disk is full.")
+        }
+        await store.send(.fileShareStarted(preparedURL)) {
+            $0.operationStatus = .busy("Opening native share sheet for reports.docx.")
+        }
+        await store.send(.fileShareCompleted(preparedURL)) {
+            $0.operationStatus = .shared("Share completed for reports.docx.")
+        }
+        await store.send(.fileShareCancelled) {
+            $0.operationStatus = .cancelled("Share cancelled. No share success was recorded.")
+        }
+        await store.send(.fileShareFailed("No destination accepted the file.")) {
+            $0.operationStatus = .failed("Share failed: No destination accepted the file.")
         }
     }
 
@@ -1126,6 +1251,7 @@ private func testProjectStoreClient(
     saveProject: @escaping @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project = { project, _, _, _ in
         project
     },
+    deleteProject: @escaping @Sendable (_ id: String) async throws -> [ProjectSummary] = { _ in [] },
     importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in
         importPreview(format: .csv, kind: .roster, count: 0, project: project)
     },
@@ -1143,6 +1269,7 @@ private func testProjectStoreClient(
         createProject: createProject,
         loadProject: loadProject,
         saveProject: saveProject,
+        deleteProject: deleteProject,
         importRosterFile: importRosterFile,
         importResultsFile: importResultsFile,
         importBackup: importBackup,

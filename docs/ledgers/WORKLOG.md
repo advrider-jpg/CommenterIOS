@@ -286,3 +286,18 @@ Append material work history here. Keep entries short, dated, and factual.
   listing rejects mismatched project metadata.
 - Matched CommenterV3 unresolved-placeholder reporting order by preserving
   first-seen placeholder order while de-duplicating repeated placeholders.
+
+## 2026-05-31 - MVP completion patch pass
+
+- Wired verified project deletion through TCA and `FileProjectStore.deleteProject`, including a destructive confirmation, dirty-state blocking, recovery-snapshot messaging, project-list refresh, and open-project clearing after delete.
+- Replaced ShareLink-only prepared-file sharing with a native `UIActivityViewController` adapter so share completion, cancellation, and failure are surfaced truthfully in reducer state.
+- Updated Support diagnostics and backup guidance to describe local-only recovery snapshots, native document workflows, and no configured analytics/network services.
+- Updated the privacy manifest with a file-timestamp required-reason API declaration for app-container file metadata/readback verification.
+- Added reducer coverage for project deletion, dirty deletion blocking, and native share completion statuses; refreshed README and project posture to match the implemented MVP surface.
+
+## 2026-05-31 - Live checkout patch hardening
+
+- Tightened project deletion so reducer actions are blocked while another local storage operation or import preview is pending, not only when the visible button is disabled.
+- Tightened `FileProjectStore.deleteProject` so a missing on-disk project fails with `projectNotFound` instead of reporting recovery-snapshot-backed deletion success, and verified the canonical project file is gone before deleting index rows.
+- Added reducer and persistence tests covering pending-import delete blocking and missing-file delete failure.
+- Re-ran live Windows validation; SwiftPM and Xcode/simulator gates remain blocked because `swift`, `xcodebuild`, and `xcrun` are not installed on this machine.

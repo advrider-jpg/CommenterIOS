@@ -186,6 +186,22 @@ extension AppFeature {
             state.operationStatus = .failed("File export failed: \(message)")
             return .none
 
+        case let .fileShareStarted(url):
+            state.operationStatus = .busy("Opening native share sheet for \(url.lastPathComponent).")
+            return .none
+
+        case let .fileShareCompleted(url):
+            state.operationStatus = .shared("Share completed for \(url.lastPathComponent).")
+            return .none
+
+        case .fileShareCancelled:
+            state.operationStatus = .cancelled("Share cancelled. No share success was recorded.")
+            return .none
+
+        case let .fileShareFailed(message):
+            state.operationStatus = .failed("Share failed: \(message)")
+            return .none
+
         case .preparedFileDismissed:
             state.preparedFile = nil
             return .none

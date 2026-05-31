@@ -345,6 +345,35 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   `swift test`, and app-target `xcodebuild` attempts still failed because
   `swift` and `xcodebuild` are not recognized on this Windows PATH.
 
+- Re-ran validation in the patch container after the MVP completion pass:
+  `swift package dump-package` succeeded; all Swift source and test files passed
+  `swiftc -parse`; `git diff --no-index --check` against the original upload
+  emitted no whitespace warnings; the privacy manifest parsed with
+  `NSPrivacyAccessedAPICategoryFileTimestamp` reason `C617.1`; bundled dataset
+  SHA-256 remained
+  `438950a8a72de0ce3b6b0e4271f95858d6519162c9f530a295e36722618b9572` with
+  56,564 components, 5 recipes, 4,340 assembled variants, and 2 uniqueness
+  rules; direct SQLite/ZIP implementation scans returned no production matches;
+  production source network/privacy scan found no `URLSession`, Firebase,
+  analytics, telemetry, or remote-config calls beyond package URLs, plist DTD,
+  and OOXML namespace strings. `swift package resolve` and `swift test
+  --skip-build` could not resolve dependencies because the container cannot
+  resolve `github.com`; the app-target `xcodebuild` command failed because
+  `xcodebuild` is not installed in the container.
+
+- Re-ran validation in the live Windows checkout after applying and hardening
+  the MVP completion patch. `git apply --check
+  C:\Users\jackg\Downloads\commenterios-mvp-completion.patch` passed before
+  applying. `git diff --check` passed, `git ls-files --eol` showed tracked text
+  files with LF working-tree endings, and the privacy manifest parsed with
+  `NSPrivacyAccessedAPICategoryFileTimestamp` reason `C617.1`. XcodeBuildMCP
+  discovered `C:\CommenterIOS\CommenterIOS.xcodeproj`, but simulator listing,
+  scheme listing, simulator build, and simulator tests were blocked by missing
+  Apple tools: `spawn xcrun ENOENT` or `spawn xcodebuild ENOENT`. Direct
+  `swift package resolve` and `swift test` failed because `swift` is not
+  recognized on this Windows PATH; direct app-target `xcodebuild` failed
+  because `xcodebuild` is not recognized.
+
 ## Future Required Gates
 
 Future required gates beyond current Swift package checks:

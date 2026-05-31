@@ -10,7 +10,9 @@ struct ProjectMetadataSection: View {
     let onYearLevelChanged: (ProjectYearLevel) -> Void
     let onUseFirstNameOnlyChanged: (Bool) -> Void
     let onSave: () -> Void
+    let onDeleteProject: () -> Void
     let isDisabled: Bool
+    let deleteDisabledReason: String?
 
     var body: some View {
         Section("Project") {
@@ -30,6 +32,21 @@ struct ProjectMetadataSection: View {
                 Label("Save Project", systemImage: "externaldrive")
             }
             .disabled(isDisabled)
+            Button(role: .destructive, action: onDeleteProject) {
+                Label("Delete Project", systemImage: "trash")
+            }
+            .disabled(isDisabled || deleteDisabledReason != nil)
+            if let deleteDisabledReason {
+                Text(deleteDisabledReason)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Deleting a project first creates a local recovery snapshot, then removes the verified project file and returns to Projects.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }
@@ -248,6 +265,7 @@ struct ExportSection: View {
     let onPrepareBackup: () -> Void
     let onPrepareExport: (ImportExportFormat) -> Void
     let onSavePreparedFile: () -> Void
+    let onSharePreparedFile: () -> Void
     let onDismissPreparedFile: () -> Void
     let isDisabled: Bool
     let disabledReason: String?
@@ -299,11 +317,11 @@ struct ExportSection: View {
                     Label("Save Prepared File Copy", systemImage: "square.and.arrow.down")
                 }
                 .disabled(isDisabled)
-                ShareLink(item: preparedFile.url) {
+                Button(action: onSharePreparedFile) {
                     Label("Share Prepared File", systemImage: "square.and.arrow.up")
                 }
                 .disabled(isDisabled)
-                Text("This file has been prepared and verified locally. Saving reports success only after the file exporter returns; sharing opens the iOS share sheet and is not recorded as saved.")
+                Text("This file has been prepared and verified locally. Saving reports success only after the file exporter returns; sharing records completed, cancelled, or failed native share outcomes.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 Button(action: onDismissPreparedFile) {

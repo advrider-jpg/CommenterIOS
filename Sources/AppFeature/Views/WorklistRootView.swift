@@ -15,6 +15,7 @@ struct WorklistRootView: View {
     let onProjectYearLevelChanged: (ProjectYearLevel) -> Void
     let onUseFirstNameOnlyChanged: (Bool) -> Void
     let onSave: () -> Void
+    let onDeleteProject: () -> Void
     let onAddStudent: () -> Void
     let onDeleteStudent: (String) -> Void
     let onStudentFirstNameChanged: (String, String) -> Void
@@ -31,6 +32,7 @@ struct WorklistRootView: View {
     let onPrepareBackup: () -> Void
     let onPrepareExport: (ImportExportFormat) -> Void
     let onSavePreparedFile: () -> Void
+    let onSharePreparedFile: () -> Void
     let onDismissPreparedFile: () -> Void
     let onConfirmImport: () -> Void
     let onCancelImportPreview: () -> Void
@@ -57,7 +59,9 @@ struct WorklistRootView: View {
                         onYearLevelChanged: onProjectYearLevelChanged,
                         onUseFirstNameOnlyChanged: onUseFirstNameOnlyChanged,
                         onSave: onSave,
-                        isDisabled: isEditingLocked
+                        onDeleteProject: onDeleteProject,
+                        isDisabled: isEditingLocked,
+                        deleteDisabledReason: projectDeleteDisabledReason
                     )
                     RosterSection(
                         project: project,
@@ -92,6 +96,7 @@ struct WorklistRootView: View {
                         onPrepareBackup: onPrepareBackup,
                         onPrepareExport: onPrepareExport,
                         onSavePreparedFile: onSavePreparedFile,
+                        onSharePreparedFile: onSharePreparedFile,
                         onDismissPreparedFile: onDismissPreparedFile,
                         isDisabled: isEditingLocked || hasUnsavedChanges,
                         disabledReason: exportDisabledReason
@@ -118,6 +123,9 @@ struct WorklistRootView: View {
             }
             if case .saving = status {
                 ProgressView("Saving and verifying project")
+            }
+            if case .deleting = status {
+                ProgressView("Creating recovery snapshot and deleting project")
             }
             if case .generating = status {
                 ProgressView("Generating and saving reports")
@@ -155,7 +163,7 @@ struct WorklistRootView: View {
 
     private var isWorkflowBusy: Bool {
         switch status {
-        case .creating, .loadingProject, .saving, .preparingFile, .importing, .generating:
+        case .creating, .loadingProject, .saving, .deleting, .preparingFile, .importing, .generating:
             return true
         case .notLoaded, .loading, .loaded, .failed:
             return false
@@ -178,6 +186,19 @@ struct WorklistRootView: View {
         }
         if hasUnsavedChanges {
             return "Save current changes before preparing backup or report files so exported files reflect verified local state."
+        }
+        return nil
+    }
+
+    private var projectDeleteDisabledReason: String? {
+        if let pendingImport {
+            return "\(pendingImport.title) is waiting. Confirm or cancel the import before deleting this project."
+        }
+        if isWorkflowBusy {
+            return "Wait for the current local operation to finish before deleting this project."
+        }
+        if hasUnsavedChanges {
+            return "Save or reopen the project before deleting it so the recovery snapshot reflects verified local storage."
         }
         return nil
     }
