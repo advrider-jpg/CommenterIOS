@@ -37,7 +37,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         addStudent.tap()
 
         let firstName = element("student-first-name-student-1")
-        waitForElement(firstName, named: "student first name field")
+        scrollTo(firstName, name: "student first name field")
         enterText("Ava", in: firstName, named: "student first name")
         enterText("Ng", in: element("student-last-name-student-1"), named: "student last name")
         capture("06-roster-student-entered")
