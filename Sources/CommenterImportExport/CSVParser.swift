@@ -69,21 +69,15 @@ public enum CSVParser {
         let normalizedText = normalizeUnquotedRowBreaks(text)
         do {
             let parsed = try CSVReader.decode(input: normalizedText, configuration: csvReaderConfiguration())
-            return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
+            do {
+                return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
+            } catch let error as CSVParserError {
+                return try parseFallbackRowsOrThrow(normalizedText, defaultError: error)
+            }
         } catch let error as CSVParserError {
             throw error
         } catch {
-            guard !hasUnterminatedQuotedField(normalizedText) else {
-                throw CSVParserError.unterminatedQuotedField
-            }
-
-            do {
-                return try parseTabularRows(parseFallbackRows(normalizedText), sourceLabel: "CSV file")
-            } catch let error as CSVParserError {
-                throw error
-            } catch {
-                throw CSVParserError.unterminatedQuotedField
-            }
+            return try parseFallbackRowsOrThrow(normalizedText, defaultError: .unterminatedQuotedField)
         }
     }
 
@@ -213,6 +207,23 @@ public enum CSVParser {
         }
 
         return insideQuotedField
+    }
+
+    private static func parseFallbackRowsOrThrow(_ text: String, defaultError: CSVParserError) throws -> CSVParseResult {
+        guard !hasUnterminatedQuotedField(text) else {
+            throw CSVParserError.unterminatedQuotedField
+        }
+
+        do {
+            return try parseTabularRows(parseFallbackRows(text), sourceLabel: "CSV file")
+        } catch let error as CSVParserError {
+            if defaultError == .unterminatedQuotedField {
+                throw error
+            }
+            throw defaultError == .missingDataRows(sourceLabel: "CSV file") ? error : defaultError
+        } catch {
+            throw defaultError
+        }
     }
 
     private static func parseFallbackRows(_ text: String) throws -> [[String]] {
