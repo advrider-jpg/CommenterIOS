@@ -2,6 +2,16 @@
 
 Append material work history here. Keep entries short, dated, and factual.
 
+## 2026-05-31 - OSS dependency policy guardrail
+
+- Added `docs/OSS_DEPENDENCY_POLICY.md` as the binding OSS/native-first package
+  list and custom-code limit.
+- Updated `AGENTS.md`, core rules, MVP plan, architecture decision, handoff, and
+  decision ledger to force dependency-policy review before generic
+  infrastructure work.
+- Preserved worker-current package choices where possible:
+  `swift-composable-architecture`, `CodableCSV`, `CoreXLSX`, and `OLEKit`.
+
 ## 2026-05-30 - Planning repo seeded
 
 - Created `C:\CommenterIOS`.
@@ -140,3 +150,13 @@ Append material work history here. Keep entries short, dated, and factual.
   and links the local `AppFeature` package product; XcodeBuildMCP discovery now
   finds the project, while scheme/build/test validation still requires
   `xcodebuild` on macOS.
+
+## 2026-05-31 - Dependency audit posture recorded
+
+- Added `docs/dependencies/DEPENDENCY_AUDIT.md` documenting the minimal
+  OSS/native posture, current package/license roles, and why TCA, CodableCSV,
+  CoreXLSX, and OLEKit fit offline/local-first use.
+- Recorded the decision not to add SwiftUIX or SwiftUI Introspect yet because no
+  native SwiftUI/HIG wrapper need has been proven.
+- Recorded the remaining legacy `.xls` BIFF decoding/writing risk without
+  claiming production parity is complete.
