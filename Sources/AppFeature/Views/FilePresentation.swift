@@ -60,7 +60,7 @@ struct PreparedExportDocument: FileDocument {
         guard !data.isEmpty else {
             throw Error.missingPreparedFile(defaultFilename)
         }
-        FileWrapper(regularFileWithContents: data)
+        return FileWrapper(regularFileWithContents: data)
     }
 }
 
