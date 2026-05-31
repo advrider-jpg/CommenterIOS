@@ -148,7 +148,7 @@ final class ProductionCommentDatasetTests: XCTestCase {
             context: context
         )
 
-        XCTAssertEqual(resolved.missingContext, ["[text type]", "[context]"])
-        XCTAssertEqual(resolved.unresolved, ["[text type]", "[context]"])
+        XCTAssertEqual(resolved.missingContext, ["[context]", "[text type]"])
+        XCTAssertEqual(resolved.unresolved, ["[context]", "[text type]"])
     }
 }

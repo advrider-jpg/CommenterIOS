@@ -67,7 +67,7 @@ public enum CSVParser {
 
     public static func parseCSV(_ text: String) throws -> CSVParseResult {
         do {
-            let parsed = try CSVReader.decode(input: text, configuration: csvReaderConfiguration())
+            let parsed = try CSVReader.decode(input: normalizeUnquotedRowBreaks(text), configuration: csvReaderConfiguration())
             return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
         } catch let error as CSVParserError {
             throw error
@@ -140,9 +140,46 @@ public enum CSVParser {
     private static func csvReaderConfiguration() -> CSVReader.Configuration {
         var configuration = CSVReader.Configuration()
         configuration.headerStrategy = .none
-        configuration.delimiters.row = nil
+        configuration.delimiters.row = .standard
         configuration.presample = true
         return configuration
+    }
+
+    private static func normalizeUnquotedRowBreaks(_ text: String) -> String {
+        var output = ""
+        var index = text.startIndex
+        var insideQuotedField = false
+
+        while index < text.endIndex {
+            let character = text[index]
+            let next = text.index(after: index)
+
+            if character == "\"" {
+                if insideQuotedField, next < text.endIndex, text[next] == "\"" {
+                    output.append(character)
+                    output.append(text[next])
+                    index = text.index(after: next)
+                    continue
+                }
+                insideQuotedField.toggle()
+                output.append(character)
+            } else if !insideQuotedField, character == "\r" {
+                if next < text.endIndex, text[next] == "\n" {
+                    output.append("\r\n")
+                    index = text.index(after: next)
+                    continue
+                }
+                output.append("\r\n")
+            } else if !insideQuotedField, character == "\n" {
+                output.append("\r\n")
+            } else {
+                output.append(character)
+            }
+
+            index = next
+        }
+
+        return output
     }
 
     private static func csvWriterConfiguration() -> CSVWriter.Configuration {
