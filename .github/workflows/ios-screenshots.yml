@@ -60,7 +60,7 @@ jobs:
             -project CommenterIOS.xcodeproj \
             -scheme CommenterIOS \
             -destination '${{ steps.simulator.outputs.destination }}' \
-            -only-testing:CommenterIOSScreenshotTests/CommenterIOSScreenshotTests/testCoreAppPages \
+            -only-testing:CommenterIOSScreenshotTests/CommenterIOSScreenshotTests/testCoreReportFlowScreenshots \
             -resultBundlePath build/CommenterIOSScreenshots.xcresult \
             -skipPackagePluginValidation \
             -skipMacroValidation \
