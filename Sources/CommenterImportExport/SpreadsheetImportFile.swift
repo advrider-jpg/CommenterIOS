@@ -141,7 +141,7 @@ private func parseOOXMLWorksheetRows(_ data: Data, label: String) throws -> CSVP
 
     for path in worksheetPaths {
         guard let xml = entries[path]?.stringValue else { continue }
-        let rows = parseOOXMLRows(xml, sharedStrings: sharedStrings)
+        let rows = try parseOOXMLRows(xml, sharedStrings: sharedStrings, label: label)
         let normalized = normalizeWorksheetRows(rows)
         if !normalized.isEmpty {
             return try CSVParser.parseTabularRows(normalized, sourceLabel: label)
@@ -159,8 +159,8 @@ private func parseOOXMLSharedStrings(_ data: Data?) -> [String] {
     }
 }
 
-private func parseOOXMLRows(_ xml: String, sharedStrings: [String]) -> [[String]] {
-    xml.matches(pattern: #"<row\b[^>]*>(.*?)</row>"#).map { rowXML in
+private func parseOOXMLRows(_ xml: String, sharedStrings: [String], label: String) throws -> [[String]] {
+    try xml.matches(pattern: #"<row\b[^>]*>(.*?)</row>"#).map { rowXML in
         var cellsByIndex: [Int: String] = [:]
         for cellXML in rowXML.matches(pattern: #"<c\b[^>]*>.*?</c>"#) {
             let attributes = cellXML.captured(pattern: #"^<c\b([^>]*)>"#) ?? ""
@@ -173,8 +173,10 @@ private func parseOOXMLRows(_ xml: String, sharedStrings: [String]) -> [[String]
                 cellsByIndex[index] = body.matches(pattern: #"<t\b[^>]*>(.*?)</t>"#).map(xmlUnescape).joined()
             } else if type == "s",
                       let rawIndex = body.captured(pattern: #"<v\b[^>]*>(.*?)</v>"#),
-                      let sharedIndex = Int(rawIndex.trimmingCharacters(in: .whitespacesAndNewlines)),
-                      sharedStrings.indices.contains(sharedIndex) {
+                      let sharedIndex = Int(rawIndex.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                guard sharedStrings.indices.contains(sharedIndex) else {
+                    throw SpreadsheetImportFileError.unreadableWorkbook(label)
+                }
                 cellsByIndex[index] = sharedStrings[sharedIndex]
             } else {
                 cellsByIndex[index] = xmlUnescape(body.captured(pattern: #"<v\b[^>]*>(.*?)</v>"#) ?? "")
