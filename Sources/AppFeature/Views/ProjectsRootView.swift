@@ -58,6 +58,7 @@ struct ProjectsRootView: View {
                 }
             }
             .navigationTitle("Projects")
+            .accessibilityIdentifier("projects-page")
         }
     }
 

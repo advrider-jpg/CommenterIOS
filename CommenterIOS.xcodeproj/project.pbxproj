@@ -10,12 +10,25 @@
         1A2B3C4D5E6F700000000001 /* CommenterIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F700000000011 /* CommenterIOSApp.swift */; };
         1A2B3C4D5E6F700000000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F700000000012 /* PrivacyInfo.xcprivacy */; };
         1A2B3C4D5E6F700000000003 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F700000000013 /* AppFeature */; };
+        2B3C4D5E6F70000000000001 /* CommenterIOSScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3C4D5E6F70000000000011 /* CommenterIOSScreenshotTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+        2B3C4D5E6F70000000000061 /* PBXContainerItemProxy */ = {
+            isa = PBXContainerItemProxy;
+            containerPortal = 1A2B3C4D5E6F700000000061 /* Project object */;
+            proxyType = 1;
+            remoteGlobalIDString = 1A2B3C4D5E6F700000000041;
+            remoteInfo = CommenterIOS;
+        };
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
         1A2B3C4D5E6F700000000011 /* CommenterIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/CommenterIOSApp/CommenterIOSApp.swift; sourceTree = "<group>"; };
         1A2B3C4D5E6F700000000012 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Sources/CommenterIOSApp/Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
         1A2B3C4D5E6F700000000014 /* CommenterIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CommenterIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        2B3C4D5E6F70000000000011 /* CommenterIOSScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITests/CommenterIOSScreenshotTests/CommenterIOSScreenshotTests.swift; sourceTree = "<group>"; };
+        2B3C4D5E6F70000000000014 /* CommenterIOSScreenshotTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CommenterIOSScreenshotTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -27,6 +40,13 @@
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
+        2B3C4D5E6F70000000000021 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -35,6 +55,7 @@
             children = (
                 1A2B3C4D5E6F700000000011 /* CommenterIOSApp.swift */,
                 1A2B3C4D5E6F700000000012 /* PrivacyInfo.xcprivacy */,
+                2B3C4D5E6F70000000000031 /* UITests */,
                 1A2B3C4D5E6F700000000032 /* Products */,
             );
             sourceTree = "<group>";
@@ -43,8 +64,17 @@
             isa = PBXGroup;
             children = (
                 1A2B3C4D5E6F700000000014 /* CommenterIOS.app */,
+                2B3C4D5E6F70000000000014 /* CommenterIOSScreenshotTests.xctest */,
             );
             name = Products;
+            sourceTree = "<group>";
+        };
+        2B3C4D5E6F70000000000031 /* UITests */ = {
+            isa = PBXGroup;
+            children = (
+                2B3C4D5E6F70000000000011 /* CommenterIOSScreenshotTests.swift */,
+            );
+            name = UITests;
             sourceTree = "<group>";
         };
 /* End PBXGroup section */
@@ -70,6 +100,26 @@
             productReference = 1A2B3C4D5E6F700000000014 /* CommenterIOS.app */;
             productType = "com.apple.product-type.application";
         };
+        2B3C4D5E6F70000000000041 /* CommenterIOSScreenshotTests */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 2B3C4D5E6F70000000000051 /* Build configuration list for PBXNativeTarget "CommenterIOSScreenshotTests" */;
+            buildPhases = (
+                2B3C4D5E6F70000000000022 /* Sources */,
+                2B3C4D5E6F70000000000021 /* Frameworks */,
+                2B3C4D5E6F70000000000023 /* Resources */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+                2B3C4D5E6F70000000000062 /* PBXTargetDependency */,
+            );
+            name = CommenterIOSScreenshotTests;
+            packageProductDependencies = (
+            );
+            productName = CommenterIOSScreenshotTests;
+            productReference = 2B3C4D5E6F70000000000014 /* CommenterIOSScreenshotTests.xctest */;
+            productType = "com.apple.product-type.bundle.ui-testing";
+        };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -81,6 +131,9 @@
                 LastUpgradeCheck = 1540;
                 TargetAttributes = {
                     1A2B3C4D5E6F700000000041 = {
+                        CreatedOnToolsVersion = 15.4;
+                    };
+                    2B3C4D5E6F70000000000041 = {
                         CreatedOnToolsVersion = 15.4;
                     };
                 };
@@ -102,6 +155,7 @@
             projectRoot = "";
             targets = (
                 1A2B3C4D5E6F700000000041 /* CommenterIOS */,
+                2B3C4D5E6F70000000000041 /* CommenterIOSScreenshotTests */,
             );
         };
 /* End PBXProject section */
@@ -112,6 +166,13 @@
             buildActionMask = 2147483647;
             files = (
                 1A2B3C4D5E6F700000000002 /* PrivacyInfo.xcprivacy in Resources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        2B3C4D5E6F70000000000023 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -126,7 +187,23 @@
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
+        2B3C4D5E6F70000000000022 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                2B3C4D5E6F70000000000001 /* CommenterIOSScreenshotTests.swift in Sources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+        2B3C4D5E6F70000000000062 /* PBXTargetDependency */ = {
+            isa = PBXTargetDependency;
+            target = 1A2B3C4D5E6F700000000041 /* CommenterIOS */;
+            targetProxy = 2B3C4D5E6F70000000000061 /* PBXContainerItemProxy */;
+        };
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
         1A2B3C4D5E6F700000000081 /* Debug */ = {
@@ -305,6 +382,54 @@
             };
             name = Release;
         };
+        2B3C4D5E6F70000000000083 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_TEAM = "";
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/Frameworks",
+                    "@loader_path/Frameworks",
+                );
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.commenterios.app.screenshottests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = NO;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = 1;
+                TEST_TARGET_NAME = CommenterIOS;
+            };
+            name = Debug;
+        };
+        2B3C4D5E6F70000000000084 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                DEVELOPMENT_TEAM = "";
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+                LD_RUNPATH_SEARCH_PATHS = (
+                    "$(inherited)",
+                    "@executable_path/Frameworks",
+                    "@loader_path/Frameworks",
+                );
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.commenterios.app.screenshottests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_EMIT_LOC_STRINGS = NO;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = 1;
+                TEST_TARGET_NAME = CommenterIOS;
+            };
+            name = Release;
+        };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -322,6 +447,15 @@
             buildConfigurations = (
                 1A2B3C4D5E6F700000000081 /* Debug */,
                 1A2B3C4D5E6F700000000082 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        2B3C4D5E6F70000000000051 /* Build configuration list for PBXNativeTarget "CommenterIOSScreenshotTests" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                2B3C4D5E6F70000000000083 /* Debug */,
+                2B3C4D5E6F70000000000084 /* Release */,
             );
             defaultConfigurationIsVisible = 0;
             defaultConfigurationName = Release;

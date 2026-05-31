@@ -337,3 +337,15 @@ Append material work history here. Keep entries short, dated, and factual.
   compilation because TCA dependency macros were not enabled.
 - Updated the validation ledger's intended Xcode app-target command to match
   the CI workflow exactly.
+
+## 2026-05-31 - Simulator screenshot workflow
+
+- Added a separate GitHub Actions workflow that resolves packages, selects and
+  erases an available hosted iPhone simulator, runs a dedicated XCUITest
+  screenshot lane, verifies at least ten PNG screenshots were written, and
+  uploads both PNGs and the `.xcresult` bundle as artifacts.
+- Added a `CommenterIOSScreenshotTests` UI test target to the Xcode project and
+  shared scheme so the workflow captures the real SwiftUI app through the
+  simulator instead of a mock preview.
+- Added stable accessibility identifiers to the three root tab pages for
+  screenshot/test targeting without changing user-visible product behavior.

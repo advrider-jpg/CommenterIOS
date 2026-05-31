@@ -112,6 +112,7 @@ struct WorklistRootView: View {
                 }
             }
             .navigationTitle(project?.metadata.name ?? "Worklist")
+            .accessibilityIdentifier("worklist-page")
         }
     }
 
