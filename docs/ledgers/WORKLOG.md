@@ -318,3 +318,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Tightened CSV fallback use so a primary parse that loses malformed data is cross-checked before reporting missing rows, and changed the CSV writer test to verify round-tripped multiline content rather than a single newline spelling.
 - Made CSV fallback error selection explicit for missing-row decoder results and scoped the writer test to formula guarding plus multiline content emission after CI showed generated CSV is not a parser fixture.
 - Added a no-quotes CSV width preflight so malformed unquoted rows are rejected before the primary decoder can collapse them into a misleading missing-data result.
+- Switched legacy XLS import to try the app's verified simple compound-file workbook extractor before OLEKit, avoiding the CI crash path while preserving OLEKit as the fallback for files the local extractor cannot read.

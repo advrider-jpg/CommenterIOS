@@ -97,19 +97,19 @@ public enum SpreadsheetImportFile {
 
     public static func parseXLS(_ url: URL, label: String) throws -> CSVParseResult {
         let stream: Data
-        do {
-            let ole = try OLEFile(url.path)
-            guard let workbook = findOLEEntry(named: "Workbook", in: ole.root) ?? findOLEEntry(named: "Book", in: ole.root) else {
-                throw LegacyXLSWorkbookError.missingWorkbookStream
-            }
-            stream = try ole.stream(workbook).readDataToEnd()
-        } catch {
-            guard let data = try? Data(contentsOf: url),
-                  let fallbackStream = try? workbookStreamFromCompoundFile(data)
-            else {
+        if let data = try? Data(contentsOf: url),
+           let fallbackStream = try? workbookStreamFromCompoundFile(data) {
+            stream = fallbackStream
+        } else {
+            do {
+                let ole = try OLEFile(url.path)
+                guard let workbook = findOLEEntry(named: "Workbook", in: ole.root) ?? findOLEEntry(named: "Book", in: ole.root) else {
+                    throw LegacyXLSWorkbookError.missingWorkbookStream
+                }
+                stream = try ole.stream(workbook).readDataToEnd()
+            } catch {
                 throw SpreadsheetImportFileError.unreadableWorkbook(label)
             }
-            stream = fallbackStream
         }
 
         let rows: [[String]]
