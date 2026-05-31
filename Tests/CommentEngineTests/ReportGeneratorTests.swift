@@ -37,8 +37,8 @@ final class ReportGeneratorTests: XCTestCase {
         var generator = try ReportGenerator(data: data, projectMetadata: metadata())
         let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
 
-        XCTAssertEqual(report.text, "Ava writes clearly in English. Ava uses evidence. Ava should revise punctuation.")
-        XCTAssertEqual(report.variantIds, ["ASSEMBLED_fd91849e"])
+        XCTAssertEqual(report.text, "Ava explains ideas in English. Ava uses evidence. Ava should revise punctuation.")
+        XCTAssertEqual(report.variantIds, ["ASSEMBLED_2d1440b2"])
     }
 
     func testAggregateSubjectRequiresConcreteFocus() throws {

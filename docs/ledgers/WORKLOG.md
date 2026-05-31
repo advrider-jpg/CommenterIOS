@@ -323,3 +323,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Removed OLEKit from the package manifest and import path after repeated CI signal-5 exits, recorded the fail-closed legacy XLS exception, and updated dependency policy/audit docs to reflect fixture-limited local OLE/BIFF support until a mature iOS parser is proven.
 - Fixed legacy XLS compound-file directory parsing to reset sliced `Data` indices before walking 128-byte directory entries, avoiding Swift `Data.SubSequence` out-of-bounds traps in import and writer validation.
 - Restored OLEKit after the signal-5 failure persisted without it, superseded the temporary removal decision, and kept the zero-based `Data` slice fix as the actual XLS crash repair.
+- Updated the project import XLSX fixture to use shared strings and aligned the component-assembly report test with the deterministic text/hash emitted by the current generator.

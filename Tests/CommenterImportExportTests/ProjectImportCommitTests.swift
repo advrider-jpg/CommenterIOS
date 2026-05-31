@@ -228,14 +228,29 @@ final class ProjectImportCommitTests: XCTestCase {
     }
 
     private func workbookData(rows: [[String]]) throws -> Data {
+        var sharedStrings: [String] = []
+        var sharedStringIndex: [String: Int] = [:]
         let sheetRows = rows.enumerated().map { rowIndex, values in
             let rowNumber = rowIndex + 1
             let cells = values.enumerated().map { columnIndex, value in
                 let reference = "\(columnName(columnIndex + 1))\(rowNumber)"
-                return #"<c r="\#(reference)" t="inlineStr"><is><t xml:space="preserve">\#(xmlEscape(value))</t></is></c>"#
+                let index = sharedStringIndex[value] ?? {
+                    sharedStrings.append(value)
+                    let newIndex = sharedStrings.count - 1
+                    sharedStringIndex[value] = newIndex
+                    return newIndex
+                }()
+                return #"<c r="\#(reference)" t="s"><v>\#(index)</v></c>"#
             }.joined()
             return #"<row r="\#(rowNumber)">\#(cells)</row>"#
         }.joined()
+        let sharedItems = sharedStrings
+            .map { #"<si><t xml:space="preserve">\#(xmlEscape($0))</t></si>"# }
+            .joined()
+        let sharedStringsXML = """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="\(sharedStrings.count)" uniqueCount="\(sharedStrings.count)">\(sharedItems)</sst>
+        """
         let sheetXML = """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>\(sheetRows)</sheetData></worksheet>
@@ -243,7 +258,7 @@ final class ProjectImportCommitTests: XCTestCase {
         return try OOXMLZipWriter.archive(entries: [
             OOXMLZipEntry(path: "[Content_Types].xml", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>
+            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>
             """.utf8)),
             OOXMLZipEntry(path: "_rels/.rels", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -257,7 +272,8 @@ final class ProjectImportCommitTests: XCTestCase {
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>
             """.utf8)),
-            OOXMLZipEntry(path: "xl/worksheets/sheet1.xml", data: Data(sheetXML.utf8))
+            OOXMLZipEntry(path: "xl/worksheets/sheet1.xml", data: Data(sheetXML.utf8)),
+            OOXMLZipEntry(path: "xl/sharedStrings.xml", data: Data(sharedStringsXML.utf8))
         ])
     }
 
