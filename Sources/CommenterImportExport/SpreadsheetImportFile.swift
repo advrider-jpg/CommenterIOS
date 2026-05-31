@@ -97,9 +97,13 @@ public enum SpreadsheetImportFile {
 
     public static func parseXLS(_ url: URL, label: String) throws -> CSVParseResult {
         let stream: Data
-        if let data = try? Data(contentsOf: url),
-           let fallbackStream = try? workbookStreamFromCompoundFile(data) {
-            stream = fallbackStream
+        let data = try Data(contentsOf: url)
+        if data.hasOLECompoundFileSignature {
+            do {
+                stream = try workbookStreamFromCompoundFile(data)
+            } catch {
+                throw SpreadsheetImportFileError.unreadableWorkbook(label)
+            }
         } else {
             do {
                 let ole = try OLEFile(url.path)
@@ -376,6 +380,10 @@ private func numberString(_ value: Double) -> String {
 private extension Data {
     var stringValue: String? {
         String(data: self, encoding: .utf8) ?? String(data: self, encoding: .utf16)
+    }
+
+    var hasOLECompoundFileSignature: Bool {
+        count >= 8 && prefix(8) == Data([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
     }
 
     func uint16LE(at offset: Int) -> UInt16 {
