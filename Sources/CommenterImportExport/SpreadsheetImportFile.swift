@@ -67,10 +67,15 @@ public enum SpreadsheetImportFile {
         do {
             file = try XLSXFile(data: data)
         } catch {
-            if let fallback = try? parseOOXMLWorksheetRows(data, label: label) {
-                return fallback
+            do {
+                return try parseOOXMLWorksheetRows(data, label: label)
+            } catch let error as CSVParserError {
+                throw error
+            } catch let error as SpreadsheetImportFileError {
+                throw error
+            } catch {
+                throw SpreadsheetImportFileError.unreadableWorkbook(label)
             }
-            throw SpreadsheetImportFileError.unreadableWorkbook(label)
         }
 
         do {
