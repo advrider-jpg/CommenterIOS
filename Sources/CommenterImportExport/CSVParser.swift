@@ -66,6 +66,10 @@ public enum CSVParser {
     }
 
     public static func parseCSV(_ text: String) throws -> CSVParseResult {
+        if let error = unquotedRowWidthMismatch(in: text) {
+            throw error
+        }
+
         let normalizedText = normalizeUnquotedRowBreaks(text)
         do {
             let parsed = try CSVReader.decode(input: normalizedText, configuration: csvReaderConfiguration())
@@ -207,6 +211,28 @@ public enum CSVParser {
         }
 
         return insideQuotedField
+    }
+
+    private static func unquotedRowWidthMismatch(in text: String) -> CSVParserError? {
+        guard !text.contains("\"") else { return nil }
+
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let rows = normalized.split(separator: "\n", omittingEmptySubsequences: false)
+        let parsedRows = rows.enumerated().compactMap { index, row -> (number: Int, cells: [String])? in
+            let cells = row.split(separator: ",", omittingEmptySubsequences: false)
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            guard cells.contains(where: { !$0.isEmpty }) else { return nil }
+            return (index + 1, cells)
+        }
+
+        guard let header = parsedRows.first, parsedRows.count > 1 else { return nil }
+        for row in parsedRows.dropFirst() where row.cells.count != header.cells.count {
+            return .rowWidthMismatch(sourceLabel: "CSV file", row: row.number, expectedColumns: header.cells.count)
+        }
+
+        return nil
     }
 
     private static func parseFallbackRowsOrThrow(_ text: String, defaultError: CSVParserError) throws -> CSVParseResult {
