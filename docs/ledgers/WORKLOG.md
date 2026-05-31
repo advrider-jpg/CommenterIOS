@@ -306,3 +306,4 @@ Append material work history here. Keep entries short, dated, and factual.
 
 - Fixed Swift CI compile errors by updating the `resolveSubjectForGeneration` call site to the current `uiSubject:` argument label and restoring the explicit return from `splitUnits`.
 - Fixed report-generator test compile assertions to unwrap optional trace text explicitly before checking diagnostic substrings.
+- Split the legacy XLS little-endian double conversion into explicit byte terms after CI showed the combined bit expression exceeded Swift's type-check budget.
