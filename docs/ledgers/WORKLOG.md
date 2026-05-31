@@ -352,3 +352,7 @@ Append material work history here. Keep entries short, dated, and factual.
 - After the first hosted screenshot run reached the simulator, adjusted the UI
   test to locate real controls inside each core worklist area instead of
   SwiftUI section headers that were not exposed as static text in XCUITest.
+- After hosted screenshot runs proved the UI test now captures all ten
+  screenshots but the raw output directory stays empty in CI, added an
+  `xcresulttool export attachments` workflow step that extracts the kept
+  XCTest screenshot attachments into stable PNG files before artifact upload.

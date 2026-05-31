@@ -401,6 +401,12 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   the `Roster` SwiftUI section header as a `StaticText`. The screenshot test now
   anchors worklist captures on real visible controls inside each area instead
   of section headers.
+- Manual workflow runs `26725702774` and `26725932729` proved the hosted
+  screenshot UI test passes through all ten core captures and uploads the
+  `.xcresult`, but both failed the PNG verification step because the raw
+  `build/screenshots` directory was empty. The screenshot workflow now exports
+  kept XCTest attachments from `build/CommenterIOSScreenshots.xcresult` into
+  stable PNG files before running the existing count check and artifact upload.
 
 ## Future Required Gates
 
