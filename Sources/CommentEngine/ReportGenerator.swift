@@ -86,7 +86,7 @@ public struct ReportGenerator {
 
         let mappedBand = bandMapping[achievementLevel.rawValue] ?? achievementLevel.rawValue
         let normalizedLevel = Self.normalizeLevel(student.yearLevel.rawValue)
-        let subjectResolution = resolveSubjectForGeneration(subject, data: data, focusStrand: result.focusStrand)
+        let subjectResolution = resolveSubjectForGeneration(uiSubject: subject, data: data, focusStrand: result.focusStrand)
         guard subjectResolution.eligible, !subjectResolution.candidates.isEmpty else {
             throw ReportGenerationError.unavailableSubject(subjectResolution.reason ?? "Draft comments are not available for \(subject) yet.")
         }
@@ -443,11 +443,15 @@ public struct ReportGenerator {
         ].filter { !$0.isEmpty }
         guard !notes.isEmpty else { return "" }
 
-        let repaired = repairReportNoteText(notes.joined(separator: " "), context: repairContext)
-        if hasBlockingRepairIssue(repaired.issues) {
-            throw ReportGenerationError.unsafeTeacherText(label: "Report note", message: blockingRepairMessage(label: "Report note", issues: repaired.issues))
+        var repairedSentences: [String] = []
+        for note in notes {
+            let repaired = repairReportNoteText(note, context: repairContext)
+            if hasBlockingRepairIssue(repaired.issues) {
+                throw ReportGenerationError.unsafeTeacherText(label: "Report note", message: blockingRepairMessage(label: "Report note", issues: repaired.issues))
+            }
+            repairedSentences.append(repaired.text)
         }
-        return repaired.text
+        return repairedSentences.filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     private func appendFlagSentences(_ text: String, flags: [String: Bool]?, student: Student, subject: String, displayName: String) -> String {

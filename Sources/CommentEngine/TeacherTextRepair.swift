@@ -300,7 +300,7 @@ private func removeRepeatedName(_ text: String, context: TeacherTextRepairContex
 
 private func splitUnits(_ text: String) -> [String] {
     let normalized = cleanLineEndings(text)
-    unitSeparatorRegex
+    return unitSeparatorRegex
         .stringByReplacingMatches(in: normalized, range: NSRange(normalized.startIndex..<normalized.endIndex, in: normalized), withTemplate: "\u{1f}")
         .components(separatedBy: "\u{1f}")
         .map(cleanText)

@@ -110,6 +110,21 @@ final class FileProjectStoreTests: XCTestCase {
         }
     }
 
+    func testDeleteMissingProjectFailsInsteadOfReportingSnapshotSuccess() throws {
+        let root = temporaryRoot()
+        let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })
+        _ = try store.saveProject(fixtureProject())
+        try FileManager.default.removeItem(at: projectFileURL(root: root, projectId: "p1"))
+
+        do {
+            try store.deleteProject(id: "p1")
+            XCTFail("Expected missing project delete to fail before reporting recovery snapshot success")
+        } catch ProjectStoreError.projectNotFound(let id) {
+            XCTAssertEqual(id, "p1")
+            XCTAssertTrue(try store.listRecoverySnapshots(projectId: "p1").isEmpty)
+        }
+    }
+
     func testTamperedProjectFailsReadVerification() throws {
         let root = temporaryRoot()
         let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })

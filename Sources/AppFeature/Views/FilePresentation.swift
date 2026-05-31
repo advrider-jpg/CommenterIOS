@@ -60,7 +60,7 @@ struct PreparedExportDocument: FileDocument {
         guard !data.isEmpty else {
             throw Error.missingPreparedFile(defaultFilename)
         }
-        FileWrapper(regularFileWithContents: data)
+        return FileWrapper(regularFileWithContents: data)
     }
 }
 
@@ -68,6 +68,12 @@ extension UTType {
     static let xlsxWorkbook = UTType(filenameExtension: "xlsx") ?? .data
     static let xlsWorkbook = UTType(filenameExtension: "xls") ?? .data
     static let commenterBackup = UTType(filenameExtension: "commenter-backup.json") ?? .json
+}
+
+
+struct SharePresentation: Identifiable, Equatable {
+    let id = UUID()
+    let url: URL
 }
 
 func isCancellation(_ error: Error) -> Bool {

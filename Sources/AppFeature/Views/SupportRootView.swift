@@ -54,6 +54,25 @@ struct SupportRootView: View {
                     }
                 }
 
+                Section("Backup and Recovery") {
+                    Text("Use Prepare Backup JSON for a user-owned export copy. Project saves, backup imports, and project deletion create local recovery snapshots before replacing or removing verified project storage.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Recovery snapshots remain local in the app support folder; the MVP does not upload or synchronize them.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Section("Release Diagnostics") {
+                    LabeledContent("Network services", value: "Not configured")
+                    LabeledContent("Analytics and telemetry", value: "Not configured")
+                    LabeledContent("Native document workflows", value: "Import, export, and share")
+                    Text("File success is only recorded after native completion callbacks report a saved export or completed share.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 Section("Privacy") {
                     Text("CommenterIOS is local-only. Accounts, cloud sync, analytics, telemetry, remote AI, and backend project persistence are outside the MVP product shape.")
                         .fixedSize(horizontal: false, vertical: true)
@@ -111,6 +130,8 @@ struct SupportRootView: View {
             "Loading project"
         case .saving:
             "Saving"
+        case .deleting:
+            "Deleting project"
         case .preparingFile:
             "Preparing file"
         case .importing:

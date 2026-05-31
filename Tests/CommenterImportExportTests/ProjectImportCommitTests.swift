@@ -88,10 +88,7 @@ final class ProjectImportCommitTests: XCTestCase {
         let original = fixtureProject()
         let url = try writeTemporaryFile(
             name: "roster.xlsx",
-            data: try workbookData(rows: [
-                ["First Name", "Last Name", "Year Level"],
-                ["Ben", "Stone", "Year 6"]
-            ])
+            data: try rosterWorkbookData()
         )
 
         let preview = try prepareRosterImportPreview(
@@ -227,58 +224,55 @@ final class ProjectImportCommitTests: XCTestCase {
         return url
     }
 
-    private func workbookData(rows: [[String]]) throws -> Data {
-        let sheetRows = rows.enumerated().map { rowIndex, values in
-            let rowNumber = rowIndex + 1
-            let cells = values.enumerated().map { columnIndex, value in
-                let reference = "\(columnName(columnIndex + 1))\(rowNumber)"
-                return #"<c r="\#(reference)" t="inlineStr"><is><t xml:space="preserve">\#(xmlEscape(value))</t></is></c>"#
-            }.joined()
-            return #"<row r="\#(rowNumber)">\#(cells)</row>"#
-        }.joined()
-        let sheetXML = """
-        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>\(sheetRows)</sheetData></worksheet>
-        """
+    private func rosterWorkbookData() throws -> Data {
         return try OOXMLZipWriter.archive(entries: [
             OOXMLZipEntry(path: "[Content_Types].xml", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>
+            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+              <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+              <Default Extension="xml" ContentType="application/xml"/>
+              <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+              <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+            </Types>
             """.utf8)),
             OOXMLZipEntry(path: "_rels/.rels", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+            </Relationships>
             """.utf8)),
             OOXMLZipEntry(path: "xl/workbook.xml", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>
+            <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <sheets>
+                <sheet name="Sheet1" sheetId="1" r:id="rId1"/>
+              </sheets>
+            </workbook>
             """.utf8)),
             OOXMLZipEntry(path: "xl/_rels/workbook.xml.rels", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+            </Relationships>
             """.utf8)),
-            OOXMLZipEntry(path: "xl/worksheets/sheet1.xml", data: Data(sheetXML.utf8))
+            OOXMLZipEntry(path: "xl/worksheets/sheet1.xml", data: Data("""
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <sheetData>
+                <row r="1">
+                  <c r="A1" t="inlineStr"><is><t>First Name</t></is></c>
+                  <c r="B1" t="inlineStr"><is><t>Last Name</t></is></c>
+                  <c r="C1" t="inlineStr"><is><t>Year Level</t></is></c>
+                </row>
+                <row r="2">
+                  <c r="A2" t="inlineStr"><is><t>Ben</t></is></c>
+                  <c r="B2" t="inlineStr"><is><t>Stone</t></is></c>
+                  <c r="C2" t="inlineStr"><is><t>Year 6</t></is></c>
+                </row>
+              </sheetData>
+            </worksheet>
+            """.utf8))
         ])
     }
 
-    private func columnName(_ oneBasedIndex: Int) -> String {
-        var index = oneBasedIndex
-        var name = ""
-        while index > 0 {
-            index -= 1
-            let scalar = UnicodeScalar(65 + (index % 26))!
-            name.insert(Character(scalar), at: name.startIndex)
-            index /= 26
-        }
-        return name
-    }
-
-    private func xmlEscape(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-            .replacingOccurrences(of: "'", with: "&apos;")
-    }
 }

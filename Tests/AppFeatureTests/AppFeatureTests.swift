@@ -150,7 +150,120 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.createProjectTapped) {
             $0.operationStatus = .failed("Project storage is not available yet. Wait for local storage to load, or resolve the storage error shown on this screen.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
+    }
+
+
+    func testDeleteProjectCreatesRecoverySnapshotThenClearsOpenProject() async {
+        let original = project(id: "p1", name: "Room 5", revision: 3)
+        let other = ProjectSummary(
+            id: "p2",
+            name: "Room 6",
+            term: "Term 2",
+            updatedAt: 20,
+            revision: 2
+        )
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.projects = [projectSummary(original), other]
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        initial.workflowMessage = "Room 5 is open."
+        initial.operationStatus = .saved("Project opened from verified local storage.")
+        initial.selectedTab = .worklist
+        initial.preparedFile = AppFeature.PreparedFile(url: URL(fileURLWithPath: "/tmp/old.docx"), label: "Old file")
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                deleteProject: { id in
+                    XCTAssertEqual(id, "p1")
+                    await probe.record("delete-p1")
+                    return [other]
+                }
+            )
+        }
+
+        await store.send(.deleteProjectConfirmed("p1")) {
+            $0.projectStorageStatus = .deleting
+            $0.preparedFile = nil
+            $0.pendingImport = nil
+            $0.operationStatus = .busy("Creating a recovery snapshot and deleting the local project.")
+            $0.projectStorageMessage = "Creating a recovery snapshot and deleting the local project."
+        }
+        await store.receive(.projectDeleted("p1", [other], "Room 5 was deleted after a verified recovery snapshot was created.")) {
+            $0.projectStorageStatus = .loaded
+            $0.projects = [other]
+            $0.projectStorageMessage = "1 saved project loaded from local storage."
+            $0.selectedProject = nil
+            $0.selectedProjectReadiness = nil
+            $0.workflowMessage = "Open or create a project to manage roster, subjects, results, drafts, backups, and exports."
+            $0.selectedTab = .projects
+            $0.operationStatus = .saved("Room 5 was deleted after a verified recovery snapshot was created.")
+        }
+        await XCTAssertProbeValues(probe, ["delete-p1"])
+    }
+
+    func testDirtyProjectCannotBeDeletedUntilVerifiedStorageReflectsCurrentState() async {
+        let original = project(id: "p1", name: "Room 5", revision: 3)
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                deleteProject: { _ in
+                    await probe.record("unexpected-delete")
+                    return []
+                }
+            )
+        }
+
+        await store.send(.deleteProjectConfirmed("p1")) {
+            $0.operationStatus = .failed("Save or reopen the project before deleting it so the recovery snapshot reflects verified local storage.")
+        }
+        await XCTAssertProbeValues(probe, [])
+    }
+
+    func testPendingImportBlocksProjectDeletion() async {
+        let original = project(id: "p1", name: "Room 5", revision: 3)
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        initial.operationStatus = .saved("Project opened from verified local storage.")
+        initial.pendingImport = AppFeature.PendingImport(
+            project: original,
+            title: "Roster import preview",
+            detail: "1 row accepted.",
+            successMessage: "Roster import saved.",
+            expectedRevision: 3,
+            recoveryReason: .beforeImportReplace
+        )
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                deleteProject: { _ in
+                    await probe.record("unexpected-delete")
+                    return []
+                }
+            )
+        }
+
+        await store.send(.deleteProjectConfirmed("p1")) {
+            $0.operationStatus = .failed("Roster import preview is waiting. Confirm or cancel the import before deleting this project.")
+        }
+        await XCTAssertProbeValues(probe, [])
     }
 
     func testProjectYearLevelEditMarksProjectDirtyAndSaveUsesVerifiedStorePath() async {
@@ -243,7 +356,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
 
         await store.send(.saveProjectTapped) {
             $0.projectStorageStatus = .saving
@@ -259,7 +372,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["verified-save"])
+        await XCTAssertProbeValues(probe, ["verified-save"])
     }
 
     func testManualRosterSubjectResultAndReportEditsAreSavedOnlyThroughStoreResponse() async {
@@ -364,7 +477,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness(edited)
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
 
         await store.send(.saveProjectTapped) {
             $0.projectStorageStatus = .saving
@@ -382,7 +495,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["verified-save"])
+        await XCTAssertProbeValues(probe, ["verified-save"])
     }
 
     func testManualEditSaveFailureDoesNotReportSuccessOrReplaceDirtyProject() async {
@@ -468,11 +581,12 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 student validated from XLSX. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from XLSX. Confirm to save this roster import locally."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster"])
+        await XCTAssertProbeValues(probe, ["parsed-roster"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -487,7 +601,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Roster imported, saved, and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster", "verified-save"])
+        await XCTAssertProbeValues(probe, ["parsed-roster", "verified-save"])
     }
 
     func testRosterImportFailureLeavesSelectedProjectUnchanged() async {
@@ -664,11 +778,6 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.projectStoreClient = testProjectStoreClient(
-                importBackup: { pickedURL in
-                    XCTAssertEqual(pickedURL, url)
-                    await probe.record("parsed-backup")
-                    return imported
-                },
                 saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
                     XCTAssertEqual(project, imported)
                     XCTAssertNil(expectedRevision)
@@ -676,6 +785,11 @@ final class AppFeatureTests: XCTestCase {
                     XCTAssertEqual(recoveryReason, .beforeImportReplace)
                     await probe.record("verified-save")
                     return saved
+                },
+                importBackup: { pickedURL in
+                    XCTAssertEqual(pickedURL, url)
+                    await probe.record("parsed-backup")
+                    return imported
                 }
             )
         }
@@ -686,11 +800,12 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.")
             $0.workflowMessage = "Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup"])
+        await XCTAssertProbeValues(probe, ["parsed-backup"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -705,7 +820,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = message
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup", "verified-save"])
+        await XCTAssertProbeValues(probe, ["parsed-backup", "verified-save"])
     }
 
     func testBackupImportSaveFailureAfterConfirmClearsPreviewAndDoesNotReportSuccess() async {
@@ -730,11 +845,6 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.projectStoreClient = testProjectStoreClient(
-                importBackup: { pickedURL in
-                    XCTAssertEqual(pickedURL, url)
-                    await probe.record("parsed-backup")
-                    return imported
-                },
                 saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
                     XCTAssertEqual(project, imported)
                     XCTAssertNil(expectedRevision)
@@ -742,6 +852,11 @@ final class AppFeatureTests: XCTestCase {
                     XCTAssertEqual(recoveryReason, .beforeImportReplace)
                     await probe.record("failed-save")
                     throw TestSaveFailure()
+                },
+                importBackup: { pickedURL in
+                    XCTAssertEqual(pickedURL, url)
+                    await probe.record("parsed-backup")
+                    return imported
                 }
             )
         }
@@ -752,11 +867,12 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.")
             $0.workflowMessage = "Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup"])
+        await XCTAssertProbeValues(probe, ["parsed-backup"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -767,7 +883,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.operationStatus = .failed("Import failed. Project data was left unchanged: Save failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup", "failed-save"])
+        await XCTAssertProbeValues(probe, ["parsed-backup", "failed-save"])
     }
 
     func testRosterImportSaveFailureAfterConfirmClearsPreviewAndLeavesProjectUnchanged() async {
@@ -814,11 +930,12 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 student validated from CSV. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from CSV. Confirm to save this roster import locally."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster"])
+        await XCTAssertProbeValues(probe, ["parsed-roster"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -829,7 +946,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.operationStatus = .failed("Import failed. Project data was left unchanged: Save failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster", "failed-save"])
+        await XCTAssertProbeValues(probe, ["parsed-roster", "failed-save"])
     }
 
     func testResultsImportPickPreparesPreviewWithoutSavingThenConfirmCommits() async {
@@ -879,11 +996,12 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 result row validated from XLSX. Confirm to save these results locally.")
             $0.workflowMessage = "1 result row validated from XLSX. Confirm to save these results locally."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-results"])
+        await XCTAssertProbeValues(probe, ["parsed-results"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -898,7 +1016,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Results imported, saved, and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["parsed-results", "verified-save"])
+        await XCTAssertProbeValues(probe, ["parsed-results", "verified-save"])
     }
 
     func testImportPreviewCancelLeavesSelectedProjectUnchangedAndDoesNotSave() async {
@@ -940,6 +1058,7 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 student validated from CSV. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from CSV. Confirm to save this roster import locally."
@@ -948,7 +1067,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.operationStatus = .cancelled("Import preview cancelled. No project data changed.")
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster"])
+        await XCTAssertProbeValues(probe, ["parsed-roster"])
     }
 
     func testResultsImportParseFailureDoesNotSaveOrReportSuccess() async {
@@ -982,7 +1101,7 @@ final class AppFeatureTests: XCTestCase {
             $0.projectStorageStatus = .loaded
             $0.operationStatus = .failed("Import failed. Project data was left unchanged: Import parse failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["failed-results-parse"])
+        await XCTAssertProbeValues(probe, ["failed-results-parse"])
     }
 
     func testReportExportPreparationFailureClearsExistingPreparedFile() async {
@@ -1016,7 +1135,7 @@ final class AppFeatureTests: XCTestCase {
         }
     }
 
-    func testFileExporterCompletionStatusesDistinguishSavedCancelledAndFailed() async {
+    func testFileExporterAndShareCompletionStatusesDistinguishCompletedCancelledAndFailed() async {
         let preparedURL = URL(fileURLWithPath: "/tmp/reports.docx")
         var initial = AppFeature.State()
         initial.projectStorageStatus = .loaded
@@ -1034,6 +1153,18 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.send(.fileExportFailed("Disk is full.")) {
             $0.operationStatus = .failed("File export failed: Disk is full.")
+        }
+        await store.send(.fileShareStarted(preparedURL)) {
+            $0.operationStatus = .busy("Opening native share sheet for reports.docx.")
+        }
+        await store.send(.fileShareCompleted(preparedURL)) {
+            $0.operationStatus = .shared("Share completed for reports.docx.")
+        }
+        await store.send(.fileShareCancelled) {
+            $0.operationStatus = .cancelled("Share cancelled. No share success was recorded.")
+        }
+        await store.send(.fileShareFailed("No destination accepted the file.")) {
+            $0.operationStatus = .failed("Share failed: No destination accepted the file.")
         }
     }
 
@@ -1069,7 +1200,7 @@ final class AppFeatureTests: XCTestCase {
             $0.projectStorageStatus = .loaded
             $0.operationStatus = .failed("Reports were not generated: Generation failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["failed-generation"])
+        await XCTAssertProbeValues(probe, ["failed-generation"])
     }
 }
 
@@ -1103,6 +1234,16 @@ private struct TestUnexpectedSave: LocalizedError {
     }
 }
 
+private func XCTAssertProbeValues(
+    _ probe: WorkflowProbe,
+    _ expected: [String],
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    let values = await probe.values()
+    XCTAssertEqual(values, expected, file: file, line: line)
+}
+
 private actor WorkflowProbe {
     private var recordedValues: [String] = []
 
@@ -1126,6 +1267,7 @@ private func testProjectStoreClient(
     saveProject: @escaping @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project = { project, _, _, _ in
         project
     },
+    deleteProject: @escaping @Sendable (_ id: String) async throws -> [ProjectSummary] = { _ in [] },
     importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in
         importPreview(format: .csv, kind: .roster, count: 0, project: project)
     },
@@ -1143,6 +1285,7 @@ private func testProjectStoreClient(
         createProject: createProject,
         loadProject: loadProject,
         saveProject: saveProject,
+        deleteProject: deleteProject,
         importRosterFile: importRosterFile,
         importResultsFile: importResultsFile,
         importBackup: importBackup,

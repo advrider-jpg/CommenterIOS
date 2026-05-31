@@ -72,7 +72,7 @@ struct ProjectsRootView: View {
         switch status {
         case .notLoaded, .loading:
             return "Local project storage is still being checked."
-        case .creating, .loadingProject, .saving, .preparingFile, .importing, .generating:
+        case .creating, .loadingProject, .saving, .deleting, .preparingFile, .importing, .generating:
             return "Finish the current local operation before starting another project action."
         case .failed:
             return "Project actions are unavailable until local storage is available."
@@ -86,7 +86,7 @@ struct ProjectsRootView: View {
         switch status {
         case .notLoaded, .loading:
             ProgressView("Checking local project storage")
-        case .creating, .loadingProject, .saving, .preparingFile, .importing, .generating:
+        case .creating, .loadingProject, .saving, .deleting, .preparingFile, .importing, .generating:
             ProgressView(message)
         case .loaded:
             LabeledContent("Storage", value: message)

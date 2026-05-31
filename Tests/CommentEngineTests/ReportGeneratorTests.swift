@@ -32,13 +32,13 @@ final class ReportGeneratorTests: XCTestCase {
     func testAssemblesFromComponentsWhenVariantsCannotResolveContext() throws {
         var data = fixtureData()
         data.assembledVariants = [
-            AssembledVariant(variantID: "needs-context", keyID: "strength", text: "{StudentName} writes about [unit/topic].")
+            AssembledVariant(variantID: "needs-context", keyID: "strength", text: "{StudentName} writes about [missing context].")
         ]
         var generator = try ReportGenerator(data: data, projectMetadata: metadata())
         let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
 
-        XCTAssertEqual(report.text, "Ava writes clearly in English. Ava uses evidence. Ava should revise punctuation.")
-        XCTAssertEqual(report.variantIds, ["ASSEMBLED_fd91849e"])
+        XCTAssertEqual(report.text, "Ava explains ideas in English. Ava uses evidence. Ava should revise punctuation.")
+        XCTAssertEqual(report.variantIds, ["ASSEMBLED_2d1440b2"])
     }
 
     func testAggregateSubjectRequiresConcreteFocus() throws {
@@ -83,7 +83,7 @@ final class ReportGeneratorTests: XCTestCase {
         let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
 
         XCTAssertEqual(report.text, "Ava writes clearly in English. Ava used quotations.")
-        XCTAssertTrue(report.trace.contains("Rejected by placeholders/context"))
+        XCTAssertTrue((report.trace ?? "").contains("Rejected by placeholders/context"))
     }
 
     func testUsesSafeEvidencePhraseForSpecificTaskWithoutDuplicateAppend() throws {
@@ -100,7 +100,7 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(report.text, "Ava wrote a persuasive text for advertising campaign.")
         XCTAssertEqual(report.variantIds, ["specific"])
-        XCTAssertTrue(report.trace.contains("Teacher evidence was used through a safe specific task phrase."))
+        XCTAssertTrue((report.trace ?? "").contains("Teacher evidence was used through a safe specific task phrase."))
     }
 
     func testAppendsRepairedReportNotesAndBlocksUnsafeNotes() throws {
@@ -116,7 +116,7 @@ final class ReportGeneratorTests: XCTestCase {
         )
 
         XCTAssertEqual(report.text, "Ava writes clearly in English. Ava has shown using feedback. Ava would benefit from planning carefully.")
-        XCTAssertTrue(report.trace.contains("Teacher/student note emphasis included."))
+        XCTAssertTrue((report.trace ?? "").contains("Teacher/student note emphasis included."))
 
         sourceResult.reportEmphasisNote = "Keep [Student Name] placeholder."
         XCTAssertThrowsError(try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 2)) { error in
@@ -205,7 +205,7 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(
             report.text,
-            "A helpful next step for Ava is to use evidence from text.\n\nAva writes clearly in English."
+            "A helpful next step for Ava is to use evidence from text."
         )
     }
 

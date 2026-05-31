@@ -16,6 +16,8 @@ struct OperationStatusView: View {
             WorkflowStatusView(message, systemImage: "checkmark.circle", tone: .success)
         case let .prepared(message):
             WorkflowStatusView(message, systemImage: "doc.badge.gearshape", tone: .prepared)
+        case let .shared(message):
+            WorkflowStatusView(message, systemImage: "square.and.arrow.up", tone: .success)
         case let .cancelled(message):
             WorkflowStatusView(message, systemImage: "xmark.circle", tone: .neutral)
         case let .failed(message):

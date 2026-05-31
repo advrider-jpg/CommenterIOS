@@ -17,4 +17,4 @@ jobs:
       - name: Run Swift tests
         run: swift test
       - name: Build iOS app target
-        run: xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
+        run: xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation -skipMacroValidation build CODE_SIGNING_ALLOWED=NO

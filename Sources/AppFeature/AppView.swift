@@ -8,6 +8,8 @@ public struct AppView: View {
     @State private var importMode: ImportMode?
     @State private var exportDocument: PreparedExportDocument?
     @State private var isExportingFile = false
+    @State private var sharePresentation: SharePresentation?
+    @State private var projectDeletionCandidate: ProjectDeletionCandidate?
 
     public init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -40,6 +42,13 @@ public struct AppView: View {
                     onProjectYearLevelChanged: { viewStore.send(.projectYearLevelChanged($0)) },
                     onUseFirstNameOnlyChanged: { viewStore.send(.useFirstNameOnlyChanged($0)) },
                     onSave: { viewStore.send(.saveProjectTapped) },
+                    onDeleteProject: {
+                        guard let project = viewStore.selectedProject else { return }
+                        projectDeletionCandidate = ProjectDeletionCandidate(
+                            id: project.metadata.id,
+                            name: project.metadata.name
+                        )
+                    },
                     onAddStudent: { viewStore.send(.addStudentTapped) },
                     onDeleteStudent: { viewStore.send(.deleteStudentTapped($0)) },
                     onStudentFirstNameChanged: { viewStore.send(.studentFirstNameChanged($0, $1)) },
@@ -56,13 +65,24 @@ public struct AppView: View {
                     onPrepareBackup: { viewStore.send(.prepareBackupTapped) },
                     onPrepareExport: { viewStore.send(.prepareReportExportTapped($0)) },
                     onSavePreparedFile: {
-                        guard let preparedFile = viewStore.preparedFile else { return }
+                        guard let preparedFile = viewStore.preparedFile else {
+                            viewStore.send(.fileExportFailed("No verified prepared file is available."))
+                            return
+                        }
                         do {
                             exportDocument = try PreparedExportDocument(url: preparedFile.url)
                             isExportingFile = true
                         } catch {
                             viewStore.send(.fileExportFailed(error.localizedDescription))
                         }
+                    },
+                    onSharePreparedFile: {
+                        guard let preparedFile = viewStore.preparedFile else {
+                            viewStore.send(.fileShareFailed("No verified prepared file is available."))
+                            return
+                        }
+                        sharePresentation = SharePresentation(url: preparedFile.url)
+                        viewStore.send(.fileShareStarted(preparedFile.url))
                     },
                     onDismissPreparedFile: { viewStore.send(.preparedFileDismissed) },
                     onConfirmImport: { viewStore.send(.confirmImportTapped) },
@@ -98,6 +118,32 @@ public struct AppView: View {
                 defaultFilename: exportDocument?.defaultFilename ?? "CommenterExport"
             ) { result in
                 handleExportResult(result, viewStore: viewStore)
+            }
+            .sheet(item: $sharePresentation) { presentation in
+                ActivityShareSheet(url: presentation.url) { result in
+                    handleShareResult(result, url: presentation.url, viewStore: viewStore)
+                }
+            }
+            .confirmationDialog(
+                "Delete Project?",
+                isPresented: Binding(
+                    get: { projectDeletionCandidate != nil },
+                    set: { isPresented in
+                        if !isPresented { projectDeletionCandidate = nil }
+                    }
+                ),
+                titleVisibility: .visible,
+                presenting: projectDeletionCandidate
+            ) { candidate in
+                Button("Delete \(candidate.name)", role: .destructive) {
+                    projectDeletionCandidate = nil
+                    viewStore.send(.deleteProjectConfirmed(candidate.id))
+                }
+                Button("Cancel", role: .cancel) {
+                    projectDeletionCandidate = nil
+                }
+            } message: { _ in
+                Text("A recovery snapshot of the verified local project will be created before the project file is removed. Save or reopen first if there are unsaved edits.")
             }
         }
     }
@@ -156,4 +202,31 @@ public struct AppView: View {
             }
         }
     }
+
+    private func handleShareResult(
+        _ result: Result<Bool, Error>,
+        url: URL,
+        viewStore: ViewStore<AppFeature.State, AppFeature.Action>
+    ) {
+        sharePresentation = nil
+        switch result {
+        case let .success(completed):
+            if completed {
+                viewStore.send(.fileShareCompleted(url))
+            } else {
+                viewStore.send(.fileShareCancelled)
+            }
+        case let .failure(error):
+            if isCancellation(error) {
+                viewStore.send(.fileShareCancelled)
+            } else {
+                viewStore.send(.fileShareFailed(error.localizedDescription))
+            }
+        }
+    }
+}
+
+private struct ProjectDeletionCandidate: Identifiable, Equatable {
+    let id: String
+    let name: String
 }

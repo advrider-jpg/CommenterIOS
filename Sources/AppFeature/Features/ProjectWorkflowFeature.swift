@@ -1,3 +1,4 @@
+import CommentEngine
 import CommenterDomain
 import CommenterPersistence
 import ComposableArchitecture
@@ -117,6 +118,58 @@ extension AppFeature {
         case let .reportsGenerationFailed(message):
             state.projectStorageStatus = .loaded
             state.operationStatus = .failed("Reports were not generated: \(message)")
+            return .none
+
+        case let .deleteProjectConfirmed(id):
+            guard let project = state.selectedProject, project.metadata.id == id else {
+                state.operationStatus = .failed("Open the project before deleting it.")
+                return .none
+            }
+            guard case .loaded = state.projectStorageStatus else {
+                state.operationStatus = .failed("Wait for the current local operation to finish before deleting this project.")
+                return .none
+            }
+            if let pendingImport = state.pendingImport {
+                state.operationStatus = .failed("\(pendingImport.title) is waiting. Confirm or cancel the import before deleting this project.")
+                return .none
+            }
+            if case .dirty = state.operationStatus {
+                state.operationStatus = .failed("Save or reopen the project before deleting it so the recovery snapshot reflects verified local storage.")
+                return .none
+            }
+            state.projectStorageStatus = .deleting
+            state.preparedFile = nil
+            state.pendingImport = nil
+            state.operationStatus = .busy("Creating a recovery snapshot and deleting the local project.")
+            state.projectStorageMessage = "Creating a recovery snapshot and deleting the local project."
+            let projectName = project.metadata.name
+            return .run { send in
+                do {
+                    let projects = try await projectStoreClient.deleteProject(id)
+                    await send(.projectDeleted(id, projects, "\(projectName) was deleted after a verified recovery snapshot was created."))
+                } catch {
+                    await send(.projectDeleteFailed(error.localizedDescription))
+                }
+            }
+
+        case let .projectDeleted(id, projects, message):
+            state.projectStorageStatus = .loaded
+            state.projects = sortedProjects(projects)
+            state.projectStorageMessage = projectStorageLoadedMessage(projectCount: projects.count)
+            if state.selectedProject?.metadata.id == id {
+                state.selectedProject = nil
+                state.selectedProjectReadiness = nil
+                state.workflowMessage = "Open or create a project to manage roster, subjects, results, drafts, backups, and exports."
+                state.selectedTab = .projects
+            }
+            state.preparedFile = nil
+            state.pendingImport = nil
+            state.operationStatus = .saved(message)
+            return .none
+
+        case let .projectDeleteFailed(message):
+            state.projectStorageStatus = .loaded
+            state.operationStatus = .failed("Project could not be deleted: \(message)")
             return .none
 
         default:

@@ -66,13 +66,22 @@ public enum CSVParser {
     }
 
     public static func parseCSV(_ text: String) throws -> CSVParseResult {
+        if let error = unquotedRowWidthMismatch(in: text) {
+            throw error
+        }
+
+        let normalizedText = normalizeUnquotedRowBreaks(text)
         do {
-            let parsed = try CSVReader.decode(input: text, configuration: csvReaderConfiguration())
-            return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
+            let parsed = try CSVReader.decode(input: normalizedText, configuration: csvReaderConfiguration())
+            do {
+                return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
+            } catch let error as CSVParserError {
+                return try parseFallbackRowsOrThrow(normalizedText, defaultError: error)
+            }
         } catch let error as CSVParserError {
             throw error
         } catch {
-            throw CSVParserError.unterminatedQuotedField
+            return try parseFallbackRowsOrThrow(normalizedText, defaultError: .unterminatedQuotedField)
         }
     }
 
@@ -143,6 +152,165 @@ public enum CSVParser {
         configuration.delimiters.row = .standard
         configuration.presample = true
         return configuration
+    }
+
+    private static func normalizeUnquotedRowBreaks(_ text: String) -> String {
+        var output = ""
+        var index = text.startIndex
+        var insideQuotedField = false
+
+        while index < text.endIndex {
+            let character = text[index]
+            let next = text.index(after: index)
+
+            if character == "\"" {
+                if insideQuotedField, next < text.endIndex, text[next] == "\"" {
+                    output.append(character)
+                    output.append(text[next])
+                    index = text.index(after: next)
+                    continue
+                }
+                insideQuotedField.toggle()
+                output.append(character)
+            } else if !insideQuotedField, character == "\r" {
+                if next < text.endIndex, text[next] == "\n" {
+                    output.append("\r\n")
+                    index = text.index(after: next)
+                    continue
+                }
+                output.append("\r\n")
+            } else if !insideQuotedField, character == "\n" {
+                output.append("\r\n")
+            } else {
+                output.append(character)
+            }
+
+            index = next
+        }
+
+        return output
+    }
+
+    private static func hasUnterminatedQuotedField(_ text: String) -> Bool {
+        var index = text.startIndex
+        var insideQuotedField = false
+
+        while index < text.endIndex {
+            let character = text[index]
+            let next = text.index(after: index)
+
+            if character == "\"" {
+                if insideQuotedField, next < text.endIndex, text[next] == "\"" {
+                    index = text.index(after: next)
+                    continue
+                }
+                insideQuotedField.toggle()
+            }
+
+            index = next
+        }
+
+        return insideQuotedField
+    }
+
+    private static func unquotedRowWidthMismatch(in text: String) -> CSVParserError? {
+        guard !text.contains("\"") else { return nil }
+
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let rows = normalized.split(separator: "\n", omittingEmptySubsequences: false)
+        let parsedRows = rows.enumerated().compactMap { index, row -> (number: Int, cells: [String])? in
+            let cells = row.split(separator: ",", omittingEmptySubsequences: false)
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            guard cells.contains(where: { !$0.isEmpty }) else { return nil }
+            return (index + 1, cells)
+        }
+
+        guard let header = parsedRows.first, parsedRows.count > 1 else { return nil }
+        for row in parsedRows.dropFirst() where row.cells.count != header.cells.count {
+            return .rowWidthMismatch(sourceLabel: "CSV file", row: row.number, expectedColumns: header.cells.count)
+        }
+
+        return nil
+    }
+
+    private static func parseFallbackRowsOrThrow(_ text: String, defaultError: CSVParserError) throws -> CSVParseResult {
+        guard !hasUnterminatedQuotedField(text) else {
+            throw CSVParserError.unterminatedQuotedField
+        }
+
+        do {
+            return try parseTabularRows(parseFallbackRows(text), sourceLabel: "CSV file")
+        } catch let error as CSVParserError {
+            if defaultError == .unterminatedQuotedField {
+                throw error
+            }
+            if case .missingDataRows = defaultError {
+                throw error
+            }
+            throw defaultError
+        } catch {
+            throw defaultError
+        }
+    }
+
+    private static func parseFallbackRows(_ text: String) throws -> [[String]] {
+        var rows: [[String]] = []
+        var row: [String] = []
+        var field = ""
+        var index = text.startIndex
+        var insideQuotedField = false
+
+        func finishField() {
+            row.append(field)
+            field = ""
+        }
+
+        func finishRow() {
+            finishField()
+            rows.append(row)
+            row = []
+        }
+
+        while index < text.endIndex {
+            let character = text[index]
+            let next = text.index(after: index)
+
+            if character == "\"" {
+                if insideQuotedField, next < text.endIndex, text[next] == "\"" {
+                    field.append(character)
+                    index = text.index(after: next)
+                    continue
+                }
+                insideQuotedField.toggle()
+            } else if !insideQuotedField, character == "," {
+                finishField()
+            } else if !insideQuotedField, character == "\r" {
+                finishRow()
+                if next < text.endIndex, text[next] == "\n" {
+                    index = text.index(after: next)
+                    continue
+                }
+            } else if !insideQuotedField, character == "\n" {
+                finishRow()
+            } else {
+                field.append(character)
+            }
+
+            index = next
+        }
+
+        if insideQuotedField {
+            throw CSVParserError.unterminatedQuotedField
+        }
+
+        if !field.isEmpty || !row.isEmpty || !text.isEmpty {
+            finishField()
+            rows.append(row)
+        }
+
+        return rows
     }
 
     private static func csvWriterConfiguration() -> CSVWriter.Configuration {

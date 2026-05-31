@@ -5,19 +5,18 @@ questions here. Do not use this as a task list.
 
 ## Current Posture
 
-CommenterIOS is a fresh native iPhone-first SwiftUI/TCA port of CommenterV3.
-The repo contains planning, guardrails, source-truth maps, initial backlog
-artifacts, an initial Swift package scaffold, and a minimal native iOS Xcode app
-host project.
+CommenterIOS is a native iPhone-first SwiftUI/TCA port of CommenterV3 with the
+MVP teacher workflow source surface present in package targets and an iOS app
+host. The checkout includes bundled production dataset loading, deterministic
+generation, local verified project persistence, recovery snapshots, CSV/XLSX/XLS
+import, DOCX/XLSX/XLS export, backup JSON import/export, support diagnostics,
+and native iOS import/export/share presentation wiring.
 
-The scaffold currently includes the root SwiftUI/TCA app entry, local package
-targets, production dataset resource wiring, a privacy manifest, a shared
-`CommenterIOS` Xcode scheme, and initial unit-test targets. It also includes the
-first backup envelope and project fingerprint foundation ported from live
-CommenterV3 source.
-
-Durable project storage, native backup file workflows, import/export,
-generation parity, and Xcode build/run/release validation remain incomplete.
+The remaining release constraint is validation environment availability: Swift
+package dependency resolution, Xcode build/test, simulator/device validation,
+signing, TestFlight, and App Store archive checks must run on a macOS Apple
+toolchain with network access to package dependencies before release claims are
+made.
 
 ## Product Purpose
 
@@ -66,9 +65,7 @@ MVP scope includes:
 
 ## Open Questions
 
-- Exact Swift package or owned implementation for XLSX parsing/writing.
-- Exact Swift package or owned implementation for legacy XLS parsing/writing.
-- Exact DOCX OpenXML implementation strategy.
 - Exact Xcode signing team, provisioning, and app identifier values.
 - Final app name, bundle identifier, icon, and App Store metadata.
 - Whether iPad is explicitly supported or only compatibility-tested.
+- Final TestFlight tester set, release notes, and App Store privacy-form entries.

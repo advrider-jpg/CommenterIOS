@@ -22,7 +22,10 @@ extension AppFeature {
              .projectSaveFailed(_),
              .generateReportsTapped,
              .reportsGeneratedAndSaved(_, _),
-             .reportsGenerationFailed(_):
+             .reportsGenerationFailed(_),
+             .deleteProjectConfirmed(_),
+             .projectDeleted(_, _, _),
+             .projectDeleteFailed(_):
             return reduceProjectWorkflow(&state, action)
 
         case .projectNameChanged(_),
@@ -57,6 +60,10 @@ extension AppFeature {
              .fileExportSaved(_),
              .fileExportCancelled,
              .fileExportFailed(_),
+             .fileShareStarted(_),
+             .fileShareCompleted(_),
+             .fileShareCancelled,
+             .fileShareFailed(_),
              .preparedFileDismissed:
             return reduceFileWorkflow(&state, action)
         }
