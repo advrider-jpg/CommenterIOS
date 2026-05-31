@@ -777,11 +777,6 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.projectStoreClient = testProjectStoreClient(
-                importBackup: { pickedURL in
-                    XCTAssertEqual(pickedURL, url)
-                    await probe.record("parsed-backup")
-                    return imported
-                },
                 saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
                     XCTAssertEqual(project, imported)
                     XCTAssertNil(expectedRevision)
@@ -789,6 +784,11 @@ final class AppFeatureTests: XCTestCase {
                     XCTAssertEqual(recoveryReason, .beforeImportReplace)
                     await probe.record("verified-save")
                     return saved
+                },
+                importBackup: { pickedURL in
+                    XCTAssertEqual(pickedURL, url)
+                    await probe.record("parsed-backup")
+                    return imported
                 }
             )
         }
@@ -843,11 +843,6 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.projectStoreClient = testProjectStoreClient(
-                importBackup: { pickedURL in
-                    XCTAssertEqual(pickedURL, url)
-                    await probe.record("parsed-backup")
-                    return imported
-                },
                 saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
                     XCTAssertEqual(project, imported)
                     XCTAssertNil(expectedRevision)
@@ -855,6 +850,11 @@ final class AppFeatureTests: XCTestCase {
                     XCTAssertEqual(recoveryReason, .beforeImportReplace)
                     await probe.record("failed-save")
                     throw TestSaveFailure()
+                },
+                importBackup: { pickedURL in
+                    XCTAssertEqual(pickedURL, url)
+                    await probe.record("parsed-backup")
+                    return imported
                 }
             )
         }

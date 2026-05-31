@@ -310,3 +310,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Added the missing persistence import for `RecoveryReason` in AppFeature and restored an explicit `FileWrapper` return in prepared export presentation.
 - Removed the duplicate project-summary helper from the store client and imported CommentEngine where the split project reducer reads readiness.
 - Fixed AppFeatureTests probe assertions so actor-isolated values are awaited before entering XCTest autoclosures.
+- Reordered backup-import test client arguments to match the test helper signature exposed by CI.
