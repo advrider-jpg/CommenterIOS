@@ -16,6 +16,7 @@ The desired stack and posture:
 - native SwiftUI/HIG
 - reusable components
 - OSS scaffolding where useful
+- the binding package/custom-code policy in `docs/OSS_DEPENDENCY_POLICY.md`
 - owned design system
 - production-ready MVP, not a thin beta
 
@@ -65,6 +66,10 @@ Six subagents contributed planning lanes:
 - OSS risk: use SwiftUI-TCA-Template and Point-Free TCA; use SwiftUIX and
   SwiftUI Introspect only behind wrappers; avoid Firebase/auth/paywall/VIPER
   starters.
+- Dependency posture: use the packages listed in
+  `docs/OSS_DEPENDENCY_POLICY.md`; preserve worker-added packages where possible;
+  do not hand-roll generic infrastructure unless that policy or a later decision
+  ledger entry grants a specific exception.
 - Sequencing: critical path is source audit, domain, generation parity,
   persistence, import/export, iPhone workflow, release validation.
 
@@ -86,6 +91,8 @@ Six subagents contributed planning lanes:
 5. Treat all import/export formats as MVP requirements.
 6. Do not allow unsupported paths to masquerade as working paths.
 7. Use no telemetry for MVP.
+8. Use OSS/native APIs first and keep custom code limited to Commenter-specific
+   logic or small adapters.
 
 ## Current Repo State
 

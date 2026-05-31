@@ -156,3 +156,31 @@ ported behavior.
 
 Release impact:
 Failure to reconcile against live source is a process blocker for porting work.
+
+## C007 - OSS/native first, minimal custom infrastructure
+
+Rule:
+CommenterIOS must use Apple-native APIs and the approved OSS dependency list in
+`docs/OSS_DEPENDENCY_POLICY.md` before writing or keeping custom generic
+infrastructure. Custom code is allowed for Commenter-specific product logic and
+small adapters around native/OSS APIs. Broad custom parsers, document writers,
+SQLite wrappers, file-flow abstractions, navigation frameworks, and UI primitive
+systems are disallowed unless `docs/OSS_DEPENDENCY_POLICY.md` or a later
+decision-ledger entry records a specific exception.
+
+Why it matters:
+The user explicitly wants barely any custom code. Hand-rolled generic
+infrastructure increases maintenance risk, encourages partial happy-path
+implementations, and undermines the planned OSS scaffold/component strategy.
+
+Evidence:
+Explicit user instruction; `docs/OSS_DEPENDENCY_POLICY.md`;
+`docs/CHAT_HANDOFF.md`; `docs/decisions/0001-native-swiftui-tca.md`.
+
+Validation:
+Future validation must include a dependency/license audit, a scan for custom
+generic parsers/writers/wrappers, and fixture proof for every allowed adapter.
+
+Release impact:
+Violation of this rule is a release blocker unless the user expressly approves a
+specific exception.

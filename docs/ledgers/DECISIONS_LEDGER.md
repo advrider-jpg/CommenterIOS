@@ -3,6 +3,31 @@
 Append durable architectural, product, data, testing, and process decisions
 here. Do not rewrite history; supersede entries with dated notes.
 
+## 2026-05-31 - OSS/native-first dependency policy is binding
+
+Decision:
+Use `docs/OSS_DEPENDENCY_POLICY.md` as the binding dependency list and
+custom-code limit for generic infrastructure. Preserve the worker-added
+packages where possible (`swift-composable-architecture`, `CodableCSV`,
+`CoreXLSX`, and `OLEKit`) and require approved native/OSS options before custom
+CSV, XLSX, XLS/OLE, DOCX/OOXML, SQLite, file-flow, or reusable UI
+infrastructure.
+
+Rationale:
+The user explicitly wants barely any custom code. The previous implementation
+pass drifted toward custom parsers and oversized bespoke app files. A concrete
+dependency policy is now required so future agents use mature packages/native
+APIs first and only write Commenter-specific logic or small adapters.
+
+Evidence:
+Explicit user instruction; `docs/OSS_DEPENDENCY_POLICY.md`;
+`docs/decisions/0001-native-swiftui-tca.md`; `docs/CHAT_HANDOFF.md`.
+
+Impact:
+Future work must audit dependency fit before implementing generic
+infrastructure. Violations are release blockers unless a later decision ledger
+entry records a specific exception.
+
 ## 2026-05-30 - Start a new native iOS repo
 
 Decision:

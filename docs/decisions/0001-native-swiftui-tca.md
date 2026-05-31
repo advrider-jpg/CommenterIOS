@@ -26,6 +26,8 @@ Use:
 - Local Swift packages for domain, generation, persistence, import/export, and
   test support.
 - A TCA-oriented OSS template as a scaffold seed.
+- The approved OSS dependency list in `docs/OSS_DEPENDENCY_POLICY.md` for
+  generic infrastructure.
 
 Do not use:
 
@@ -34,22 +36,17 @@ Do not use:
 - analytics or telemetry scaffolds
 - CloudKit or account sync
 - generic starter state that pretends persistence works
+- broad custom generic infrastructure when a listed native API or OSS package
+  can provide it
 
 ## OSS Guidance
 
-Use as foundation:
+Use `docs/OSS_DEPENDENCY_POLICY.md` as the binding package list and
+custom-code limit. That file includes the worker-current packages already added
+to `Package.swift` where possible, plus required additions for persistence,
+ZIP/OOXML, DOCX, and selective UI helper usage.
 
-- `pointfreeco/swift-composable-architecture`
-- `ethanhuang13/SwiftUI-TCA-Template`
-
-Use as reference only:
-
-- `pointfreeco/isowords`
-
-Use selectively behind owned wrappers:
-
-- `SwiftUIX`
-- `SwiftUI Introspect`
+Use `pointfreeco/isowords` as reference only.
 
 Do not let OSS packages define product behavior or visual language.
 
@@ -61,4 +58,3 @@ line-for-line.
 This raises the up-front work for data parity, generation parity, and
 import/export parity, but it reduces long-term risk and gives a real native
 iPhone workflow.
-

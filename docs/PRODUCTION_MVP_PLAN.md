@@ -56,6 +56,11 @@ These are not deferred. They are intentionally excluded from this product shape:
 
 Use SwiftUI and The Composable Architecture.
 
+Use `docs/OSS_DEPENDENCY_POLICY.md` as the binding dependency and custom-code
+policy. The MVP should use mature OSS packages and Apple-native APIs for
+generic infrastructure. Custom code is a last resort for Commenter-specific
+behavior or small adapters around approved dependencies.
+
 The root feature tree should be:
 
 ```text
@@ -110,17 +115,22 @@ placeholder resolution, readiness diagnostics, and parity tests.
 `CommenterPersistence`
 
 Local project storage, revision conflicts, read-after-write verification,
-fingerprints, recovery snapshots, draft autosave, and metadata index.
+fingerprints, recovery snapshots, draft autosave, and metadata index. SQLite
+metadata/index work must use GRDB once dependency migration begins; direct
+`sqlite3` code is not the default architecture.
 
 `CommenterImportExport`
 
 CSV/XLSX/XLS import, backup JSON import/export, DOCX/XLSX/XLS export, and file
-payload construction.
+payload construction. Generic CSV, XLSX, XLS/OLE, DOCX, ZIP/OOXML, and workbook
+handling must use the approved dependencies in `docs/OSS_DEPENDENCY_POLICY.md`
+unless a decision-ledger exception is recorded.
 
 `DesignSystem`
 
 Owned SwiftUI components. Native HIG by default. OSS visual helpers only behind
-owned wrappers.
+owned wrappers. Do not hand-roll generic UI primitives when native SwiftUI,
+SwiftUIX, or SwiftUI-Introspect can cover the need.
 
 `CommenterTestSupport`
 
@@ -268,6 +278,7 @@ Required CI:
 - import/export tests
 - no-network static scan
 - dependency/license audit
+- OSS dependency policy audit
 - privacy manifest validation
 
 Required release checks:
@@ -374,4 +385,3 @@ Day 9:
 Day 10:
 
 - Prove XLSX, XLS, and DOCX implementation choices with fixtures.
-

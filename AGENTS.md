@@ -29,6 +29,7 @@ Also read:
 
 - `docs/CHAT_HANDOFF.md`
 - `docs/PRODUCTION_MVP_PLAN.md`
+- `docs/OSS_DEPENDENCY_POLICY.md`
 - `docs/source-truth/commenterv3-source-map.md`
 
 ## Repository Snapshot
@@ -82,6 +83,22 @@ pretending it works.
 If you encounter fake state, placeholder behavior, misleading UI, silent
 failure, or stateless implementation while working in this codebase, fix it
 completely or stop and report why it cannot be fixed in the current scope.
+
+## OSS/Native-First Dependency Discipline
+
+Before changing `Package.swift`, import/export code, persistence code, file
+workflows, reusable UI components, or any generic infrastructure, read
+`docs/OSS_DEPENDENCY_POLICY.md`.
+
+The default posture is barely any custom generic code. Use Apple-native APIs and
+the approved OSS dependency list first. Custom code is acceptable for
+Commenter-specific product logic and small adapters around native/OSS APIs.
+
+Do not hand-roll CSV, XLSX, XLS/OLE, DOCX/OOXML, SQLite, file-picker/share, or
+design-system infrastructure unless `docs/OSS_DEPENDENCY_POLICY.md` or a later
+decision-ledger entry explicitly allows the exception. Required MVP workflows
+must still be completed; dependency discipline is not permission to defer or
+disable them.
 
 ## Source Truth Discipline
 
