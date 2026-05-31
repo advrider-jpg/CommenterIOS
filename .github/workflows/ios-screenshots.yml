@@ -102,9 +102,10 @@ jobs:
                   if exported and suggested:
                       exported_path = os.path.join(attachment_dir, exported)
                       if os.path.isfile(exported_path) and exported.lower().endswith(".png"):
-                          match = re.search(r"(\d{2}-[A-Za-z0-9_-]+)", suggested)
-                          if match:
-                              screenshots[match.group(1)] = exported_path
+                          name = os.path.splitext(suggested)[0]
+                          name = re.sub(r"_\d+_[0-9A-Fa-f-]{36}$", "", name)
+                          if re.fullmatch(r"\d{2}-[A-Za-z0-9-]+", name):
+                              screenshots[name] = exported_path
                   for child in value.values():
                       walk(child)
               elif isinstance(value, list):
