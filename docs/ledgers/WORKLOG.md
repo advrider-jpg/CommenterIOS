@@ -301,3 +301,7 @@ Append material work history here. Keep entries short, dated, and factual.
 - Tightened `FileProjectStore.deleteProject` so a missing on-disk project fails with `projectNotFound` instead of reporting recovery-snapshot-backed deletion success, and verified the canonical project file is gone before deleting index rows.
 - Added reducer and persistence tests covering pending-import delete blocking and missing-file delete failure.
 - Re-ran live Windows validation; SwiftPM and Xcode/simulator gates remain blocked because `swift`, `xcodebuild`, and `xcrun` are not installed on this machine.
+
+## 2026-05-31 - PR CI compile repair
+
+- Fixed Swift CI compile errors by updating the `resolveSubjectForGeneration` call site to the current `uiSubject:` argument label and restoring the explicit return from `splitUnits`.

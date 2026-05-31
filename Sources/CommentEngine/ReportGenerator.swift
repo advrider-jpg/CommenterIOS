@@ -86,7 +86,7 @@ public struct ReportGenerator {
 
         let mappedBand = bandMapping[achievementLevel.rawValue] ?? achievementLevel.rawValue
         let normalizedLevel = Self.normalizeLevel(student.yearLevel.rawValue)
-        let subjectResolution = resolveSubjectForGeneration(subject, data: data, focusStrand: result.focusStrand)
+        let subjectResolution = resolveSubjectForGeneration(uiSubject: subject, data: data, focusStrand: result.focusStrand)
         guard subjectResolution.eligible, !subjectResolution.candidates.isEmpty else {
             throw ReportGenerationError.unavailableSubject(subjectResolution.reason ?? "Draft comments are not available for \(subject) yet.")
         }
