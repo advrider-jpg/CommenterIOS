@@ -581,6 +581,7 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 student validated from XLSX. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from XLSX. Confirm to save this roster import locally."
@@ -799,6 +800,7 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.")
             $0.workflowMessage = "Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement."
@@ -865,6 +867,7 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.")
             $0.workflowMessage = "Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement."
@@ -927,6 +930,7 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 student validated from CSV. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from CSV. Confirm to save this roster import locally."
@@ -992,6 +996,7 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 result row validated from XLSX. Confirm to save these results locally.")
             $0.workflowMessage = "1 result row validated from XLSX. Confirm to save these results locally."
@@ -1053,6 +1058,7 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
+            $0.selectedTab = .worklist
             $0.pendingImport = preview
             $0.operationStatus = .prepared("1 student validated from CSV. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from CSV. Confirm to save this roster import locally."

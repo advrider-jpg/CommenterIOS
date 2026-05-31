@@ -66,13 +66,24 @@ public enum CSVParser {
     }
 
     public static func parseCSV(_ text: String) throws -> CSVParseResult {
+        let normalizedText = normalizeUnquotedRowBreaks(text)
         do {
-            let parsed = try CSVReader.decode(input: normalizeUnquotedRowBreaks(text), configuration: csvReaderConfiguration())
+            let parsed = try CSVReader.decode(input: normalizedText, configuration: csvReaderConfiguration())
             return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
         } catch let error as CSVParserError {
             throw error
         } catch {
-            throw CSVParserError.unterminatedQuotedField
+            guard !hasUnterminatedQuotedField(normalizedText) else {
+                throw CSVParserError.unterminatedQuotedField
+            }
+
+            do {
+                return try parseTabularRows(parseFallbackRows(normalizedText), sourceLabel: "CSV file")
+            } catch let error as CSVParserError {
+                throw error
+            } catch {
+                throw CSVParserError.unterminatedQuotedField
+            }
         }
     }
 
@@ -180,6 +191,86 @@ public enum CSVParser {
         }
 
         return output
+    }
+
+    private static func hasUnterminatedQuotedField(_ text: String) -> Bool {
+        var index = text.startIndex
+        var insideQuotedField = false
+
+        while index < text.endIndex {
+            let character = text[index]
+            let next = text.index(after: index)
+
+            if character == "\"" {
+                if insideQuotedField, next < text.endIndex, text[next] == "\"" {
+                    index = text.index(after: next)
+                    continue
+                }
+                insideQuotedField.toggle()
+            }
+
+            index = next
+        }
+
+        return insideQuotedField
+    }
+
+    private static func parseFallbackRows(_ text: String) throws -> [[String]] {
+        var rows: [[String]] = []
+        var row: [String] = []
+        var field = ""
+        var index = text.startIndex
+        var insideQuotedField = false
+
+        func finishField() {
+            row.append(field)
+            field = ""
+        }
+
+        func finishRow() {
+            finishField()
+            rows.append(row)
+            row = []
+        }
+
+        while index < text.endIndex {
+            let character = text[index]
+            let next = text.index(after: index)
+
+            if character == "\"" {
+                if insideQuotedField, next < text.endIndex, text[next] == "\"" {
+                    field.append(character)
+                    index = text.index(after: next)
+                    continue
+                }
+                insideQuotedField.toggle()
+            } else if !insideQuotedField, character == "," {
+                finishField()
+            } else if !insideQuotedField, character == "\r" {
+                finishRow()
+                if next < text.endIndex, text[next] == "\n" {
+                    index = text.index(after: next)
+                    continue
+                }
+            } else if !insideQuotedField, character == "\n" {
+                finishRow()
+            } else {
+                field.append(character)
+            }
+
+            index = next
+        }
+
+        if insideQuotedField {
+            throw CSVParserError.unterminatedQuotedField
+        }
+
+        if !field.isEmpty || !row.isEmpty || !text.isEmpty {
+            finishField()
+            rows.append(row)
+        }
+
+        return rows
     }
 
     private static func csvWriterConfiguration() -> CSVWriter.Configuration {

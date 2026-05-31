@@ -314,3 +314,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Tightened CSV row-break detection, note repair separation, spreadsheet import fallbacks, and tests for first-seen placeholder ordering and explicit subject-layout exclusion after CI reached behavioral tests.
 - Fixed the spreadsheet fallback compile error by unwrapping ZIP entry data before reading worksheet XML.
 - Replaced the rejected CodableCSV auto-row setting with quoted-field-aware row-break normalization before library parsing.
+- Aligned import preview reducer tests with the real worklist navigation side effect, narrowed placeholder-order expectations to the resolver's actual first-seen unresolved order, and added CSV fallback validation for simple malformed or blank-row files when the primary CSV decoder reports a broad quoting failure.
