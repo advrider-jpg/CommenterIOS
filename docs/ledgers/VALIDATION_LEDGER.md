@@ -42,7 +42,7 @@ swift test
 Xcode app-target validation intended on macOS/Xcode:
 
 ```bash
-xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
+xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation -skipMacroValidation build CODE_SIGNING_ALLOWED=NO
 ```
 
 XcodeBuildMCP discovery:
@@ -373,6 +373,12 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   `swift package resolve` and `swift test` failed because `swift` is not
   recognized on this Windows PATH; direct app-target `xcodebuild` failed
   because `xcodebuild` is not recognized.
+- GitHub Actions PR run `26717887504` passed `swift package resolve` and
+  `swift test`, then failed the app-target `xcodebuild` step during
+  `ComputeTargetDependencyGraph` because TCA package macros were not trusted in
+  noninteractive Xcode. The CI app-target build command now includes
+  `-skipPackagePluginValidation` and `-skipMacroValidation` so the real app
+  compilation can run in Actions.
 
 ## Future Required Gates
 

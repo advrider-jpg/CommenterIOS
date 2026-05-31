@@ -328,3 +328,12 @@ Append material work history here. Keep entries short, dated, and factual.
 - Matched the project XLSX fixture shape to the inline-string workbook fixture already accepted by the parser and made fallback OOXML parsing reject missing shared-string targets as unreadable workbooks.
 - Expanded the project import XLSX helper package metadata to match the fuller OOXML fixture shape used by the passing spreadsheet parser tests.
 - Replaced the dynamic project import XLSX mini-generator with a hardcoded inline-string workbook fixture matching the parser-level accepted shape.
+
+## 2026-05-31 - CI Xcode macro validation repair
+
+- Updated the GitHub Actions app-target Xcode build command to skip package
+  plugin and macro validation in noninteractive CI after PR run `26717887504`
+  passed `swift package resolve` and `swift test` but failed before source
+  compilation because TCA dependency macros were not enabled.
+- Updated the validation ledger's intended Xcode app-target command to match
+  the CI workflow exactly.
