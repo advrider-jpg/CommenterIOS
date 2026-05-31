@@ -1,5 +1,6 @@
 import CoreXLSX
 import Foundation
+import OLEKit
 
 public enum SpreadsheetImportFileError: LocalizedError, Equatable {
     case unsupportedFormat(String)
@@ -101,10 +102,10 @@ public enum SpreadsheetImportFile {
             do {
                 stream = try workbookStreamFromCompoundFile(data)
             } catch {
-                throw SpreadsheetImportFileError.unreadableWorkbook(label)
+                stream = try readOLEWorkbookStream(url, label: label)
             }
         } else {
-            throw SpreadsheetImportFileError.unreadableWorkbook(label)
+            stream = try readOLEWorkbookStream(url, label: label)
         }
 
         let rows: [[String]]
@@ -190,7 +191,7 @@ private func workbookStreamFromCompoundFile(_ data: Data) throws -> Data {
         throw LegacyXLSWorkbookError.invalidCompoundFile
     }
 
-    let directory = data[directoryOffset..<directoryOffset + sectorSize]
+    let directory = Data(data[directoryOffset..<directoryOffset + sectorSize])
     for entryOffset in stride(from: 0, to: directory.count, by: 128) {
         let entry = Data(directory[entryOffset..<entryOffset + 128])
         guard directoryEntryName(entry) == "Workbook" || directoryEntryName(entry) == "Book" else { continue }
@@ -203,6 +204,18 @@ private func workbookStreamFromCompoundFile(_ data: Data) throws -> Data {
     }
 
     throw LegacyXLSWorkbookError.missingWorkbookStream
+}
+
+private func readOLEWorkbookStream(_ url: URL, label: String) throws -> Data {
+    do {
+        let ole = try OLEFile(url.path)
+        guard let workbook = findOLEEntry(named: "Workbook", in: ole.root) ?? findOLEEntry(named: "Book", in: ole.root) else {
+            throw LegacyXLSWorkbookError.missingWorkbookStream
+        }
+        return try ole.stream(workbook).readDataToEnd()
+    } catch {
+        throw SpreadsheetImportFileError.unreadableWorkbook(label)
+    }
 }
 
 private func directoryEntryName(_ entry: Data) -> String {
@@ -272,6 +285,18 @@ private func columnIndex(from column: String) -> Int {
         value = value * 26 + Int(scalar.value - 64)
     }
     return max(0, value - 1)
+}
+
+private func findOLEEntry(named name: String, in entry: DirectoryEntry) -> DirectoryEntry? {
+    if entry.name == name {
+        return entry
+    }
+    for child in entry.children {
+        if let match = findOLEEntry(named: name, in: child) {
+            return match
+        }
+    }
+    return nil
 }
 
 private func parseBIFFRows(_ stream: Data) throws -> [[String]] {

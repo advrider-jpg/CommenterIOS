@@ -286,7 +286,7 @@ enum LegacyXLSWorkbookWriter {
         guard directoryOffset + sectorSize <= data.count else {
             throw LegacyXLSWorkbookError.invalidCompoundFile
         }
-        let directory = data[directoryOffset..<directoryOffset + sectorSize]
+        let directory = Data(data[directoryOffset..<directoryOffset + sectorSize])
         for entryOffset in stride(from: 0, to: directory.count, by: 128) {
             let entry = Data(directory[entryOffset..<entryOffset + 128])
             if directoryEntryName(entry) == "Workbook" {
