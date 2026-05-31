@@ -6,8 +6,18 @@ questions here. Do not use this as a task list.
 ## Current Posture
 
 CommenterIOS is a fresh native iPhone-first SwiftUI/TCA port of CommenterV3.
-The repo currently contains planning, guardrails, source-truth maps, and initial
-backlog artifacts. The SwiftUI/TCA app has not yet been scaffolded.
+The repo contains planning, guardrails, source-truth maps, initial backlog
+artifacts, an initial Swift package scaffold, and a minimal native iOS Xcode app
+host project.
+
+The scaffold currently includes the root SwiftUI/TCA app entry, local package
+targets, production dataset resource wiring, a privacy manifest, a shared
+`CommenterIOS` Xcode scheme, and initial unit-test targets. It also includes the
+first backup envelope and project fingerprint foundation ported from live
+CommenterV3 source.
+
+Durable project storage, native backup file workflows, import/export,
+generation parity, and Xcode build/run/release validation remain incomplete.
 
 ## Product Purpose
 
@@ -59,5 +69,6 @@ MVP scope includes:
 - Exact Swift package or owned implementation for XLSX parsing/writing.
 - Exact Swift package or owned implementation for legacy XLS parsing/writing.
 - Exact DOCX OpenXML implementation strategy.
+- Exact Xcode signing team, provisioning, and app identifier values.
 - Final app name, bundle identifier, icon, and App Store metadata.
 - Whether iPad is explicitly supported or only compatibility-tested.

@@ -52,3 +52,19 @@ Rationale:
 The user asked whether the new repo had the same strict setup as other repos.
 The planning seed did not, so the guardrail harness was added before further
 implementation.
+
+## 2026-05-31 - Host the Swift package in a native Xcode app target
+
+Decision:
+Add `CommenterIOS.xcodeproj` as a minimal native iOS app host that compiles the
+SwiftUI app entry and links the local `AppFeature` Swift package product.
+
+Rationale:
+SwiftPM package tests are useful for module validation, but TestFlight,
+simulator, archive, privacy-manifest, signing, and App Store release gates need
+a real iOS app target and shared scheme. The app target should host package
+modules rather than duplicating product behavior outside the TCA/package seams.
+
+Evidence:
+`CommenterIOS.xcodeproj`; `Sources/AppFeature/AppEntryView.swift`;
+`Sources/CommenterIOSApp/CommenterIOSApp.swift`.

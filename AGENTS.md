@@ -34,8 +34,9 @@ Also read:
 ## Repository Snapshot
 
 CommenterIOS is the fresh native iPhone-first SwiftUI/TCA port of CommenterV3.
-The repo currently starts as a planning/scaffold seed. The production source of
-truth for behavior is still the live `C:\Commenterv3` checkout.
+The repo currently contains planning/ledger guardrails, an initial Swift package
+scaffold, and a minimal native iOS Xcode app host project. The production source
+of truth for behavior is still the live `C:\Commenterv3` checkout.
 
 CommenterIOS must preserve CommenterV3's core product posture:
 
@@ -52,16 +53,25 @@ privacy, TestFlight, and App Store readiness. These are not deferred.
 
 ## Commands
 
-No Swift/Xcode project has been generated yet. Until then, repository-level
-checks are limited to git/document hygiene:
+An initial Swift package scaffold and `CommenterIOS.xcodeproj` exist. On a
+machine with Swift/Xcode available, run:
+
+- Resolve packages: `swift package resolve`
+- Run Swift package tests: `swift test`
+- Build iOS app target:
+  `xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO`
+
+Until an Apple toolchain is available in the local environment, repository-level
+checks are limited to git/document hygiene and dataset verification:
 
 - Check status: `git status --short`
 - Check whitespace: `git diff --check`
 - Check staged whitespace: `git diff --cached --check`
 - Check line endings: `git ls-files --eol`
 
-After the SwiftUI/TCA project is scaffolded, update `docs/ledgers/VALIDATION_LEDGER.md`
-with real commands. Do not invent commands that do not exist.
+Use XcodeBuildMCP discovery/build/run/test tools whenever the local environment
+has a discoverable project plus the required Xcode/simulator support. Do not
+invent commands that do not exist.
 
 ## Truthfulness Prime Directive
 

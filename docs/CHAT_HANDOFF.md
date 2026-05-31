@@ -89,9 +89,11 @@ Six subagents contributed planning lanes:
 
 ## Current Repo State
 
-This repo currently contains planning and handoff files only. It has no SwiftUI
-project yet.
+This repo now contains planning and handoff files, an initial Swift package
+scaffold for the SwiftUI/TCA app, and a minimal `CommenterIOS.xcodeproj` app
+host with a shared `CommenterIOS` scheme.
 
-The next implementation step is to scaffold the iOS project and preserve these
-docs in the new source tree.
-
+The next implementation step is to continue from the scaffold into source-truth
+parity slices: full dataset validation, generation parity, durable local
+persistence, import/export, and XcodeBuildMCP build/run validation on a machine
+with Xcode and simulator support.
