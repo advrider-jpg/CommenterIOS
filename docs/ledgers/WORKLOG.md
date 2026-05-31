@@ -326,3 +326,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Updated the project import XLSX fixture to use shared strings and aligned the component-assembly report test with the deterministic text/hash emitted by the current generator.
 - Stopped masking XLSX fallback validation errors as generic unreadable-workbook failures so CI and users see the concrete tabular validation failure when fallback parsing succeeds but the rows are invalid.
 - Matched the project XLSX fixture shape to the inline-string workbook fixture already accepted by the parser and made fallback OOXML parsing reject missing shared-string targets as unreadable workbooks.
+- Expanded the project import XLSX helper package metadata to match the fuller OOXML fixture shape used by the passing spreadsheet parser tests.
