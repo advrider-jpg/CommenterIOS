@@ -187,16 +187,6 @@ public extension DependencyValues {
     }
 }
 
-private func projectSummary(_ project: Project) -> ProjectSummary {
-    ProjectSummary(
-        id: project.metadata.id,
-        name: project.metadata.name,
-        term: project.metadata.term,
-        updatedAt: project.metadata.updatedAt,
-        revision: project.metadata.persistence?.revision
-    )
-}
-
 private func milliseconds(_ date: Date) -> Int64 {
     Int64((date.timeIntervalSince1970 * 1000).rounded())
 }
