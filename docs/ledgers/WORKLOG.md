@@ -305,3 +305,4 @@ Append material work history here. Keep entries short, dated, and factual.
 ## 2026-05-31 - PR CI compile repair
 
 - Fixed Swift CI compile errors by updating the `resolveSubjectForGeneration` call site to the current `uiSubject:` argument label and restoring the explicit return from `splitUnits`.
+- Fixed report-generator test compile assertions to unwrap optional trace text explicitly before checking diagnostic substrings.
