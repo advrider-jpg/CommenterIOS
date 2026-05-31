@@ -1,3 +1,4 @@
+import CodableCSV
 import Foundation
 
 public struct CSVParseResult: Equatable, Sendable {
@@ -65,58 +66,14 @@ public enum CSVParser {
     }
 
     public static func parseCSV(_ text: String) throws -> CSVParseResult {
-        var parsedRows: [[String]] = []
-        var current = ""
-        var row: [String] = []
-        var inQuotes = false
-        let characters = Array(text)
-        var index = 0
-
-        while index < characters.count {
-            let character = characters[index]
-            let next = index + 1 < characters.count ? characters[index + 1] : nil
-
-            if character == "\"" {
-                if inQuotes, next == "\"" {
-                    current.append("\"")
-                    index += 2
-                    continue
-                }
-                inQuotes.toggle()
-                index += 1
-                continue
-            }
-
-            if character == ",", !inQuotes {
-                row.append(current)
-                current = ""
-                index += 1
-                continue
-            }
-
-            if (character == "\n" || character == "\r"), !inQuotes {
-                if character == "\r", next == "\n" {
-                    index += 1
-                }
-                row.append(current)
-                parsedRows.append(row)
-                row = []
-                current = ""
-                index += 1
-                continue
-            }
-
-            current.append(character)
-            index += 1
-        }
-
-        if inQuotes {
+        do {
+            let parsed = try CSVReader.decode(input: text, configuration: csvReaderConfiguration())
+            return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
+        } catch let error as CSVParserError {
+            throw error
+        } catch {
             throw CSVParserError.unterminatedQuotedField
         }
-
-        row.append(current)
-        parsedRows.append(row)
-        return try parseTabularRows(parsedRows, sourceLabel: "CSV file")
     }
 
     public static func parseTabularRows(_ rows: [[String]], sourceLabel: String = "file") throws -> CSVParseResult {
@@ -170,15 +127,27 @@ public enum CSVParser {
     public static func toCSV(rows: [[String: String]]) -> String {
         guard let first = rows.first else { return "" }
         let headers = Array(first.keys)
-        let lines = [headers.map(escapeCell).joined(separator: ",")] + rows.map { row in
-            headers.map { escapeCell(row[$0] ?? "") }.joined(separator: ",")
+        let table = [headers] + rows.map { row in
+            headers.map { formulaGuard(row[$0] ?? "") }
         }
-        return lines.joined(separator: "\r\n")
+        return (try? CSVWriter.encode(rows: table, into: String.self, configuration: csvWriterConfiguration())) ?? ""
     }
 
-    private static func escapeCell(_ value: String) -> String {
-        let guarded = value.range(of: #"^\s*[=+\-@]"#, options: .regularExpression) == nil ? value : "'\(value)"
-        let escaped = guarded.replacingOccurrences(of: "\"", with: "\"\"")
-        return escaped.range(of: #"[",\r\n]"#, options: .regularExpression) == nil ? escaped : "\"\(escaped)\""
+    private static func formulaGuard(_ value: String) -> String {
+        value.range(of: #"^\s*[=+\-@]"#, options: .regularExpression) == nil ? value : "'\(value)"
+    }
+
+    private static func csvReaderConfiguration() -> CSVReader.Configuration {
+        var configuration = CSVReader.Configuration()
+        configuration.headerStrategy = .none
+        configuration.delimiters.row = .standard
+        configuration.presample = true
+        return configuration
+    }
+
+    private static func csvWriterConfiguration() -> CSVWriter.Configuration {
+        var configuration = CSVWriter.Configuration()
+        configuration.delimiters.row = "\r\n"
+        return configuration
     }
 }

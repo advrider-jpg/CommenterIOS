@@ -20,6 +20,11 @@ let package = Package(
         .executable(name: "CommenterIOSApp", targets: ["CommenterIOSApp"])
     ],
     dependencies: [
+        .package(url: "https://github.com/CoreOffice/CoreXLSX.git", .upToNextMinor(from: "0.14.1")),
+        .package(url: "https://github.com/CoreOffice/OLEKit.git", .upToNextMinor(from: "0.2.0")),
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.10.0"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
+        .package(url: "https://github.com/dehesa/CodableCSV.git", from: "0.6.7"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0")
     ],
     targets: [
@@ -31,12 +36,22 @@ let package = Package(
         ),
         .target(
             name: "CommenterPersistence",
-            dependencies: ["CommenterDomain"],
-            linkerSettings: [.linkedLibrary("sqlite3")]
+            dependencies: [
+                "CommenterDomain",
+                .product(name: "GRDB", package: "GRDB.swift")
+            ]
         ),
         .target(
             name: "CommenterImportExport",
-            dependencies: ["CommenterDomain", "CommentEngine", "CommenterPersistence"]
+            dependencies: [
+                "CommenterDomain",
+                "CommentEngine",
+                "CommenterPersistence",
+                .product(name: "CodableCSV", package: "CodableCSV"),
+                .product(name: "CoreXLSX", package: "CoreXLSX"),
+                .product(name: "OLEKit", package: "OLEKit"),
+                .product(name: "ZIPFoundation", package: "ZIPFoundation")
+            ]
         ),
         .target(name: "DesignSystem"),
         .target(
@@ -75,7 +90,10 @@ let package = Package(
             name: "AppFeatureTests",
             dependencies: [
                 "AppFeature",
+                "CommentEngine",
                 "CommenterDomain",
+                "CommenterImportExport",
+                "CommenterPersistence",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ]
         ),

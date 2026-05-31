@@ -147,7 +147,11 @@ public enum CSVTemplates {
 
         switch kind {
         case .roster:
-            return CSVTemplateDocument(filename: rosterFilename, mimeType: csvMimeType, text: rosterTemplateCSV())
+            return CSVTemplateDocument(
+                filename: rosterFilename,
+                mimeType: csvMimeType,
+                text: rosterTemplateCSV()
+            )
         case .achievementResults:
             return CSVTemplateDocument(
                 filename: achievementResultsFilename,

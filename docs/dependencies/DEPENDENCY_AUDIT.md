@@ -43,3 +43,68 @@ exists. Full production BIFF cell decoding/writing still needs either mature
 `libxls`/`libxlsxwriter` integration or a documented production-grade
 compatibility reason backed by real fixtures and target-app validation. Until
 then, `.xls` work must keep surfacing incomplete coverage honestly.
+
+## 2026-05-31 - DOCX, ZIP, XLSX writer, and legacy XLS package suitability
+
+Scope:
+This is a dependency/package suitability sidecar only. It does not approve
+manifest, source, or test edits by itself. Before adding any package below,
+prove the exact package revision with `swift package resolve`, `swift test`,
+`xcodebuild`, simulator/device file workflows, and target-app open validation.
+
+Product constraints checked:
+
+- iOS SwiftPM/Xcode integration must work without manual host installs in CI.
+- All document and workbook work must remain local/offline and must not transmit
+  teacher, student, project, or report data.
+- Every success state must be backed by a real written file, nonzero size,
+  package/readback verification, native export/share completion where relevant,
+  and target-app open proof for release.
+- Licenses must be permissive enough for App Store distribution and must be
+  included in third-party notices.
+
+Package findings:
+
+| Area | Exact package checked | Suitability | Build and compatibility concerns | Licensing concerns | Custom adapter exception |
+| --- | --- | --- | --- | --- | --- |
+| DOCX generation | `Techopolis/SwiftDocX`, latest observed `1.0.1`, manifest URL `https://github.com/Techopolis/SwiftDocX.git`, product `SwiftDocX` | Promising but not mature enough to treat as proven production infrastructure yet. It is pure Swift, supports SwiftPM, declares iOS 13+, and depends on ZIPFoundation. It should be evaluated before any further custom DOCX writer work. | Small/young project footprint observed upstream. Must prove it can create the required Commenter packet: title page, per-student sections, headings, headers, footers, page numbers, page breaks, paragraph spacing, XML escaping, and no unresolved placeholders. Must open in Word and Pages after iOS export/share. | MIT license. ZIPFoundation transitive MIT notice also required. | A small Commenter adapter from `PreparedReportPacket` to SwiftDocX document calls is justified. A broad custom DOCX XML/package writer is not justified unless SwiftDocX fails a documented fixture/open-validation matrix. |
+| ZIP/OOXML assembly | `weichsel/ZIPFoundation`, recommended manifest URL `https://github.com/weichsel/ZIPFoundation.git`, product `ZIPFoundation` | Suitable generic ZIP infrastructure. It is mature, SwiftPM-compatible, supports Apple platforms including iOS, and is local/offline. Use for direct OOXML package read/write only when a higher-level DOCX/XLSX package does not own the ZIP layer. | Must verify deterministic archive output is not required by any fingerprint contract. Must verify in-memory and temp-file behavior on iOS sandbox for expected file sizes. | MIT license. | A small adapter that writes or reads required OOXML entries through ZIPFoundation is justified. A custom ZIP writer/reader is not justified. |
+| XLSX writing, direct C package | `jmcnamara/libxlsxwriter`, latest observed `v1.2.4`, manifest URL `https://github.com/jmcnamara/libxlsxwriter.git`, product `libxlsxwriter` | Best candidate for XLSX export if a thin Swift adapter is acceptable. Swift Package Index reports iOS build compatibility, and upstream says the library creates XLSX files, supports text/numbers/formulas/hyperlinks, works on iOS, and uses zlib. | It is a C API, not a Swift-native model. Must prove SwiftPM/Xcode can link zlib for app and tests, temp-file behavior works in the iOS sandbox, output omits private fields, formula-leading strings are neutralized, and output opens in Excel, Numbers, and LibreOffice. Must pin a release, not a moving branch. | FreeBSD license plus bundled third-party notices for FreeBSD macros, zlib/minizip, tmpfileplus MPL 2.0 unless compiled out, optional DTOA MIT-style notice, and optional MD5 public-domain/BSD-style notice. Legal/notices review required. | A small Swift adapter from `ReportReviewRow`/template rows to libxlsxwriter calls is justified. Custom XLSX XML generation is not justified if this package builds and passes fixture/open validation. |
+| XLSX writing, Swift wrapper | `damuellen/xlsxwriter.swift`, manifest URL `https://github.com/damuellen/xlsxwriter.swift`, product `xlsxwriter` | Not the preferred route unless direct `jmcnamara/libxlsxwriter` proves worse. The wrapper exposes Swift ergonomics, but its README still describes manual libxlsxwriter installation in places and branch-based SPM usage. | Must prove the selected branch/tag builds on iOS through SwiftPM without manual host-installed C libraries and without a floating branch in release code. The wrapper has lower adoption than upstream libxlsxwriter. | Wrapper license file mirrors libxlsxwriter/freeBSD and bundled third-party notices; verify wrapper-specific copyright and notices before shipping. | A wrapper adapter is acceptable only if it reduces code while preserving pinned, reproducible SwiftPM builds. Otherwise use direct libxlsxwriter. |
+| Legacy XLS BIFF parsing | `libxls/libxls`, latest observed `1.6.3`, URL `https://github.com/libxls/libxls` | Best mature parser candidate for binary `.xls` import semantics, but not drop-in for this repo yet. It reads old OLE/BIFF XLS, has in-memory parsing APIs, fuzzing history, and CI on Mac/Linux/Windows. | No first-party SwiftPM manifest was observed. It uses autotools/configure rather than a direct iOS SwiftPM package. Must prove an iOS-compatible module map or vendored SwiftPM target can build reproducibly in CI before replacing the current OLEKit-plus-BIFF adapter. | BSD 2-clause license. Include notices. | A small import adapter on top of libxls is justified if the package can be vendored cleanly. Until that proof exists, a narrowly scoped BIFF parser on top of OLEKit remains temporarily justified only for required fixture-backed cells. |
+| Legacy XLS BIFF writing | `libxls/libxls` plus search for mature Swift/iOS BIFF writers | No suitable mature SwiftPM/iOS writer was found in this audit. `libxls` is read-focused and is not an XLS writer. `libxlsxwriter` writes only modern `.xlsx`, not legacy BIFF `.xls`. | Because legacy `.xls` export is MVP-required, either find a maintained iOS-compatible BIFF writer in a future audit or keep the smallest possible custom BIFF8/OLE writer with hard limits. Must pass real `.xls` fixtures and open in Excel/LibreOffice/Numbers where supported. | Any custom exception must avoid pulling in unclear-license code snippets. If a future writer is found, license must be re-audited. | A small custom XLS writer exception remains justified for now, but only as a recorded exception with row/column/cell-size limits, OLE/BIFF structural tests, and target-app open validation. |
+
+Recommended next package posture:
+
+1. Add/evaluate `ZIPFoundation` before touching any direct OOXML ZIP assembly.
+2. Evaluate `SwiftDocX` for DOCX generation behind a narrow
+   `PreparedReportPacket` adapter. Keep the existing custom DOCX output only as
+   a temporary bridge until SwiftDocX passes or fails documented fixtures.
+3. Prefer direct `jmcnamara/libxlsxwriter` over `damuellen/xlsxwriter.swift`
+   for XLSX export unless the wrapper proves a pinned iOS SwiftPM release with
+   better ergonomics and no manual native dependency steps.
+4. Evaluate `libxls` only for legacy `.xls` import, not export.
+5. Keep a temporary custom legacy `.xls` writer exception only because no mature
+   iOS SwiftPM BIFF writer was identified. The exception is not release-complete
+   until real workbook fixtures and target-app open checks pass.
+
+Sources checked:
+
+- SwiftDocX: `https://github.com/Techopolis/SwiftDocX`,
+  `https://raw.githubusercontent.com/Techopolis/SwiftDocX/master/Package.swift`,
+  `https://raw.githubusercontent.com/Techopolis/SwiftDocX/master/LICENSE`
+- ZIPFoundation: `https://github.com/weichsel/ZIPFoundation`,
+  `https://raw.githubusercontent.com/weichsel/ZIPFoundation/development/Package.swift`,
+  `https://raw.githubusercontent.com/weichsel/ZIPFoundation/development/LICENSE`
+- libxlsxwriter: `https://swiftpackageindex.com/jmcnamara/libxlsxwriter`,
+  `https://raw.githubusercontent.com/jmcnamara/libxlsxwriter/main/Package.swift`,
+  `https://libxlsxwriter.github.io/`,
+  `https://libxlsxwriter.github.io/getting_started.html`,
+  `https://raw.githubusercontent.com/jmcnamara/libxlsxwriter/main/License.txt`
+- xlsxwriter.swift: `https://github.com/damuellen/xlsxwriter.swift`,
+  `https://raw.githubusercontent.com/damuellen/xlsxwriter.swift/main/Package.swift`,
+  `https://raw.githubusercontent.com/damuellen/xlsxwriter.swift/main/License.txt`
+- libxls: `https://github.com/libxls/libxls`,
+  `https://raw.githubusercontent.com/libxls/libxls/master/README.md`,
+  `https://raw.githubusercontent.com/libxls/libxls/master/LICENSE`,
+  `https://raw.githubusercontent.com/libxls/libxls/master/configure.ac`

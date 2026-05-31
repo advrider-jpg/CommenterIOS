@@ -7,6 +7,7 @@ public enum ReportGenerationError: LocalizedError, Equatable {
     case unavailableSubject(String)
     case noEligibleComment(studentName: String, subject: String)
     case unresolvedPlaceholders(label: String, placeholders: [String])
+    case unsafeTeacherText(label: String, message: String)
 
     public var errorDescription: String? {
         switch self {
@@ -20,6 +21,8 @@ public enum ReportGenerationError: LocalizedError, Equatable {
             return "Draft comments could not be created for \(studentName) in \(subject). Check the result, focus area, and report note, then try again."
         case let .unresolvedPlaceholders(label, placeholders):
             return "\(label) contains template text that must be replaced: \(placeholders.joined(separator: ", "))"
+        case let .unsafeTeacherText(label, message):
+            return message.hasPrefix(label) ? message : "\(label) \(message)"
         }
     }
 }
@@ -94,6 +97,18 @@ public struct ReportGenerator {
             result: result,
             projectMetadata: projectMetadata
         )
+        let repairContext = createTeacherTextRepairContext(student: student, placeholderContext: context)
+        let repairedEvidence = repairEvidenceText(result.evidenceText, context: repairContext)
+        if hasBlockingRepairIssue(repairedEvidence.issues) {
+            throw ReportGenerationError.unsafeTeacherText(label: "Evidence", message: blockingRepairMessage(label: "Evidence", issues: repairedEvidence.issues))
+        }
+        let generationContext = buildPlaceholderContext(
+            student: student,
+            subject: concreteSubject,
+            result: result,
+            projectMetadata: projectMetadata,
+            overrides: repairedEvidence.specificTaskPhrase.map { ["specificTask": $0] } ?? [:]
+        )
 
         trace.append("Request: \(subject); candidates: \(subjectResolution.candidates.joined(separator: ", ")); text subject: \(concreteSubject); level: \(student.yearLevel.rawValue) -> \(normalizedLevel); band: \(achievementLevel.rawValue) -> \(mappedBand)")
 
@@ -102,25 +117,41 @@ public struct ReportGenerator {
             normalizedLevel: normalizedLevel,
             mappedBand: mappedBand,
             result: result,
-            context: context,
+            context: generationContext,
             trace: &trace
         ) ?? assembleFromComponents(
             dataSubjects: subjectResolution.candidates,
             normalizedLevel: normalizedLevel,
             mappedBand: mappedBand,
             result: result,
-            context: context,
+            context: generationContext,
             trace: &trace
         )
 
         guard let generated else {
-            throw ReportGenerationError.noEligibleComment(studentName: context.displayName, subject: subject)
+            throw ReportGenerationError.noEligibleComment(studentName: generationContext.displayName, subject: subject)
         }
 
-        let finalText = cleanSpacing(generated.text)
+        let subjectText = try decorateSubjectText(
+            generated.text,
+            student: student,
+            subject: concreteSubject,
+            result: result,
+            context: generationContext,
+            repairContext: repairContext,
+            repairedEvidence: repairedEvidence,
+            trace: &trace
+        )
+        let finalText = applyReportLayout(
+            subjectText,
+            student: student,
+            subject: concreteSubject,
+            result: result,
+            context: generationContext
+        )
         let unresolved = findUnresolvedPlaceholders(finalText)
         guard unresolved.isEmpty else {
-            throw ReportGenerationError.unresolvedPlaceholders(label: "\(context.displayName) \(subject) report", placeholders: unresolved)
+            throw ReportGenerationError.unresolvedPlaceholders(label: "\(generationContext.displayName) \(subject) report", placeholders: unresolved)
         }
 
         recordUsage(generated.variantID)
@@ -260,6 +291,190 @@ public struct ReportGenerator {
         }.first
     }
 
+    private func decorateSubjectText(
+        _ baseText: String,
+        student: Student,
+        subject: String,
+        result: AchievementResult,
+        context: PlaceholderContext,
+        repairContext: TeacherTextRepairContext,
+        repairedEvidence: RepairedEvidenceText,
+        trace: inout [String]
+    ) throws -> String {
+        var subjectText = cleanSpacing(baseText)
+
+        if !repairedEvidence.appendedText.isEmpty {
+            let evidencePhrase = repairedEvidence.specificTaskPhrase ?? ""
+            let evidenceAlreadyCovered = !evidencePhrase.isEmpty && subjectText.lowercased().contains(evidencePhrase.lowercased())
+            if evidenceAlreadyCovered {
+                trace.append("Teacher evidence was used through a safe specific task phrase.")
+            } else {
+                subjectText = "\(Self.ensureSentence(subjectText)) \(repairedEvidence.appendedText)"
+            }
+        }
+
+        let normalizedSubject = normalizeSubjectLabel(subject)
+        if normalizedSubject == "english", let englishFocus = generateEnglishFocusSentence(student: student, subject: subject, result: result, displayName: context.displayName, pronouns: context) {
+            subjectText = "\(Self.ensureSentence(subjectText)) \(englishFocus)"
+        } else if normalizedSubject == "mathematics", let mathProficiency = generateMathProficiencySentence(student: student, subject: subject, result: result, displayName: context.displayName, pronouns: context) {
+            subjectText = "\(Self.ensureSentence(subjectText)) \(mathProficiency)"
+        }
+
+        subjectText = appendFlagSentences(subjectText, flags: result.flags, student: student, subject: subject, displayName: context.displayName)
+
+        let noteSentence = try generateTeacherNoteSentence(student: student, result: result, repairContext: repairContext)
+        if !noteSentence.isEmpty {
+            trace.append("Teacher/student note emphasis included.")
+            subjectText = "\(Self.ensureSentence(subjectText)) \(noteSentence)"
+        }
+        return cleanSpacing(subjectText)
+    }
+
+    private func applyReportLayout(
+        _ subjectText: String,
+        student: Student,
+        subject: String,
+        result: AchievementResult,
+        context: PlaceholderContext
+    ) -> String {
+        let reportLayout = normalizeReportLayout(projectMetadata.reportLayout)
+        if !reportLayout.enabled { return cleanSpacing(subjectText) }
+
+        let paragraphs: [ReportSection: String] = [
+            .general: generateGeneralParagraph(student: student, subject: subject, displayName: context.displayName),
+            .subject: subjectText,
+            .dispositions: generateDispositionsParagraph(result: result, displayName: context.displayName),
+            .nextSteps: generateNextStepsParagraph(student: student, subject: subject, result: result, displayName: context.displayName)
+        ]
+
+        return reportLayout.order
+            .filter { reportLayout.include[$0] != false }
+            .compactMap { paragraphs[$0]?.trimmingCharacters(in: .whitespacesAndNewlines).trimmedNonEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    private func generateGeneralParagraph(student: Student, subject: String, displayName: String) -> String {
+        guard let attitude = student.attitudeDescriptor?.trimmedNonEmpty else { return "" }
+        let templates = [
+            "{Name} is a {attitude} learner who approaches {Subject} with enthusiasm.",
+            "A {attitude} learner, {Name} engages positively with {Subject} content.",
+            "{Name} approaches learning in a {attitude} manner and participates actively in {Subject}."
+        ]
+        let hash = Self.fnv1a("\(student.id)::\(subject)::\(projectMetadata.id)::general")
+        return templates[Int(hash % UInt32(templates.count))]
+            .replacingOccurrences(of: "{Name}", with: displayName)
+            .replacingOccurrences(of: "{attitude}", with: attitude)
+            .replacingOccurrences(of: "{Subject}", with: subject)
+    }
+
+    private func generateEnglishFocusSentence(student: Student, subject: String, result: AchievementResult, displayName: String, pronouns: PlaceholderContext) -> String? {
+        let tags = stableOrderedArray(result.englishFocusTags)
+        guard !tags.isEmpty else { return nil }
+        let hash = Self.fnv1a("\(student.id)::\(subject)::english-focus")
+        let template: String
+        if tags.count == 1 {
+            template = englishFocusTemplatesSingle[Int(hash % UInt32(englishFocusTemplatesSingle.count))]
+                .replacingOccurrences(of: "{tag}", with: tags[0])
+        } else {
+            template = englishFocusTemplatesDouble[Int(hash % UInt32(englishFocusTemplatesDouble.count))]
+                .replacingOccurrences(of: "{tag1}", with: tags[0])
+                .replacingOccurrences(of: "{tag2}", with: tags[1])
+        }
+        return replacePronounTemplateTokens(template, displayName: displayName, pronouns: pronouns)
+    }
+
+    private func generateMathProficiencySentence(student: Student, subject: String, result: AchievementResult, displayName: String, pronouns: PlaceholderContext) -> String? {
+        let proficiencies = stableOrderedArray(result.mathProficiencies)
+        guard !proficiencies.isEmpty else { return nil }
+        let hash = Self.fnv1a("\(student.id)::\(subject)::math-prof")
+        let template: String
+        if proficiencies.count == 1 {
+            template = mathProficiencyTemplatesSingle[Int(hash % UInt32(mathProficiencyTemplatesSingle.count))]
+                .replacingOccurrences(of: "{prof}", with: proficiencies[0])
+        } else {
+            template = mathProficiencyTemplatesDouble[Int(hash % UInt32(mathProficiencyTemplatesDouble.count))]
+                .replacingOccurrences(of: "{prof1}", with: proficiencies[0])
+                .replacingOccurrences(of: "{prof2}", with: proficiencies[1])
+        }
+        return replacePronounTemplateTokens(template, displayName: displayName, pronouns: pronouns)
+    }
+
+    private func generateDispositionsParagraph(result: AchievementResult, displayName: String) -> String {
+        let fragments = stableOrderedArray(result.mathMindsetToggles).map(mindsetToFragment)
+        if fragments.isEmpty { return "" }
+        if fragments.count == 1 { return "\(displayName) \(fragments[0])." }
+        if fragments.count == 2 { return "\(displayName) \(fragments[0]) and \(fragments[1])." }
+        let last = fragments[fragments.count - 1]
+        return "\(displayName) \(fragments.dropLast().joined(separator: ", ")), and \(last)."
+    }
+
+    private func generateNextStepsParagraph(student: Student, subject: String, result: AchievementResult, displayName: String) -> String {
+        let goals = stableOrderedArray(result.nextStepGoals)
+        guard !goals.isEmpty else { return "" }
+        let hash = Self.fnv1a("\(student.id)::\(subject)::next-steps")
+        if goals.count == 1 {
+            return nextStepTemplatesSingle[Int(hash % UInt32(nextStepTemplatesSingle.count))]
+                .replacingOccurrences(of: "{Name}", with: displayName)
+                .replacingOccurrences(of: "{goal}", with: goals[0])
+        }
+        return nextStepTemplatesDouble[Int(hash % UInt32(nextStepTemplatesDouble.count))]
+            .replacingOccurrences(of: "{Name}", with: displayName)
+            .replacingOccurrences(of: "{goal1}", with: goals[0])
+            .replacingOccurrences(of: "{goal2}", with: goals[1])
+    }
+
+    private func sanitizeNote(_ value: String?, label: String) throws -> String {
+        let trimmed = cleanSpacing((value ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+        if trimmed.isEmpty { return "" }
+        if !findUnresolvedPlaceholders(trimmed).isEmpty {
+            throw ReportGenerationError.unsafeTeacherText(label: label, message: "still contains template text that must be replaced.")
+        }
+        if trimmed.count > 180 {
+            throw ReportGenerationError.unsafeTeacherText(label: label, message: "must be 180 characters or fewer before generation.")
+        }
+        return trimmed
+    }
+
+    private func generateTeacherNoteSentence(student: Student, result: AchievementResult, repairContext: TeacherTextRepairContext) throws -> String {
+        let notes = [
+            try sanitizeNote(student.reportEmphasisNote, label: "Student report emphasis note"),
+            try sanitizeNote(result.reportEmphasisNote, label: "Result report emphasis note")
+        ].filter { !$0.isEmpty }
+        guard !notes.isEmpty else { return "" }
+
+        let repaired = repairReportNoteText(notes.joined(separator: " "), context: repairContext)
+        if hasBlockingRepairIssue(repaired.issues) {
+            throw ReportGenerationError.unsafeTeacherText(label: "Report note", message: blockingRepairMessage(label: "Report note", issues: repaired.issues))
+        }
+        return repaired.text
+    }
+
+    private func appendFlagSentences(_ text: String, flags: [String: Bool]?, student: Student, subject: String, displayName: String) -> String {
+        guard let flags else { return text }
+        var updated = cleanSpacing(text)
+        reportFlags.forEach { flag in
+            guard flags[flag.id] == true else { return }
+            let hash = Self.fnv1a("\(student.id)::\(subject)::\(flag.id)")
+            let sentence = flag.sentences[Int(hash % UInt32(flag.sentences.count))]
+                .replacingOccurrences(of: "[StudentName]", with: displayName)
+                .replacingOccurrences(of: "[Student Name]", with: displayName)
+                .replacingOccurrences(of: "[Subject]", with: subject)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !sentence.isEmpty else { return }
+            updated = "\(Self.ensureSentence(updated)) \(sentence)"
+        }
+        return cleanSpacing(updated)
+    }
+
+    private func replacePronounTemplateTokens(_ template: String, displayName: String, pronouns: PlaceholderContext) -> String {
+        template
+            .replacingOccurrences(of: "{Name}", with: displayName)
+            .replacingOccurrences(of: "{HeShe}", with: pronouns.heShe)
+            .replacingOccurrences(of: "{heshe}", with: pronouns.heSheLower)
+            .replacingOccurrences(of: "{HisHer}", with: pronouns.hisHer)
+            .replacingOccurrences(of: "{hisher}", with: pronouns.hisHer)
+    }
+
     private func canUseVariant(_ variantID: String) -> Bool {
         let current = usageCounts[variantID] ?? 0
         if current >= maxUsagePerClass { return false }
@@ -336,8 +551,8 @@ public struct ReportGenerator {
 
     private static func fnv1a(_ value: String) -> UInt32 {
         var hash: UInt32 = 0x811c9dc5
-        for scalar in value.unicodeScalars {
-            hash ^= UInt32(scalar.value)
+        for codeUnit in value.utf16 {
+            hash ^= UInt32(codeUnit)
             hash = hash &* 0x01000193
         }
         return hash

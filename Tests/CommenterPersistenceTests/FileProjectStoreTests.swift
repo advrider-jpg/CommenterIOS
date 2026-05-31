@@ -46,6 +46,30 @@ final class FileProjectStoreTests: XCTestCase {
         XCTAssertEqual(snapshots[0].project.metadata.name, "Project")
     }
 
+    func testSaveMaintainsLocalSQLiteIndexFile() async throws {
+        let root = temporaryRoot()
+        let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })
+        let saved = try store.saveProject(fixtureProject())
+        let indexURL = projectIndexURL(root: root)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path))
+        XCTAssertGreaterThan(try fileSize(indexURL), 0)
+
+        var renamed = saved
+        renamed.metadata.name = "Renamed Project"
+        _ = try store.saveProject(renamed, options: SaveProjectOptions(expectedRevision: 1))
+        XCTAssertGreaterThan(try fileSize(indexURL), 0)
+
+        try store.deleteProject(id: "p1")
+        do {
+            _ = try await store.loadProject(id: "p1")
+            XCTFail("Expected deleted project to be unavailable after index-backed delete")
+        } catch ProjectStoreError.projectNotFound(let id) {
+            XCTAssertEqual(id, "p1")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path))
+        }
+    }
+
     func testTamperedProjectFailsReadVerification() throws {
         let root = temporaryRoot()
         let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })
@@ -99,11 +123,21 @@ final class FileProjectStoreTests: XCTestCase {
             .appendingPathComponent("CommenterIOSTests-\(UUID().uuidString)", isDirectory: true)
     }
 
+    private func projectIndexURL(root: URL) -> URL {
+        root
+            .appendingPathComponent("projects", isDirectory: true)
+            .appendingPathComponent("index.sqlite")
+    }
+
     private func projectJSONSize(root: URL, projectId: String) throws -> UInt64 {
         let url = root
             .appendingPathComponent("projects", isDirectory: true)
             .appendingPathComponent(projectId, isDirectory: true)
             .appendingPathComponent("project.json")
+        return try fileSize(url)
+    }
+
+    private func fileSize(_ url: URL) throws -> UInt64 {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes[.size] as? NSNumber)?.uint64Value ?? 0
     }

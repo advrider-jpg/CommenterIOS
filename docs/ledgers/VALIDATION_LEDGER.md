@@ -214,6 +214,16 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   passed. `swift test`, `xcodebuild ... build`, and XcodeBuildMCP scheme
   listing/build validation remained blocked because `swift` and `xcodebuild`
   are not available on PATH in this Windows checkout.
+- Re-ran available checks after the OSS/native workflow implementation pass:
+  `git diff --check`, `git diff --cached --check`, `git ls-files --eol`,
+  untracked line-ending scan for new Swift/test files, no-disabled-required-flow
+  UI scan, no-direct-sqlite scan, OOXML ZIP custom-writer scan, and package API
+  source checks for CodableCSV/CoreXLSX/OLEKit/ZIPFoundation. Hygiene and EOL
+  checks passed. `swift package resolve`, `swift test`, and
+  `xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination
+  'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO` remain
+  blocked because `swift` and `xcodebuild` are not available on PATH in this
+  Windows checkout.
 
 ## Future Required Gates
 

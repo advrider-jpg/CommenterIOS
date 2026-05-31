@@ -160,3 +160,29 @@ Append material work history here. Keep entries short, dated, and factual.
   native SwiftUI/HIG wrapper need has been proven.
 - Recorded the remaining legacy `.xls` BIFF decoding/writing risk without
   claiming production parity is complete.
+
+## 2026-05-31 - OSS/native workflow implementation pass
+
+- Added the approved GRDB and ZIPFoundation package dependencies, migrated the
+  SQLite project index off direct `sqlite3`, and replaced the custom OOXML ZIP
+  byte writer with a ZIPFoundation-backed adapter.
+- Wired native SwiftUI file importer/exporter/share flows through TCA actions
+  for backup JSON, roster/results CSV/XLSX/XLS imports, and prepared DOCX/XLSX/XLS
+  report exports, including security-scoped access for imported files and no
+  empty-data fallback when exporting prepared files.
+- Split the root app reducer/view surface into owned TCA workflow files and
+  native SwiftUI view components while keeping required teacher workflow buttons
+  wired to real reducer operations.
+- Added CodableCSV/CoreXLSX/OLEKit-backed import adapters, V3-style generation
+  repair/decorate/layout behavior, truthful locked-report generation messaging,
+  and focused reducer/import/generation/persistence tests.
+- Tightened import flows to validate picked roster/results/backup files into a
+  visible confirmation preview before any durable project save, and made backup
+  import previews reachable even when no project is already open.
+- Added spreadsheet fixture coverage for CSV, UTF-16 CSV, XLSX inline strings,
+  XLSX shared strings, XLSX numeric cells, malformed files, oversized files,
+  and generated legacy XLS workbook streams; fixed the CodableCSV reader config
+  to use the package's standard CRLF/LF row delimiter instead of unsupported
+  delimiter inference.
+- Windows validation remained limited to hygiene/static checks because `swift`
+  and `xcodebuild` were unavailable on PATH.

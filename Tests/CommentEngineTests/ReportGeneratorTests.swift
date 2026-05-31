@@ -67,6 +67,188 @@ final class ReportGeneratorTests: XCTestCase {
         XCTAssertEqual(report.text, "Ava explains ideas in English.")
     }
 
+    func testRepairsAndAppendsEvidenceWhenItIsNotSafeAsSpecificTask() throws {
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+        var sourceResult = result()
+        sourceResult.evidenceText = "used quotations"
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(report.text, "Ava writes clearly in English. Ava used quotations.")
+        XCTAssertTrue(report.trace.contains("Rejected by placeholders/context"))
+    }
+
+    func testUsesSafeEvidencePhraseForSpecificTaskWithoutDuplicateAppend() throws {
+        var data = fixtureData()
+        data.assembledVariants = [
+            AssembledVariant(variantID: "specific", keyID: "strength", text: "{StudentName} wrote a [text type] for [specific task].")
+        ]
+        var sourceResult = result()
+        sourceResult.textType = "persuasive text"
+        sourceResult.evidenceText = "advertising campaign"
+        var generator = try ReportGenerator(data: data, projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(report.text, "Ava wrote a persuasive text for advertising campaign.")
+        XCTAssertEqual(report.variantIds, ["specific"])
+        XCTAssertTrue(report.trace.contains("Teacher evidence was used through a safe specific task phrase."))
+    }
+
+    func testAppendsRepairedReportNotesAndBlocksUnsafeNotes() throws {
+        var sourceResult = result()
+        sourceResult.reportEmphasisNote = "needs planning carefully"
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        let report = try generator.generateReport(
+            student: student(reportEmphasisNote: "using feedback"),
+            subject: "English",
+            result: sourceResult,
+            generatedAt: 1
+        )
+
+        XCTAssertEqual(report.text, "Ava writes clearly in English. Ava has shown using feedback. Ava would benefit from planning carefully.")
+        XCTAssertTrue(report.trace.contains("Teacher/student note emphasis included."))
+
+        sourceResult.reportEmphasisNote = "Keep [Student Name] placeholder."
+        XCTAssertThrowsError(try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 2)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("template text"))
+        }
+    }
+
+    func testAddsEnglishFocusAndReportFlagsDeterministically() throws {
+        var sourceResult = result()
+        sourceResult.englishFocusTags = ["Inferencing"]
+        sourceResult.flags = [
+            "TURN_TAKING_CALLING_OUT": true,
+            "PARTICIPATION_ENGAGEMENT": true
+        ]
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(gender: .female), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(
+            report.text,
+            "Ava writes clearly in English. In Inferencing, she demonstrates solid understanding. Ava is developing respectful discussion habits in English by waiting to be called on before speaking. Ava participates confidently in English and contributes thoughtful ideas during discussions."
+        )
+    }
+
+    func testAddsMathProficiencyDispositionsAndNextStepLayout() throws {
+        var sourceResult = AchievementResult(
+            studentId: "s1",
+            subject: "Mathematics",
+            achievementLevel: .atStandard,
+            focusStrand: "Number",
+            mathProficiencies: ["Fluency"],
+            mathMindsetToggles: ["Growth mindset", "Checks working carefully"],
+            nextStepGoals: ["justify reasoning", "check working and show steps"]
+        )
+        sourceResult.evidenceText = nil
+        var mathMetadata = metadata(subject: "Mathematics")
+        mathMetadata.reportLayout = ReportLayout(
+            enabled: true,
+            order: [.general, .subject, .dispositions, .nextSteps],
+            include: [.general: true, .subject: true, .dispositions: true, .nextSteps: true]
+        )
+        var generator = try ReportGenerator(data: mathData(), projectMetadata: mathMetadata)
+
+        let report = try generator.generateReport(
+            student: student(gender: .female, attitudeDescriptor: "diligent"),
+            subject: "Mathematics",
+            result: sourceResult,
+            generatedAt: 1
+        )
+
+        XCTAssertEqual(
+            report.text,
+            [
+                "Ava is a diligent learner who approaches Mathematics with enthusiasm.",
+                "Ava solves problems in Mathematics. Ava shows solid skills in Fluency.",
+                "Ava demonstrates a growth mindset and checks working carefully.",
+                "To continue developing, Ava will focus on justify reasoning as well as check working and show steps."
+            ].joined(separator: "\n\n")
+        )
+    }
+
+    func testLayoutCanReturnSubjectOnlyWhenDisabled() throws {
+        var sourceMetadata = metadata()
+        sourceMetadata.reportLayout = ReportLayout(enabled: false)
+        var sourceResult = result()
+        sourceResult.nextStepGoals = ["use evidence from text"]
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: sourceMetadata)
+
+        let report = try generator.generateReport(student: student(attitudeDescriptor: "curious"), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(report.text, "Ava writes clearly in English.")
+    }
+
+    func testLayoutIncludeDefaultsKeepSubjectAndMissingSectionsIncluded() throws {
+        var sourceMetadata = metadata()
+        sourceMetadata.reportLayout = ReportLayout(
+            enabled: true,
+            order: [.nextSteps, .subject],
+            include: [.general: false, .subject: false]
+        )
+        var sourceResult = result()
+        sourceResult.nextStepGoals = ["use evidence from text"]
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: sourceMetadata)
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(
+            report.text,
+            "A helpful next step for Ava is to use evidence from text.\n\nAva writes clearly in English."
+        )
+    }
+
+    func testOptionalDecorationArraysIgnoreBlankValues() throws {
+        var sourceResult = result()
+        sourceResult.englishFocusTags = [" ", "Inferencing", ""]
+        sourceResult.mathMindsetToggles = ["", "Growth mindset"]
+        sourceResult.nextStepGoals = ["", "use evidence from text"]
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(gender: .female), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(
+            report.text,
+            [
+                "Ava writes clearly in English. In Inferencing, she demonstrates solid understanding.",
+                "Ava demonstrates a growth mindset.",
+                "A helpful next step for Ava is to use evidence from text."
+            ].joined(separator: "\n\n")
+        )
+    }
+
+    func testUnsafeEvidenceTextBlocksGeneration() throws {
+        var sourceResult = result()
+        sourceResult.evidenceText = "Keep [context] placeholder."
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        XCTAssertThrowsError(try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Evidence could not be used safely"))
+            XCTAssertTrue(error.localizedDescription.contains("template placeholders"))
+        }
+    }
+
+    func testTemplateHashMatchesV3UTF16SelectionForNonASCIIKeys() throws {
+        var sourceMetadata = metadata(id: "p🙂")
+        sourceMetadata.reportLayout = ReportLayout(enabled: true)
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: sourceMetadata)
+
+        let report = try generator.generateReport(
+            student: student(attitudeDescriptor: "curious"),
+            subject: "English",
+            result: result(),
+            generatedAt: 1
+        )
+
+        XCTAssertEqual(
+            report.text,
+            "A curious learner, Ava engages positively with English content.\n\nAva writes clearly in English."
+        )
+    }
+
     func testGenerationFingerprintUsesStableSubjectOrderAndSourceContextNormalization() {
         var leftMetadata = metadata()
         leftMetadata.selectedSubjects = [
@@ -127,21 +309,42 @@ final class ReportGeneratorTests: XCTestCase {
         )
     }
 
-    private func metadata() -> ProjectMetadata {
+    private func mathData() -> CommentEngineData {
+        CommentEngineData(
+            componentBank: [
+                Component(keyID: "math-strength", subject: "Mathematics", type: .strength, level: "Year 5", band: "At Standard", text: "{StudentName} solves problems in {Subject}.", strand: "Number")
+            ],
+            recipeBank: [Recipe(recipeID: "r1", pattern: "{Strength}")],
+            assembledVariants: [
+                AssembledVariant(variantID: "math-v1", keyID: "math-strength", text: "{StudentName} solves problems in {Subject}.")
+            ],
+            uniquenessGuard: [UniquenessGuard(rule: "MaxUsagePerClass", value: 2)]
+        )
+    }
+
+    private func metadata(id: String = "p1", subject: String = "English") -> ProjectMetadata {
         ProjectMetadata(
-            id: "p1",
+            id: id,
             name: "Project",
             term: "Term 1",
             yearLevel: .year5,
             createdAt: 1,
             updatedAt: 1,
-            selectedSubjects: ["English": SelectedSubject(name: "English", allStrandsSelected: true)],
+            selectedSubjects: [subject: SelectedSubject(name: subject, allStrandsSelected: true)],
             useFirstNameOnly: true
         )
     }
 
-    private func student() -> Student {
-        Student(id: "s1", firstName: "Ava", lastName: "Ng", yearLevel: .year5)
+    private func student(gender: Gender? = nil, reportEmphasisNote: String? = nil, attitudeDescriptor: String? = nil) -> Student {
+        Student(
+            id: "s1",
+            firstName: "Ava",
+            lastName: "Ng",
+            gender: gender,
+            yearLevel: .year5,
+            reportEmphasisNote: reportEmphasisNote,
+            attitudeDescriptor: attitudeDescriptor
+        )
     }
 
     private func result() -> AchievementResult {

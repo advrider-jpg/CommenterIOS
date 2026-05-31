@@ -136,3 +136,34 @@ or target-app compatibility.
 
 Evidence:
 `docs/dependencies/DEPENDENCY_AUDIT.md`.
+
+## 2026-05-31 - Document package suitability for DOCX, ZIP, XLSX, and XLS
+
+Decision:
+Use the package suitability matrix in
+`docs/dependencies/DEPENDENCY_AUDIT.md` as the current decision record for
+document/workbook dependency work:
+
+- `ZIPFoundation` is suitable generic ZIP/OOXML infrastructure and should
+  replace custom ZIP assembly where a higher-level package does not own the
+  package layer.
+- `SwiftDocX` must be evaluated before further custom DOCX writer work, but it
+  remains proof-gated because the upstream project is young.
+- Direct `jmcnamara/libxlsxwriter` is the preferred XLSX writer candidate over
+  `damuellen/xlsxwriter.swift` unless the wrapper proves a pinned iOS SwiftPM
+  release with no manual native dependency setup.
+- `libxls` is a parser candidate for legacy `.xls` import only. It does not
+  solve legacy `.xls` export.
+- A narrow custom legacy `.xls` writer exception remains temporarily justified
+  because no mature iOS SwiftPM BIFF writer was identified, but the exception is
+  not release-complete without fixtures and target-app open validation.
+
+Rationale:
+The app must keep CSV, XLSX, legacy XLS, DOCX, and backup JSON as real MVP
+formats while avoiding ownership of broad generic infrastructure. The current
+audit separates suitable generic packages from areas where package support is
+not yet proven enough for truthful production behavior.
+
+Evidence:
+`docs/OSS_DEPENDENCY_POLICY.md`; `docs/dependencies/DEPENDENCY_AUDIT.md`;
+upstream package documentation linked in the audit.
