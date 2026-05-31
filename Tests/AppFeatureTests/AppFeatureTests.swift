@@ -150,7 +150,7 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.createProjectTapped) {
             $0.operationStatus = .failed("Project storage is not available yet. Wait for local storage to load, or resolve the storage error shown on this screen.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
     }
 
 
@@ -203,7 +203,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedTab = .projects
             $0.operationStatus = .saved("Room 5 was deleted after a verified recovery snapshot was created.")
         }
-        XCTAssertEqual(await probe.values(), ["delete-p1"])
+        await XCTAssertProbeValues(probe, ["delete-p1"])
     }
 
     func testDirtyProjectCannotBeDeletedUntilVerifiedStorageReflectsCurrentState() async {
@@ -229,7 +229,7 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.deleteProjectConfirmed("p1")) {
             $0.operationStatus = .failed("Save or reopen the project before deleting it so the recovery snapshot reflects verified local storage.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
     }
 
     func testPendingImportBlocksProjectDeletion() async {
@@ -263,7 +263,7 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.deleteProjectConfirmed("p1")) {
             $0.operationStatus = .failed("Roster import preview is waiting. Confirm or cancel the import before deleting this project.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
     }
 
     func testProjectYearLevelEditMarksProjectDirtyAndSaveUsesVerifiedStorePath() async {
@@ -356,7 +356,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
 
         await store.send(.saveProjectTapped) {
             $0.projectStorageStatus = .saving
@@ -372,7 +372,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["verified-save"])
+        await XCTAssertProbeValues(probe, ["verified-save"])
     }
 
     func testManualRosterSubjectResultAndReportEditsAreSavedOnlyThroughStoreResponse() async {
@@ -477,7 +477,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness(edited)
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
-        XCTAssertEqual(await probe.values(), [])
+        await XCTAssertProbeValues(probe, [])
 
         await store.send(.saveProjectTapped) {
             $0.projectStorageStatus = .saving
@@ -495,7 +495,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["verified-save"])
+        await XCTAssertProbeValues(probe, ["verified-save"])
     }
 
     func testManualEditSaveFailureDoesNotReportSuccessOrReplaceDirtyProject() async {
@@ -585,7 +585,7 @@ final class AppFeatureTests: XCTestCase {
             $0.operationStatus = .prepared("1 student validated from XLSX. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from XLSX. Confirm to save this roster import locally."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster"])
+        await XCTAssertProbeValues(probe, ["parsed-roster"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -600,7 +600,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Roster imported, saved, and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster", "verified-save"])
+        await XCTAssertProbeValues(probe, ["parsed-roster", "verified-save"])
     }
 
     func testRosterImportFailureLeavesSelectedProjectUnchanged() async {
@@ -803,7 +803,7 @@ final class AppFeatureTests: XCTestCase {
             $0.operationStatus = .prepared("Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.")
             $0.workflowMessage = "Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup"])
+        await XCTAssertProbeValues(probe, ["parsed-backup"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -818,7 +818,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = message
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup", "verified-save"])
+        await XCTAssertProbeValues(probe, ["parsed-backup", "verified-save"])
     }
 
     func testBackupImportSaveFailureAfterConfirmClearsPreviewAndDoesNotReportSuccess() async {
@@ -869,7 +869,7 @@ final class AppFeatureTests: XCTestCase {
             $0.operationStatus = .prepared("Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.")
             $0.workflowMessage = "Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup"])
+        await XCTAssertProbeValues(probe, ["parsed-backup"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -880,7 +880,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.operationStatus = .failed("Import failed. Project data was left unchanged: Save failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["parsed-backup", "failed-save"])
+        await XCTAssertProbeValues(probe, ["parsed-backup", "failed-save"])
     }
 
     func testRosterImportSaveFailureAfterConfirmClearsPreviewAndLeavesProjectUnchanged() async {
@@ -931,7 +931,7 @@ final class AppFeatureTests: XCTestCase {
             $0.operationStatus = .prepared("1 student validated from CSV. Confirm to save this roster import locally.")
             $0.workflowMessage = "1 student validated from CSV. Confirm to save this roster import locally."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster"])
+        await XCTAssertProbeValues(probe, ["parsed-roster"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -942,7 +942,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.operationStatus = .failed("Import failed. Project data was left unchanged: Save failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster", "failed-save"])
+        await XCTAssertProbeValues(probe, ["parsed-roster", "failed-save"])
     }
 
     func testResultsImportPickPreparesPreviewWithoutSavingThenConfirmCommits() async {
@@ -996,7 +996,7 @@ final class AppFeatureTests: XCTestCase {
             $0.operationStatus = .prepared("1 result row validated from XLSX. Confirm to save these results locally.")
             $0.workflowMessage = "1 result row validated from XLSX. Confirm to save these results locally."
         }
-        XCTAssertEqual(await probe.values(), ["parsed-results"])
+        await XCTAssertProbeValues(probe, ["parsed-results"])
 
         await store.send(.confirmImportTapped) {
             $0.projectStorageStatus = .importing
@@ -1011,7 +1011,7 @@ final class AppFeatureTests: XCTestCase {
             $0.workflowMessage = "Results imported, saved, and verified."
             $0.projects = [projectSummary(saved)]
         }
-        XCTAssertEqual(await probe.values(), ["parsed-results", "verified-save"])
+        await XCTAssertProbeValues(probe, ["parsed-results", "verified-save"])
     }
 
     func testImportPreviewCancelLeavesSelectedProjectUnchangedAndDoesNotSave() async {
@@ -1061,7 +1061,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.operationStatus = .cancelled("Import preview cancelled. No project data changed.")
         }
-        XCTAssertEqual(await probe.values(), ["parsed-roster"])
+        await XCTAssertProbeValues(probe, ["parsed-roster"])
     }
 
     func testResultsImportParseFailureDoesNotSaveOrReportSuccess() async {
@@ -1095,7 +1095,7 @@ final class AppFeatureTests: XCTestCase {
             $0.projectStorageStatus = .loaded
             $0.operationStatus = .failed("Import failed. Project data was left unchanged: Import parse failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["failed-results-parse"])
+        await XCTAssertProbeValues(probe, ["failed-results-parse"])
     }
 
     func testReportExportPreparationFailureClearsExistingPreparedFile() async {
@@ -1194,7 +1194,7 @@ final class AppFeatureTests: XCTestCase {
             $0.projectStorageStatus = .loaded
             $0.operationStatus = .failed("Reports were not generated: Generation failed for test.")
         }
-        XCTAssertEqual(await probe.values(), ["failed-generation"])
+        await XCTAssertProbeValues(probe, ["failed-generation"])
     }
 }
 
@@ -1226,6 +1226,16 @@ private struct TestUnexpectedSave: LocalizedError {
     var errorDescription: String? {
         "Unexpected save call."
     }
+}
+
+private func XCTAssertProbeValues(
+    _ probe: WorkflowProbe,
+    _ expected: [String],
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    let values = await probe.values()
+    XCTAssertEqual(values, expected, file: file, line: line)
 }
 
 private actor WorkflowProbe {

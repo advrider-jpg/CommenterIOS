@@ -309,3 +309,4 @@ Append material work history here. Keep entries short, dated, and factual.
 - Split the legacy XLS little-endian double conversion into explicit byte terms after CI showed the combined bit expression exceeded Swift's type-check budget.
 - Added the missing persistence import for `RecoveryReason` in AppFeature and restored an explicit `FileWrapper` return in prepared export presentation.
 - Removed the duplicate project-summary helper from the store client and imported CommentEngine where the split project reducer reads readiness.
+- Fixed AppFeatureTests probe assertions so actor-isolated values are awaited before entering XCTest autoclosures.
