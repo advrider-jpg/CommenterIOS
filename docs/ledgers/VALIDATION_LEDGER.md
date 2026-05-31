@@ -379,6 +379,11 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   noninteractive Xcode. The CI app-target build command now includes
   `-skipPackagePluginValidation` and `-skipMacroValidation` so the real app
   compilation can run in Actions.
+- GitHub Actions PR run `26718211590` on commit
+  `c9f6f3cff5e08bb003c10cdb099ef11e14da087c` passed the full current CI job:
+  `swift package resolve`, `swift test`, and the unsigned generic iOS Simulator
+  app-target `xcodebuild` build with package plugin and macro validation
+  skipped for noninteractive CI.
 
 ## Future Required Gates
 
