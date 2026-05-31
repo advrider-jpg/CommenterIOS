@@ -61,12 +61,52 @@ final class FileProjectStoreTests: XCTestCase {
         XCTAssertGreaterThan(try fileSize(indexURL), 0)
 
         try store.deleteProject(id: "p1")
+        let snapshots = try store.listRecoverySnapshots(projectId: "p1")
+        XCTAssertEqual(snapshots.count, 1)
+        XCTAssertEqual(snapshots[0].reason, .beforeDelete)
+        XCTAssertFalse(snapshots[0].key.isEmpty)
+        XCTAssertEqual(snapshots[0].projectId, "p1")
+        XCTAssertEqual(snapshots[0].projectName, "Renamed Project")
+        XCTAssertEqual(snapshots[0].project.metadata.name, "Renamed Project")
+        XCTAssertEqual(snapshots[0].project.metadata.persistence?.revision, 2)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryDirectoryURL(root: root, projectId: "p1").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: projectFileURL(root: root, projectId: "p1").path))
+        let allRecoverySnapshots = try store.listRecoverySnapshots()
+        XCTAssertEqual(allRecoverySnapshots.map(\.key), snapshots.map(\.key))
+
         do {
             _ = try await store.loadProject(id: "p1")
             XCTFail("Expected deleted project to be unavailable after index-backed delete")
         } catch ProjectStoreError.projectNotFound(let id) {
             XCTAssertEqual(id, "p1")
             XCTAssertTrue(FileManager.default.fileExists(atPath: indexURL.path))
+        }
+    }
+
+    func testRecoverySnapshotListingRejectsMismatchedSnapshotMetadata() throws {
+        let root = temporaryRoot()
+        let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })
+        let saved = try store.saveProject(fixtureProject())
+        let recoveryDirectory = recoveryDirectoryURL(root: root, projectId: "p1")
+        try FileManager.default.createDirectory(at: recoveryDirectory, withIntermediateDirectories: true)
+        let snapshot = RecoverySnapshot(
+            key: "bad-metadata",
+            projectId: "other-project",
+            projectName: saved.metadata.name,
+            createdAt: 1_000,
+            reason: .beforeDelete,
+            project: saved
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let snapshotURL = recoveryDirectory.appendingPathComponent("bad-metadata.json")
+        try encoder.encode(snapshot).write(to: snapshotURL, options: [.atomic])
+
+        do {
+            _ = try store.listRecoverySnapshots(projectId: "p1")
+            XCTFail("Expected mismatched recovery metadata to fail verification")
+        } catch ProjectStoreError.verificationFailed {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: projectFileURL(root: root, projectId: "p1").path))
         }
     }
 
@@ -130,11 +170,22 @@ final class FileProjectStoreTests: XCTestCase {
     }
 
     private func projectJSONSize(root: URL, projectId: String) throws -> UInt64 {
-        let url = root
+        try fileSize(projectFileURL(root: root, projectId: projectId))
+    }
+
+    private func projectFileURL(root: URL, projectId: String) -> URL {
+        root
             .appendingPathComponent("projects", isDirectory: true)
             .appendingPathComponent(projectId, isDirectory: true)
             .appendingPathComponent("project.json")
-        return try fileSize(url)
+    }
+
+    private func recoveryDirectoryURL(root: URL, projectId: String) -> URL {
+        let url = root
+            .appendingPathComponent("projects", isDirectory: true)
+            .appendingPathComponent(projectId, isDirectory: true)
+            .appendingPathComponent("recovery", isDirectory: true)
+        return url
     }
 
     private func fileSize(_ url: URL) throws -> UInt64 {

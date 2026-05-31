@@ -186,3 +186,103 @@ Append material work history here. Keep entries short, dated, and factual.
   delimiter inference.
 - Windows validation remained limited to hygiene/static checks because `swift`
   and `xcodebuild` were unavailable on PATH.
+
+## 2026-05-31 - OSS/package compliance audit refresh
+
+- Audited current Swift imports against `Package.swift` target dependencies and
+  documented that all third-party imports found in `Sources` and `Tests` have
+  matching manifest products.
+- Updated the dependency audit's current package posture to include GRDB.swift
+  and ZIPFoundation, which are already present in the manifest and source.
+- Recorded the remaining policy risks from current source: custom DOCX
+  WordprocessingML generation, custom XLSX SpreadsheetML generation, custom
+  legacy XLS BIFF/OLE writing, and narrow custom BIFF decoding for `.xls`
+  imports still need package evaluation, fixture proof, target-app validation,
+  or a durable exception before release parity is claimed.
+
+## 2026-05-31 - QA/truthfulness action-state audit
+
+- Audited production source paths for fake, placeholder, TODO, decorative,
+  disabled, unsupported, unavailable, stateless, and mock-like behavior.
+- Fixed the Create Project action so unavailable local project storage produces
+  a visible failure instead of a silent no-op, and disabled project create/backup
+  import buttons until local storage is loaded.
+- Tightened the Worklist screen so editing/actions pause during real in-flight
+  operations, stale prepared files are hidden after unsaved edits, and report
+  export buttons stay disabled with explanatory copy until readiness is complete.
+- Added reducer coverage that proves Create Project does not call the store or
+  report success when storage is unavailable.
+- Re-ran Windows-safe hygiene, line-ending, direct SQLite, direct ZIP,
+  package/import, network/privacy, and dataset hash checks; Swift/Xcode tests
+  remained blocked because the Apple toolchain is unavailable on this Windows
+  checkout.
+
+## 2026-05-31 - Persistence and reducer save-state tightening
+
+- Preserved before-delete recovery snapshots by deleting the canonical
+  `project.json` file while leaving the project recovery directory listable;
+  deleted projects still disappear from load/list flows and the SQLite index.
+- Made manual add-student reducer behavior deterministic with a local
+  collision-checked student id and blank editable names instead of a prefilled
+  placeholder name.
+- Added reducer coverage for metadata edits, manual roster add/edit/delete,
+  subject deselection pruning, achievement entry, report manual edit/lock, and
+  save failure so success is asserted only after a verified store save response.
+- Added persistence coverage proving the before-delete recovery snapshot remains
+  available after project deletion.
+
+## 2026-05-31 - Import/export and generation parity tightening
+
+- Added package-level roster/results import preview helpers that parse
+  CSV/XLSX/XLS, validate all rows, and return prepared project changes without
+  mutating the open project before user confirmation and verified save.
+- Wired AppFeature import preview state to report the accepted rows from the
+  picked file rather than total project roster/results counts after merge.
+- Tightened DOCX and review workbook preparation so written files are read back
+  and checked for expected report/header/workbook content, with failed outputs
+  removed instead of offered for export.
+- Tightened generation parity: zero-count usage entries no longer seed
+  uniqueness blocking, empty context markers such as `not applicable` and em
+  dash are treated as missing context, and generation fingerprints now use a
+  V3-style JSON string shape.
+- Added focused import/export and generation tests for the above behavior.
+
+## 2026-05-31 - Code-lane course correction and integration
+
+- Reassigned the import/export, teacher UI, TCA/persistence, and generation
+  parity lanes to concrete source/test slices after the monitor requested more
+  than audit-only work.
+- Tightened DOCX/XLSX/XLS export readback verification to reject prepared files
+  that leak internal teacher notes, variant IDs, traces, fingerprints, or
+  superseded generated text.
+- Tightened the Worklist UI so pending import previews visibly block editing
+  until confirmed/cancelled, and prepared file actions distinguish verified
+  local preparation, file-export save, and share-sheet launch states.
+- Cleared stale prepared export URLs when a new file preparation starts or
+  fails, with reducer coverage for stale prepared-file removal.
+- Matched CommenterV3 readiness precedence for manual edits by treating blank
+  manual edits as the current report text, blocking export rather than falling
+  back to generated text.
+- Tightened backup JSON export preparation so a file that fails readback
+  verification, or reads back as a different project id, is removed instead of
+  being left in the export directory.
+- Removed stale unused import/export placeholder contracts that advertised an
+  unavailable production importer/exporter and unused shared-file state after
+  the real native file workflows were wired.
+
+## 2026-05-31 - Subagent code slices for support, import, persistence, and readiness
+
+- Assigned four new code-owning subagents to disjoint implementation slices:
+  Support UI state, import preview no-op blocking, persistence recovery
+  verification, and generation/readiness placeholder parity.
+- Wired the Support tab to real existing state for local project storage,
+  project count, open project, export readiness, and prepared file status.
+- Hardened prepared export document handling so empty read or write payloads
+  fail instead of producing an empty native file-export document.
+- Tightened import preview preparation so no-data CSV imports and zero-row
+  prepared changes fail before a teacher confirmation screen can be shown.
+- Tightened recovery snapshot persistence so snapshots are read back after
+  writing, failed snapshot verification removes the written file, and recovery
+  listing rejects mismatched project metadata.
+- Matched CommenterV3 unresolved-placeholder reporting order by preserving
+  first-seen placeholder order while de-duplicating repeated placeholders.

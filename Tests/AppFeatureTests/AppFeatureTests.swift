@@ -132,6 +132,297 @@ final class AppFeatureTests: XCTestCase {
         }
     }
 
+    func testCreateProjectUnavailableStorageFailsVisiblyWithoutCallingStore() async {
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .failed("Disk permission denied.")
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                createProject: {
+                    await probe.record("unexpected-create")
+                    throw TestUnexpectedSave()
+                }
+            )
+        }
+
+        await store.send(.createProjectTapped) {
+            $0.operationStatus = .failed("Project storage is not available yet. Wait for local storage to load, or resolve the storage error shown on this screen.")
+        }
+        XCTAssertEqual(await probe.values(), [])
+    }
+
+    func testProjectYearLevelEditMarksProjectDirtyAndSaveUsesVerifiedStorePath() async {
+        let original = project(id: "p1", name: "Room 5", revision: 2)
+        var edited = original
+        edited.metadata.yearLevel = .mixed
+        var saved = edited
+        saved.metadata.persistence = ProjectPersistenceMetadata(revision: 3)
+
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
+                    XCTAssertEqual(project, edited)
+                    XCTAssertEqual(expectedRevision, 2)
+                    XCTAssertTrue(createRecoverySnapshot)
+                    XCTAssertEqual(recoveryReason, .beforeSave)
+                    return saved
+                }
+            )
+        }
+
+        await store.send(.projectYearLevelChanged(.mixed)) {
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.saveProjectTapped) {
+            $0.projectStorageStatus = .saving
+            $0.operationStatus = .busy("Saving and verifying project.")
+        }
+        await store.receive(.projectSaved(saved, "Project saved locally and verified.")) {
+            $0.projectStorageStatus = .loaded
+            $0.selectedProject = saved
+            $0.selectedProjectReadiness = getProjectReadiness(saved)
+            $0.operationStatus = .saved("Project saved locally and verified.")
+            $0.workflowMessage = "Project saved locally and verified."
+            $0.projects = [projectSummary(saved)]
+        }
+    }
+
+    func testManualMetadataEditsStayDirtyUntilVerifiedSaveReturns() async {
+        let original = project(id: "p1", name: "Room 5", term: "Term 1", revision: 2)
+        var edited = original
+        edited.metadata.name = "Room 6"
+        edited.metadata.term = "Term 2"
+        edited.metadata.useFirstNameOnly = false
+        var saved = edited
+        saved.metadata.persistence = ProjectPersistenceMetadata(revision: 3)
+        let probe = WorkflowProbe()
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        initial.projects = [projectSummary(original)]
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
+                    XCTAssertEqual(project, edited)
+                    XCTAssertEqual(expectedRevision, 2)
+                    XCTAssertTrue(createRecoverySnapshot)
+                    XCTAssertEqual(recoveryReason, .beforeSave)
+                    await probe.record("verified-save")
+                    return saved
+                }
+            )
+        }
+
+        await store.send(.projectNameChanged("Room 6")) {
+            $0.selectedProject?.metadata.name = "Room 6"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.projectTermChanged("Term 2")) {
+            $0.selectedProject?.metadata.term = "Term 2"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.useFirstNameOnlyChanged(false)) {
+            $0.selectedProject?.metadata.useFirstNameOnly = false
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        XCTAssertEqual(await probe.values(), [])
+
+        await store.send(.saveProjectTapped) {
+            $0.projectStorageStatus = .saving
+            $0.operationStatus = .busy("Saving and verifying project.")
+        }
+        await store.receive(.projectSaved(saved, "Project saved locally and verified.")) {
+            $0.projectStorageStatus = .loaded
+            $0.selectedProject = saved
+            $0.selectedProjectReadiness = getProjectReadiness(saved)
+            $0.pendingImport = nil
+            $0.preparedFile = nil
+            $0.operationStatus = .saved("Project saved locally and verified.")
+            $0.workflowMessage = "Project saved locally and verified."
+            $0.projects = [projectSummary(saved)]
+        }
+        XCTAssertEqual(await probe.values(), ["verified-save"])
+    }
+
+    func testManualRosterSubjectResultAndReportEditsAreSavedOnlyThroughStoreResponse() async {
+        var original = project(id: "p1", name: "Room 5", revision: 5)
+        original.metadata.selectedSubjects = [
+            "English": SelectedSubject(name: "English", allStrandsSelected: true),
+            "Science": SelectedSubject(name: "Science", allStrandsSelected: true)
+        ]
+        original.roster = [
+            Student(id: "s1", firstName: "Ava", lastName: "Ng", yearLevel: .year5),
+            Student(id: "s2", firstName: "Ben", lastName: "Fox", yearLevel: .year5)
+        ]
+        original.results = [
+            AchievementResult(studentId: "s1", subject: "English", achievementLevel: .developing),
+            AchievementResult(studentId: "s1", subject: "Science", achievementLevel: .atStandard),
+            AchievementResult(studentId: "s2", subject: "English", achievementLevel: .beginning)
+        ]
+        original.reports = [
+            GeneratedReport(studentId: "s1", subject: "English", text: "Draft", generatedAt: 1),
+            GeneratedReport(studentId: "s1", subject: "Science", text: "Science draft", generatedAt: 1),
+            GeneratedReport(studentId: "s2", subject: "English", text: "Ben draft", generatedAt: 1)
+        ]
+        var edited = original
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.selectedProjectReadiness = getProjectReadiness(original)
+        let probe = WorkflowProbe()
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
+                    XCTAssertEqual(project, edited)
+                    XCTAssertEqual(expectedRevision, 5)
+                    XCTAssertTrue(createRecoverySnapshot)
+                    XCTAssertEqual(recoveryReason, .beforeSave)
+                    await probe.record("verified-save")
+                    var saved = edited
+                    saved.metadata.persistence = ProjectPersistenceMetadata(revision: 6)
+                    return saved
+                }
+            )
+        }
+
+        await store.send(.addStudentTapped) {
+            edited.roster.append(Student(id: "student-3", firstName: "", lastName: "", yearLevel: .year5))
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.studentFirstNameChanged("student-3", "Cara")) {
+            edited.roster[2].firstName = "Cara"
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.studentLastNameChanged("student-3", "Lee")) {
+            edited.roster[2].lastName = "Lee"
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.deleteStudentTapped("s2")) {
+            edited.roster.removeAll { $0.id == "s2" }
+            edited.results.removeAll { $0.studentId == "s2" }
+            edited.reports.removeAll { $0.studentId == "s2" }
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.subjectToggled("Science")) {
+            edited.metadata.selectedSubjects.removeValue(forKey: "Science")
+            edited.results.removeAll { $0.subject == "Science" }
+            edited.reports.removeAll { $0.subject == "Science" }
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.achievementLevelChanged("student-3", "English", .aboveStandard)) {
+            edited.results.append(AchievementResult(studentId: "student-3", subject: "English", achievementLevel: .aboveStandard))
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.focusChanged("student-3", "English", "Writing")) {
+            edited.results[1].focusStrand = "Writing"
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.reportManualEditChanged("s1", "English", "Manual teacher edit.")) {
+            edited.reports[0].manualEdit = "Manual teacher edit."
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.reportLockChanged("s1", "English", true)) {
+            edited.reports[0].isLocked = true
+            $0.selectedProject = edited
+            $0.selectedProjectReadiness = getProjectReadiness(edited)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        XCTAssertEqual(await probe.values(), [])
+
+        await store.send(.saveProjectTapped) {
+            $0.projectStorageStatus = .saving
+            $0.operationStatus = .busy("Saving and verifying project.")
+        }
+        var saved = edited
+        saved.metadata.persistence = ProjectPersistenceMetadata(revision: 6)
+        await store.receive(.projectSaved(saved, "Project saved locally and verified.")) {
+            $0.projectStorageStatus = .loaded
+            $0.selectedProject = saved
+            $0.selectedProjectReadiness = getProjectReadiness(saved)
+            $0.pendingImport = nil
+            $0.preparedFile = nil
+            $0.operationStatus = .saved("Project saved locally and verified.")
+            $0.workflowMessage = "Project saved locally and verified."
+            $0.projects = [projectSummary(saved)]
+        }
+        XCTAssertEqual(await probe.values(), ["verified-save"])
+    }
+
+    func testManualEditSaveFailureDoesNotReportSuccessOrReplaceDirtyProject() async {
+        let original = project(id: "p1", name: "Room 5", revision: 2)
+        var dirty = original
+        dirty.metadata.name = "Unsaved Room"
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.selectedProject = original
+        initial.projects = [projectSummary(original)]
+
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                saveProject: { project, expectedRevision, createRecoverySnapshot, recoveryReason in
+                    XCTAssertEqual(project, dirty)
+                    XCTAssertEqual(expectedRevision, 2)
+                    XCTAssertTrue(createRecoverySnapshot)
+                    XCTAssertEqual(recoveryReason, .beforeSave)
+                    throw TestSaveFailure()
+                }
+            )
+        }
+
+        await store.send(.projectNameChanged("Unsaved Room")) {
+            $0.selectedProject = dirty
+            $0.selectedProjectReadiness = getProjectReadiness(dirty)
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.saveProjectTapped) {
+            $0.projectStorageStatus = .saving
+            $0.operationStatus = .busy("Saving and verifying project.")
+        }
+        await store.receive(.projectSaveFailed("Save failed for test.")) {
+            $0.projectStorageStatus = .loaded
+            $0.operationStatus = .failed("Project could not be saved: Save failed for test.")
+        }
+    }
+
     func testRosterImportPickPreparesPreviewWithoutSavingThenConfirmCommits() async {
         let original = project(id: "p1", name: "Room 5", revision: 7)
         var imported = original
@@ -141,7 +432,7 @@ final class AppFeatureTests: XCTestCase {
         let preview = AppFeature.PendingImport(
             project: imported,
             title: "Review roster import",
-            detail: "1 students validated. Confirm to save this roster import locally.",
+            detail: "1 student validated from XLSX. Confirm to save this roster import locally.",
             successMessage: "Roster imported, saved, and verified.",
             expectedRevision: 7,
             recoveryReason: .beforeSave
@@ -166,7 +457,7 @@ final class AppFeatureTests: XCTestCase {
                 importRosterFile: { _, project in
                     XCTAssertEqual(project, original)
                     await probe.record("parsed-roster")
-                    return imported
+                    return importPreview(format: .xlsx, kind: .roster, count: 1, project: imported)
                 }
             )
         }
@@ -178,8 +469,8 @@ final class AppFeatureTests: XCTestCase {
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
             $0.pendingImport = preview
-            $0.operationStatus = .prepared("1 students validated. Confirm to save this roster import locally.")
-            $0.workflowMessage = "1 students validated. Confirm to save this roster import locally."
+            $0.operationStatus = .prepared("1 student validated from XLSX. Confirm to save this roster import locally.")
+            $0.workflowMessage = "1 student validated from XLSX. Confirm to save this roster import locally."
         }
         XCTAssertEqual(await probe.values(), ["parsed-roster"])
 
@@ -486,7 +777,7 @@ final class AppFeatureTests: XCTestCase {
         let preview = AppFeature.PendingImport(
             project: imported,
             title: "Review roster import",
-            detail: "1 students validated. Confirm to save this roster import locally.",
+            detail: "1 student validated from CSV. Confirm to save this roster import locally.",
             successMessage: "Roster imported, saved, and verified.",
             expectedRevision: 7,
             recoveryReason: .beforeSave
@@ -512,7 +803,7 @@ final class AppFeatureTests: XCTestCase {
                 importRosterFile: { _, project in
                     XCTAssertEqual(project, original)
                     await probe.record("parsed-roster")
-                    return imported
+                    return importPreview(format: .csv, kind: .roster, count: 1, project: imported)
                 }
             )
         }
@@ -524,8 +815,8 @@ final class AppFeatureTests: XCTestCase {
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
             $0.pendingImport = preview
-            $0.operationStatus = .prepared("1 students validated. Confirm to save this roster import locally.")
-            $0.workflowMessage = "1 students validated. Confirm to save this roster import locally."
+            $0.operationStatus = .prepared("1 student validated from CSV. Confirm to save this roster import locally.")
+            $0.workflowMessage = "1 student validated from CSV. Confirm to save this roster import locally."
         }
         XCTAssertEqual(await probe.values(), ["parsed-roster"])
 
@@ -552,7 +843,7 @@ final class AppFeatureTests: XCTestCase {
         let preview = AppFeature.PendingImport(
             project: imported,
             title: "Review results import",
-            detail: "1 result row validated. Confirm to save these results locally.",
+            detail: "1 result row validated from XLSX. Confirm to save these results locally.",
             successMessage: "Results imported, saved, and verified.",
             expectedRevision: 4,
             recoveryReason: .beforeSave
@@ -577,7 +868,7 @@ final class AppFeatureTests: XCTestCase {
                 importResultsFile: { _, project in
                     XCTAssertEqual(project, original)
                     await probe.record("parsed-results")
-                    return imported
+                    return importPreview(format: .xlsx, kind: .results, count: 1, project: imported)
                 }
             )
         }
@@ -589,8 +880,8 @@ final class AppFeatureTests: XCTestCase {
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
             $0.pendingImport = preview
-            $0.operationStatus = .prepared("1 result row validated. Confirm to save these results locally.")
-            $0.workflowMessage = "1 result row validated. Confirm to save these results locally."
+            $0.operationStatus = .prepared("1 result row validated from XLSX. Confirm to save these results locally.")
+            $0.workflowMessage = "1 result row validated from XLSX. Confirm to save these results locally."
         }
         XCTAssertEqual(await probe.values(), ["parsed-results"])
 
@@ -617,7 +908,7 @@ final class AppFeatureTests: XCTestCase {
         let preview = AppFeature.PendingImport(
             project: imported,
             title: "Review roster import",
-            detail: "1 students validated. Confirm to save this roster import locally.",
+            detail: "1 student validated from CSV. Confirm to save this roster import locally.",
             successMessage: "Roster imported, saved, and verified.",
             expectedRevision: 7,
             recoveryReason: .beforeSave
@@ -638,7 +929,7 @@ final class AppFeatureTests: XCTestCase {
                 importRosterFile: { _, project in
                     XCTAssertEqual(project, original)
                     await probe.record("parsed-roster")
-                    return imported
+                    return importPreview(format: .csv, kind: .roster, count: 1, project: imported)
                 }
             )
         }
@@ -650,8 +941,8 @@ final class AppFeatureTests: XCTestCase {
         await store.receive(.importPreviewPrepared(preview)) {
             $0.projectStorageStatus = .loaded
             $0.pendingImport = preview
-            $0.operationStatus = .prepared("1 students validated. Confirm to save this roster import locally.")
-            $0.workflowMessage = "1 students validated. Confirm to save this roster import locally."
+            $0.operationStatus = .prepared("1 student validated from CSV. Confirm to save this roster import locally.")
+            $0.workflowMessage = "1 student validated from CSV. Confirm to save this roster import locally."
         }
         await store.send(.importPreviewCancelled) {
             $0.pendingImport = nil
@@ -694,11 +985,13 @@ final class AppFeatureTests: XCTestCase {
         XCTAssertEqual(await probe.values(), ["failed-results-parse"])
     }
 
-    func testReportExportPreparationFailureDoesNotSetPreparedFile() async {
+    func testReportExportPreparationFailureClearsExistingPreparedFile() async {
         let original = project(id: "p1", name: "Room 5", revision: 3)
+        let staleURL = URL(fileURLWithPath: "/tmp/old-report.docx")
         var initial = AppFeature.State()
         initial.projectStorageStatus = .loaded
         initial.selectedProject = original
+        initial.preparedFile = AppFeature.PreparedFile(url: staleURL, label: "Old DOCX export file is verified and ready.")
 
         let store = TestStore(initialState: initial) {
             AppFeature()
@@ -714,6 +1007,7 @@ final class AppFeatureTests: XCTestCase {
 
         await store.send(.prepareReportExportTapped(.xlsx)) {
             $0.projectStorageStatus = .preparingFile
+            $0.preparedFile = nil
             $0.operationStatus = .busy("Checking readiness and preparing XLSX export.")
         }
         await store.receive(.filePreparationFailed("File preparation failed for test.")) {
@@ -832,8 +1126,12 @@ private func testProjectStoreClient(
     saveProject: @escaping @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project = { project, _, _, _ in
         project
     },
-    importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> Project = { _, project in project },
-    importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> Project = { _, project in project },
+    importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in
+        importPreview(format: .csv, kind: .roster, count: 0, project: project)
+    },
+    importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in
+        importPreview(format: .csv, kind: .results, count: 0, project: project)
+    },
     importBackup: @escaping @Sendable (_ url: URL) async throws -> Project = { _ in project(id: "imported") },
     prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL = { _ in URL(fileURLWithPath: "/tmp/commenter-backup.json") },
     prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL = { _, format in
@@ -850,6 +1148,18 @@ private func testProjectStoreClient(
         importBackup: importBackup,
         prepareBackup: prepareBackup,
         prepareReportExport: prepareReportExport
+    )
+}
+
+private func importPreview(
+    format: ImportExportFormat,
+    kind: ProjectImportChangeKind,
+    count: Int,
+    project: Project
+) -> PreparedProjectImportPreview {
+    PreparedProjectImportPreview(
+        sourceFormat: format,
+        change: PreparedProjectImportChange(kind: kind, importedCount: count, project: project)
     )
 }
 

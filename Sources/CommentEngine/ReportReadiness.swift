@@ -148,8 +148,10 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
     }
 
     let report = project.reports.first { $0.studentId == studentId && $0.subject == subject }
-    let text = report?.manualEdit?.trimmedNonEmpty ?? report?.text.trimmedNonEmpty
-    guard let report, let text else {
+    let text = report.map { report in
+        report.manualEdit ?? report.text
+    }
+    guard let report, let text, text.trimmedNonEmpty != nil else {
         return ReportReadiness(
             status: .missingReport,
             studentId: studentId,

@@ -27,6 +27,49 @@ final class ReportReadinessTests: XCTestCase {
         XCTAssertEqual(readiness.placeholders, ["[context]"])
     }
 
+    func testUnresolvedPlaceholderOrderMatchesDraftText() {
+        var project = fixtureProject()
+        project.reports = [
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: "Ava writes about [context] for [Student Name] and returns to [context].",
+                generatedAt: 1
+            )
+        ]
+
+        let readiness = getReportReadiness(project: project, studentId: "s1", subject: "English")
+
+        XCTAssertEqual(readiness.status, .unresolvedPlaceholder)
+        XCTAssertEqual(readiness.placeholders, ["[context]", "[Student Name]"])
+    }
+
+    func testWhitespaceManualEditOverridesGeneratedTextAndBlocksReadiness() {
+        var project = fixtureProject()
+        let fingerprint = buildGenerationFingerprint(
+            projectMetadata: project.metadata,
+            student: project.roster[0],
+            result: project.results[0],
+            concreteSubject: "English"
+        )
+        project.reports = [
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: "Ava writes clearly.",
+                isLocked: true,
+                manualEdit: "   ",
+                generatedAt: 1,
+                resultFingerprint: fingerprint
+            )
+        ]
+
+        let readiness = getReportReadiness(project: project, studentId: "s1", subject: "English")
+
+        XCTAssertEqual(readiness.status, .missingReport)
+        XCTAssertEqual(readiness.report?.manualEdit, "   ")
+    }
+
     func testBlocksLanguageQualityIssue() {
         var project = fixtureProject()
         project.reports = [

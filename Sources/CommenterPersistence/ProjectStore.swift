@@ -206,8 +206,8 @@ public struct FileProjectStore: ProjectStore {
         if let existing = try existingValidProject(at: projectFile) {
             try createRecoverySnapshot(existing, reason: .beforeDelete)
         }
-        if FileManager.default.fileExists(atPath: directory.path) {
-            try FileManager.default.removeItem(at: directory)
+        if FileManager.default.fileExists(atPath: projectFile.path) {
+            try FileManager.default.removeItem(at: projectFile)
         }
         try SQLiteProjectIndex(indexURL: indexURL).deleteProject(id: id)
     }
@@ -237,6 +237,17 @@ public struct FileProjectStore: ProjectStore {
         let snapshotURL = recoveryDirectory.appendingPathComponent("\(snapshot.key).json")
         let data = try jsonEncoder().encode(snapshot)
         try data.write(to: snapshotURL, options: [.atomic])
+        do {
+            let verified = try readRecoverySnapshot(at: snapshotURL)
+            guard verified == snapshot else {
+                throw ProjectStoreError.verificationFailed
+            }
+        } catch {
+            if FileManager.default.fileExists(atPath: snapshotURL.path) {
+                try? FileManager.default.removeItem(at: snapshotURL)
+            }
+            throw error
+        }
         try pruneRecoverySnapshots(projectId: normalized.metadata.id)
     }
 
@@ -258,7 +269,7 @@ public struct FileProjectStore: ProjectStore {
             guard FileManager.default.fileExists(atPath: recovery.path) else { return [] }
             return try FileManager.default.contentsOfDirectory(at: recovery, includingPropertiesForKeys: nil)
                 .filter { $0.pathExtension == "json" }
-                .map { try jsonDecoder().decode(RecoverySnapshot.self, from: Data(contentsOf: $0)) }
+                .map { try readRecoverySnapshot(at: $0) }
         }
         return snapshots.sorted { $0.createdAt > $1.createdAt }
     }
@@ -312,6 +323,21 @@ public struct FileProjectStore: ProjectStore {
     private func existingValidProject(at url: URL) throws -> Project? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         return try readProject(at: url)
+    }
+
+    private func readRecoverySnapshot(at url: URL) throws -> RecoverySnapshot {
+        let snapshot = try jsonDecoder().decode(RecoverySnapshot.self, from: Data(contentsOf: url))
+        try assertValid(snapshot.project)
+        guard snapshot.projectId == snapshot.project.metadata.id,
+              snapshot.projectName == snapshot.project.metadata.name
+        else {
+            throw ProjectStoreError.verificationFailed
+        }
+        let readFingerprint = try projectFingerprint(snapshot.project)
+        if let stored = snapshot.project.metadata.persistence?.fingerprint, stored != readFingerprint {
+            throw ProjectStoreError.verificationFailed
+        }
+        return snapshot
     }
 
     private func writeProjectAtomically(_ project: Project, to url: URL) throws {

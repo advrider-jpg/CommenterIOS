@@ -37,6 +37,7 @@ public struct AppView: View {
                     pendingImport: viewStore.pendingImport,
                     onProjectNameChanged: { viewStore.send(.projectNameChanged($0)) },
                     onProjectTermChanged: { viewStore.send(.projectTermChanged($0)) },
+                    onProjectYearLevelChanged: { viewStore.send(.projectYearLevelChanged($0)) },
                     onUseFirstNameOnlyChanged: { viewStore.send(.useFirstNameOnlyChanged($0)) },
                     onSave: { viewStore.send(.saveProjectTapped) },
                     onAddStudent: { viewStore.send(.addStudentTapped) },
@@ -70,7 +71,15 @@ public struct AppView: View {
                 .tabItem { Label("Worklist", systemImage: "checklist") }
                 .tag(AppFeature.Tab.worklist)
 
-                SupportRootView(datasetStatus: viewStore.datasetStatus)
+                SupportRootView(
+                    datasetStatus: viewStore.datasetStatus,
+                    projectStorageStatus: viewStore.projectStorageStatus,
+                    projectStorageMessage: viewStore.projectStorageMessage,
+                    projectCount: viewStore.projects.count,
+                    selectedProject: viewStore.selectedProject,
+                    readiness: viewStore.selectedProjectReadiness,
+                    preparedFile: viewStore.preparedFile
+                )
                     .tabItem { Label("Support", systemImage: "questionmark.circle") }
                     .tag(AppFeature.Tab.support)
             }

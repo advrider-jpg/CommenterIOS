@@ -1,7 +1,5 @@
 import CommenterDomain
 import ComposableArchitecture
-import Foundation
-
 extension AppFeature {
     func reduceProjectEditing(_ state: inout State, _ action: Action) -> Effect<Action> {
         switch action {
@@ -13,6 +11,10 @@ extension AppFeature {
             updateSelectedProject(&state) { $0.metadata.term = term }
             return .none
 
+        case let .projectYearLevelChanged(yearLevel):
+            updateSelectedProject(&state) { $0.metadata.yearLevel = yearLevel }
+            return .none
+
         case let .useFirstNameOnlyChanged(enabled):
             updateSelectedProject(&state) { $0.metadata.useFirstNameOnly = enabled }
             return .none
@@ -21,9 +23,9 @@ extension AppFeature {
             updateSelectedProject(&state) { project in
                 project.roster.append(
                     Student(
-                        id: UUID().uuidString,
-                        firstName: "New",
-                        lastName: "Student",
+                        id: nextManualStudentId(in: project),
+                        firstName: "",
+                        lastName: "",
                         yearLevel: .year5
                     )
                 )
@@ -82,4 +84,13 @@ extension AppFeature {
             return .none
         }
     }
+}
+
+private func nextManualStudentId(in project: Project) -> String {
+    let existingIds = Set(project.roster.map(\.id))
+    var counter = project.roster.count + 1
+    while existingIds.contains("student-\(counter)") {
+        counter += 1
+    }
+    return "student-\(counter)"
 }

@@ -8,6 +8,7 @@ extension AppFeature {
         switch action {
         case .createProjectTapped:
             guard case .loaded = state.projectStorageStatus else {
+                state.operationStatus = .failed("Project storage is not available yet. Wait for local storage to load, or resolve the storage error shown on this screen.")
                 return .none
             }
             state.projectStorageStatus = .creating

@@ -23,8 +23,16 @@ struct ProjectsRootView: View {
                     Button(action: onCreateProject) {
                         Label("Create Project", systemImage: "plus")
                     }
+                    .disabled(!canStartProjectStorageAction)
                     Button(action: onImportBackup) {
                         Label("Import Project Backup", systemImage: "tray.and.arrow.down")
+                    }
+                    .disabled(!canStartProjectStorageAction)
+                    if !canStartProjectStorageAction {
+                        Text(projectActionUnavailableMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
@@ -44,11 +52,32 @@ struct ProjectsRootView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .disabled(!canStartProjectStorageAction)
                         }
                     }
                 }
             }
             .navigationTitle("Projects")
+        }
+    }
+
+    private var canStartProjectStorageAction: Bool {
+        if case .loaded = status {
+            return true
+        }
+        return false
+    }
+
+    private var projectActionUnavailableMessage: String {
+        switch status {
+        case .notLoaded, .loading:
+            return "Local project storage is still being checked."
+        case .creating, .loadingProject, .saving, .preparingFile, .importing, .generating:
+            return "Finish the current local operation before starting another project action."
+        case .failed:
+            return "Project actions are unavailable until local storage is available."
+        case .loaded:
+            return ""
         }
     }
 

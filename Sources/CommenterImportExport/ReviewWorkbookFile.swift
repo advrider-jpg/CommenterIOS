@@ -53,6 +53,7 @@ public func prepareReviewWorkbookFile(
     let rows = try reportReviewRows(project: project, studentId: studentId)
     let filename = try reportExportFilename(project: project, format: format, studentId: studentId)
     let destination = directory.appendingPathComponent(filename, isDirectory: false)
+    let forbiddenStrings = forbiddenWorkbookExportStrings(project: project)
     let data: Data
     do {
         data = try buildReviewWorkbookData(rows: rows, format: format)
@@ -61,15 +62,18 @@ public func prepareReviewWorkbookFile(
     }
 
     try data.write(to: destination, options: [.atomic])
-    let byteCount = try verifiedWorkbookSize(url: destination, fileManager: fileManager)
-    let readBack = try Data(contentsOf: destination)
     do {
-        try verifyReviewWorkbook(readBack, format: format)
+        let byteCount = try verifiedWorkbookSize(url: destination, fileManager: fileManager)
+        let readBack = try Data(contentsOf: destination)
+        try verifyReviewWorkbook(readBack, format: format, expectedRows: rows, forbiddenStrings: forbiddenStrings)
+        return PreparedReviewWorkbookFile(url: destination, byteCount: byteCount, format: format, rowCount: rows.count)
+    } catch let error as ReviewWorkbookFileError {
+        try? fileManager.removeItem(at: destination)
+        throw error
     } catch {
+        try? fileManager.removeItem(at: destination)
         throw ReviewWorkbookFileError.verificationFailed(destination)
     }
-
-    return PreparedReviewWorkbookFile(url: destination, byteCount: byteCount, format: format, rowCount: rows.count)
 }
 
 private let requiredXLSXEntries: Set<String> = [
@@ -92,14 +96,100 @@ private func buildReviewWorkbookData(rows: [ReportReviewRow], format: ImportExpo
     }
 }
 
-private func verifyReviewWorkbook(_ data: Data, format: ImportExportFormat) throws {
+private func verifyReviewWorkbook(
+    _ data: Data,
+    format: ImportExportFormat,
+    expectedRows: [ReportReviewRow],
+    forbiddenStrings: [String]
+) throws {
     switch format {
     case .xlsx:
         try OOXMLZipWriter.validateArchive(data, requiredEntries: requiredXLSXEntries)
+        let entries = try OOXMLZipWriter.storedEntries(data)
+        guard let workbook = entries["xl/workbook.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
+              let sheet = entries["xl/worksheets/sheet1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
+              workbook.contains(#"name="Reports""#)
+        else {
+            throw OOXMLZipWriterError.invalidArchive
+        }
+        try assertXLSXSheetContainsExpectedValues(sheet, expectedRows: expectedRows)
+        try assertXLSXSheetOmitsForbiddenStrings(sheet, forbiddenStrings: forbiddenStrings)
     case .xls:
-        try LegacyXLSWorkbookWriter.validateWorkbook(data, requiredSheetName: "Reports", requiredStrings: ReportReviewRow.headers)
+        try LegacyXLSWorkbookWriter.validateWorkbook(
+            data,
+            requiredSheetName: "Reports",
+            requiredStrings: expectedWorkbookStrings(expectedRows: expectedRows)
+        )
+        try assertLegacyXLSOmitsForbiddenStrings(data, forbiddenStrings: forbiddenStrings)
     case .csv, .docx, .backupJSON:
         throw ReviewWorkbookFileError.unsupportedFormat(format)
+    }
+}
+
+private func assertXLSXSheetContainsExpectedValues(_ sheet: String, expectedRows: [ReportReviewRow]) throws {
+    for value in expectedWorkbookStrings(expectedRows: expectedRows) {
+        guard sheet.contains(xmlEscape(value)) else {
+            throw OOXMLZipWriterError.invalidArchive
+        }
+    }
+}
+
+private func expectedWorkbookStrings(expectedRows: [ReportReviewRow]) -> [String] {
+    (ReportReviewRow.headers + expectedRows.flatMap(\.orderedValues))
+        .filter { !$0.isEmpty }
+}
+
+private func forbiddenWorkbookExportStrings(project: Project) -> [String] {
+    var values: [String?] = []
+    values.append(contentsOf: project.roster.map(\.internalTeacherNote))
+    values.append(contentsOf: project.results.map(\.internalTeacherNote))
+    for report in project.reports {
+        values.append(contentsOf: report.variantIds.map(Optional.some))
+        values.append(report.trace)
+        values.append(report.resultFingerprint)
+        if let manualEdit = report.manualEdit,
+           !manualEdit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           manualEdit != report.text {
+            values.append(report.text)
+        }
+    }
+    return uniqueForbiddenStrings(values)
+}
+
+private func assertXLSXSheetOmitsForbiddenStrings(_ sheet: String, forbiddenStrings: [String]) throws {
+    for forbidden in forbiddenStrings {
+        if sheet.contains(forbidden) || sheet.contains(xmlEscape(forbidden)) {
+            throw OOXMLZipWriterError.invalidArchive
+        }
+    }
+}
+
+private func assertLegacyXLSOmitsForbiddenStrings(_ data: Data, forbiddenStrings: [String]) throws {
+    for forbidden in forbiddenStrings {
+        if dataContainsString(data, forbidden) {
+            throw LegacyXLSWorkbookError.invalidWorkbookStream
+        }
+    }
+}
+
+private func dataContainsString(_ data: Data, _ value: String) -> Bool {
+    if data.range(of: Data(value.utf8)) != nil {
+        return true
+    }
+    var utf16LittleEndian = Data()
+    value.utf16.forEach { codeUnit in
+        var littleEndian = codeUnit.littleEndian
+        utf16LittleEndian.append(Swift.withUnsafeBytes(of: &littleEndian) { Data($0) })
+    }
+    return data.range(of: utf16LittleEndian) != nil
+}
+
+private func uniqueForbiddenStrings(_ values: [String?]) -> [String] {
+    var seen: Set<String> = []
+    return values.compactMap { value in
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard trimmed.count >= 4, seen.insert(trimmed).inserted else { return nil }
+        return trimmed
     }
 }
 

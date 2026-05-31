@@ -27,6 +27,7 @@ extension AppFeature {
 
         case .projectNameChanged(_),
              .projectTermChanged(_),
+             .projectYearLevelChanged(_),
              .useFirstNameOnlyChanged(_),
              .addStudentTapped,
              .deleteStudentTapped(_),

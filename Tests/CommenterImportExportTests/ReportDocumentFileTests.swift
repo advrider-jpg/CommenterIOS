@@ -50,6 +50,8 @@ final class ReportDocumentFileTests: XCTestCase {
         XCTAssertFalse(document.contains("Generated text should not be exported."))
         XCTAssertFalse(document.contains("private-variant"))
         XCTAssertFalse(document.contains("private trace"))
+        XCTAssertFalse(document.contains("Private student note should stay local."))
+        XCTAssertFalse(document.contains("Private result note should stay local."))
     }
 
     func testPrepareReportDocumentFileFiltersSingleStudent() throws {
@@ -103,6 +105,31 @@ final class ReportDocumentFileTests: XCTestCase {
         XCTAssertEqual(files, [])
     }
 
+    func testPrepareReportDocumentFileRejectsReadbackContainingPrivateFields() throws {
+        let root = temporaryRoot()
+        let privateNote = "Private student note must not be exported."
+        var project = fixtureProject()
+        project.roster[0].internalTeacherNote = privateNote
+        project.reports = [
+            readyReport(
+                project: project,
+                result: project.results[0],
+                text: "Generated text should not be exported.",
+                manualEdit: "Manual edit leaked: \(privateNote)",
+                generatedAt: 1
+            )
+        ]
+
+        XCTAssertThrowsError(try prepareReportDocumentFile(project: project, format: .docx, directory: root)) { error in
+            guard case .verificationFailed = error as? ReportDocumentFileError else {
+                return XCTFail("Expected verificationFailed, got \(error)")
+            }
+        }
+
+        let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        XCTAssertEqual(files, [])
+    }
+
     func testPrepareReportDocumentFileRejectsNonDirectoryDestination() throws {
         let root = temporaryRoot()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -128,8 +155,24 @@ final class ReportDocumentFileTests: XCTestCase {
                 selectedSubjects: ["English": SelectedSubject(name: "English", allStrandsSelected: true)],
                 useFirstNameOnly: false
             ),
-            roster: [Student(id: "s1", firstName: "Ava", lastName: "Ng", gender: .female, yearLevel: .year5)],
-            results: [AchievementResult(studentId: "s1", subject: "English", achievementLevel: .atStandard)]
+            roster: [
+                Student(
+                    id: "s1",
+                    firstName: "Ava",
+                    lastName: "Ng",
+                    gender: .female,
+                    yearLevel: .year5,
+                    internalTeacherNote: "Private student note should stay local."
+                )
+            ],
+            results: [
+                AchievementResult(
+                    studentId: "s1",
+                    subject: "English",
+                    achievementLevel: .atStandard,
+                    internalTeacherNote: "Private result note should stay local."
+                )
+            ]
         )
     }
 

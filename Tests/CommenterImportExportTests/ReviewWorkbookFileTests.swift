@@ -37,8 +37,11 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertNotNil(entries["xl/styles.xml"])
         XCTAssertTrue(sheet.contains("Student Name"))
         XCTAssertTrue(sheet.contains("&apos;=Manual edit &amp; final comment."))
+        XCTAssertFalse(sheet.contains("Generated text should not be exported."))
         XCTAssertFalse(sheet.contains("private-variant"))
         XCTAssertFalse(sheet.contains("private trace"))
+        XCTAssertFalse(sheet.contains("Private student note should stay local."))
+        XCTAssertFalse(sheet.contains("Private result note should stay local."))
     }
 
     func testPrepareReviewWorkbookFileWritesVerifiedLegacyXLSWorkbook() throws {
@@ -72,6 +75,8 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertFalse(labels.contains("Generated text should not be exported."))
         XCTAssertFalse(labels.contains("private-variant"))
         XCTAssertFalse(labels.contains("private trace"))
+        XCTAssertFalse(labels.contains("Private student note should stay local."))
+        XCTAssertFalse(labels.contains("Private result note should stay local."))
         XCTAssertTrue(try readBoundSheetNames(workbookStream).contains("Reports"))
     }
 
@@ -99,6 +104,33 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertEqual(files, [])
     }
 
+    func testPrepareReviewWorkbookFileRejectsReadbackContainingPrivateFields() throws {
+        for format in [ImportExportFormat.xlsx, .xls] {
+            let root = temporaryRoot()
+            let privateNote = "Private workbook note must not be exported."
+            var project = fixtureProject()
+            project.results[0].internalTeacherNote = privateNote
+            project.reports = [
+                readyReport(
+                    project: project,
+                    result: project.results[0],
+                    text: "Generated text should not be exported.",
+                    manualEdit: "Manual workbook edit leaked: \(privateNote)",
+                    generatedAt: 1
+                )
+            ]
+
+            XCTAssertThrowsError(try prepareReviewWorkbookFile(project: project, format: format, directory: root)) { error in
+                guard case .verificationFailed = error as? ReviewWorkbookFileError else {
+                    return XCTFail("Expected verificationFailed for \(format), got \(error)")
+                }
+            }
+
+            let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            XCTAssertEqual(files, [])
+        }
+    }
+
     func testPrepareReviewWorkbookFileRejectsNonDirectoryDestination() throws {
         let root = temporaryRoot()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -124,8 +156,24 @@ final class ReviewWorkbookFileTests: XCTestCase {
                 selectedSubjects: ["English": SelectedSubject(name: "English", allStrandsSelected: true)],
                 useFirstNameOnly: false
             ),
-            roster: [Student(id: "s1", firstName: "Ava", lastName: "Ng", gender: .female, yearLevel: .year5)],
-            results: [AchievementResult(studentId: "s1", subject: "English", achievementLevel: .atStandard)]
+            roster: [
+                Student(
+                    id: "s1",
+                    firstName: "Ava",
+                    lastName: "Ng",
+                    gender: .female,
+                    yearLevel: .year5,
+                    internalTeacherNote: "Private student note should stay local."
+                )
+            ],
+            results: [
+                AchievementResult(
+                    studentId: "s1",
+                    subject: "English",
+                    achievementLevel: .atStandard,
+                    internalTeacherNote: "Private result note should stay local."
+                )
+            ]
         )
     }
 

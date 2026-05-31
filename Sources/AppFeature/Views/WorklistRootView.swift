@@ -12,6 +12,7 @@ struct WorklistRootView: View {
     let pendingImport: AppFeature.PendingImport?
     let onProjectNameChanged: (String) -> Void
     let onProjectTermChanged: (String) -> Void
+    let onProjectYearLevelChanged: (ProjectYearLevel) -> Void
     let onUseFirstNameOnlyChanged: (Bool) -> Void
     let onSave: () -> Void
     let onAddStudent: () -> Void
@@ -42,6 +43,7 @@ struct WorklistRootView: View {
                 if let pendingImport {
                     ImportPreviewSection(
                         preview: pendingImport,
+                        isSaving: isWorkflowBusy,
                         onConfirm: onConfirmImport,
                         onCancel: onCancelImportPreview
                     )
@@ -52,8 +54,10 @@ struct WorklistRootView: View {
                         project: project,
                         onNameChanged: onProjectNameChanged,
                         onTermChanged: onProjectTermChanged,
+                        onYearLevelChanged: onProjectYearLevelChanged,
                         onUseFirstNameOnlyChanged: onUseFirstNameOnlyChanged,
-                        onSave: onSave
+                        onSave: onSave,
+                        isDisabled: isEditingLocked
                     )
                     RosterSection(
                         project: project,
@@ -62,28 +66,35 @@ struct WorklistRootView: View {
                         onFirstNameChanged: onStudentFirstNameChanged,
                         onLastNameChanged: onStudentLastNameChanged,
                         onYearChanged: onStudentYearChanged,
-                        onImportRoster: onImportRoster
+                        onImportRoster: onImportRoster,
+                        isDisabled: isEditingLocked
                     )
-                    SubjectsSection(project: project, onSubjectToggled: onSubjectToggled)
+                    SubjectsSection(project: project, onSubjectToggled: onSubjectToggled, isDisabled: isEditingLocked)
                     ResultsSection(
                         project: project,
                         readiness: readiness,
                         onAchievementChanged: onAchievementChanged,
                         onFocusChanged: onFocusChanged,
-                        onImportResults: onImportResults
+                        onImportResults: onImportResults,
+                        isDisabled: isEditingLocked
                     )
                     ReportsSection(
                         project: project,
                         onGenerate: onGenerate,
                         onManualEditChanged: onManualEditChanged,
-                        onLockChanged: onLockChanged
+                        onLockChanged: onLockChanged,
+                        isDisabled: isEditingLocked
                     )
                     ExportSection(
-                        preparedFile: preparedFile,
+                        preparedFile: hasUnsavedChanges ? nil : preparedFile,
+                        hasHiddenStalePreparedFile: hasUnsavedChanges && preparedFile != nil,
+                        readiness: readiness,
                         onPrepareBackup: onPrepareBackup,
                         onPrepareExport: onPrepareExport,
                         onSavePreparedFile: onSavePreparedFile,
-                        onDismissPreparedFile: onDismissPreparedFile
+                        onDismissPreparedFile: onDismissPreparedFile,
+                        isDisabled: isEditingLocked || hasUnsavedChanges,
+                        disabledReason: exportDisabledReason
                     )
                 } else if pendingImport == nil {
                     Section {
@@ -114,6 +125,60 @@ struct WorklistRootView: View {
             if case .importing = status {
                 ProgressView("Validating import")
             }
+            if case .preparingFile = status {
+                ProgressView("Preparing and verifying file")
+            }
+            if isWorkflowBusy {
+                Text("Editing and file actions are paused until the current operation finishes.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if pendingImport != nil, !isWorkflowBusy {
+                Text("A validated import is waiting for confirmation. Confirm or cancel it before editing this project.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if hasUnsavedChanges {
+                Text("Save the project before preparing backups or exports so the file reflects verified local state.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    private var isEditingLocked: Bool {
+        isWorkflowBusy || pendingImport != nil
+    }
+
+    private var isWorkflowBusy: Bool {
+        switch status {
+        case .creating, .loadingProject, .saving, .preparingFile, .importing, .generating:
+            return true
+        case .notLoaded, .loading, .loaded, .failed:
+            return false
+        }
+    }
+
+    private var hasUnsavedChanges: Bool {
+        if case .dirty = operationStatus {
+            return true
+        }
+        return false
+    }
+
+    private var exportDisabledReason: String? {
+        if let pendingImport {
+            return "\(pendingImport.title) is waiting. Confirm or cancel the import before preparing backup or report files."
+        }
+        if isWorkflowBusy {
+            return "Wait for the current local operation to finish before preparing backup or report files."
+        }
+        if hasUnsavedChanges {
+            return "Save current changes before preparing backup or report files so exported files reflect verified local state."
+        }
+        return nil
     }
 }

@@ -25,8 +25,8 @@ public struct ProjectStoreClient: Sendable {
     public var createProject: @Sendable () async throws -> ProjectSummary
     public var loadProject: @Sendable (_ id: String) async throws -> Project
     public var saveProject: @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project
-    public var importRosterFile: @Sendable (_ url: URL, _ project: Project) async throws -> Project
-    public var importResultsFile: @Sendable (_ url: URL, _ project: Project) async throws -> Project
+    public var importRosterFile: @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview
+    public var importResultsFile: @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview
     public var importBackup: @Sendable (_ url: URL) async throws -> Project
     public var prepareBackup: @Sendable (_ project: Project) async throws -> URL
     public var prepareReportExport: @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
@@ -36,8 +36,8 @@ public struct ProjectStoreClient: Sendable {
         createProject: @escaping @Sendable () async throws -> ProjectSummary,
         loadProject: @escaping @Sendable (_ id: String) async throws -> Project,
         saveProject: @escaping @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project,
-        importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> Project,
-        importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> Project,
+        importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
+        importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
         importBackup: @escaping @Sendable (_ url: URL) async throws -> Project,
         prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL,
         prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
@@ -97,24 +97,21 @@ extension ProjectStoreClient: DependencyKey {
         },
         importRosterFile: { url, project in
             try withSecurityScopedAccess(to: url) {
-                let parsed = try SpreadsheetImportFile.parseTabularImportFile(url: url, label: "Roster")
-                let students = try ImportValidation.parseRosterImportRows(
-                    parsed,
-                    existingRoster: project.roster,
+                try prepareRosterImportPreview(
+                    from: url,
+                    project: project,
+                    nowMilliseconds: milliseconds(Date()),
                     createID: { UUID().uuidString }
                 )
-                return try projectByApplyingRosterImport(students, to: project, nowMilliseconds: milliseconds(Date())).project
             }
         },
         importResultsFile: { url, project in
             try withSecurityScopedAccess(to: url) {
-                let parsed = try SpreadsheetImportFile.parseTabularImportFile(url: url, label: "Results")
-                let results = try ImportValidation.parseResultsImportRows(
-                    parsed,
-                    roster: project.roster,
-                    selectedSubjects: project.metadata.selectedSubjects
+                try prepareResultsImportPreview(
+                    from: url,
+                    project: project,
+                    nowMilliseconds: milliseconds(Date())
                 )
-                return try projectByApplyingResultsImport(results, to: project, nowMilliseconds: milliseconds(Date())).project
             }
         },
         importBackup: { url in

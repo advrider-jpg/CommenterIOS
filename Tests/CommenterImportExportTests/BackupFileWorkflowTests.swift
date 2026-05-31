@@ -1,5 +1,5 @@
 import CommenterDomain
-import CommenterImportExport
+@testable import CommenterImportExport
 import Foundation
 import XCTest
 
@@ -55,6 +55,48 @@ final class BackupFileWorkflowTests: XCTestCase {
         }
     }
 
+    func testPrepareProjectBackupFileRemovesFileWhenReadbackVerificationFails() throws {
+        let root = temporaryRoot()
+        let createdAt = Date(timeIntervalSince1970: 0)
+
+        XCTAssertThrowsError(
+            try prepareProjectBackupFile(
+                project: fixtureProject(),
+                directory: root,
+                createdAt: createdAt,
+                verifyReadBack: { _ in throw BackupError.couldNotVerify }
+            )
+        ) { error in
+            guard case .verificationFailed = error as? BackupFileWorkflowError else {
+                return XCTFail("Expected verificationFailed, got \(error)")
+            }
+        }
+
+        let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        XCTAssertEqual(files, [])
+    }
+
+    func testPrepareProjectBackupFileRemovesFileWhenReadbackProjectIdDiffers() throws {
+        let root = temporaryRoot()
+        let createdAt = Date(timeIntervalSince1970: 0)
+
+        XCTAssertThrowsError(
+            try prepareProjectBackupFile(
+                project: fixtureProject(),
+                directory: root,
+                createdAt: createdAt,
+                verifyReadBack: { _ in fixtureProject(id: "different-project") }
+            )
+        ) { error in
+            guard case .verificationFailed = error as? BackupFileWorkflowError else {
+                return XCTFail("Expected verificationFailed, got \(error)")
+            }
+        }
+
+        let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        XCTAssertEqual(files, [])
+    }
+
     func testBackupFilenameSanitizesProjectNames() {
         let name = backupFilename(project: fixtureProject(name: " *** "), createdAt: Date(timeIntervalSince1970: 0))
         XCTAssertEqual(name, "commenter-project-1970-01-01T00-00-00Z.commenter-backup.json")
@@ -63,10 +105,10 @@ final class BackupFileWorkflowTests: XCTestCase {
         XCTAssertEqual(unsafe, "Room-5-Term-1970-01-01T00-00-00Z.commenter-backup.json")
     }
 
-    private func fixtureProject(name: String = "Project Term 1") -> Project {
+    private func fixtureProject(id: String = "p1", name: String = "Project Term 1") -> Project {
         Project(
             metadata: ProjectMetadata(
-                id: "p1",
+                id: id,
                 name: name,
                 term: "Term 1",
                 yearLevel: .year5,

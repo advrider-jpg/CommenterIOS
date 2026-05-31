@@ -172,14 +172,14 @@ public func cleanSpacing(_ text: String) -> String {
 public func normalizeReportContextField(_ value: String?) -> String? {
     guard let value else { return nil }
     let normalized = value
-        .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        .replacingOccurrences(of: #"[\t\r\n ]+"#, with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
-        .trimmingCharacters(in: CharacterSet(charactersIn: ".!?;:"))
-    let emptyMarkers = ["", "n/a", "na", "none", "null", "-"]
+        .replacingOccurrences(of: #"[.!?;:]+$"#, with: "", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    let emptyMarkers = ["", "n/a", "na", "not applicable", "none", "null", "-", "\u{2014}"]
     guard !emptyMarkers.contains(normalized.lowercased()) else { return nil }
     guard normalized.count <= 120 else { return nil }
     guard findUnresolvedPlaceholders(normalized).isEmpty else { return nil }
-    guard !normalized.contains("\n") else { return nil }
     return normalized
 }
 
@@ -212,11 +212,14 @@ private func bracketPlaceholders(in text: String) -> [String] {
 private func matches(pattern: String, in text: String) -> [String] {
     guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
     let range = NSRange(text.startIndex..<text.endIndex, in: text)
-    let values = regex.matches(in: text, range: range).compactMap { match -> String? in
+    var seen = Set<String>()
+    return regex.matches(in: text, range: range).compactMap { match -> String? in
         guard let range = Range(match.range, in: text) else { return nil }
-        return String(text[range])
+        let value = String(text[range])
+        guard !seen.contains(value) else { return nil }
+        seen.insert(value)
+        return value
     }
-    return Array(Set(values)).sorted()
 }
 
 private extension String {

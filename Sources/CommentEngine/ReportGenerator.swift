@@ -53,8 +53,9 @@ public struct ReportGenerator {
 
         self.data = data
         self.projectMetadata = projectMetadata
-        self.usedVariantIds = usedVariantIds.union(existingUsage.keys)
-        self.usageCounts = existingUsage.filter { $0.value > 0 }
+        let positiveUsage = existingUsage.filter { $0.value > 0 }
+        self.usedVariantIds = usedVariantIds.union(positiveUsage.keys)
+        self.usageCounts = positiveUsage
         self.bandMapping = projectMetadata.bandMapping ?? Self.detectBandMapping(data)
         self.maxUsagePerClass = Self.uniquenessNumber(data, keys: ["MaxUsagePerClass", "MaxUsage"], defaultValue: Int.max)
         self.minVariantDistance = Self.uniquenessNumber(data, keys: ["MinVariantDistance"], defaultValue: 0)
@@ -581,75 +582,75 @@ public func buildGenerationFingerprint(
     result: AchievementResult,
     concreteSubject: String? = nil
 ) -> String {
-    let payload: [String: Any] = [
-        "metadata": stableMetadata(projectMetadata),
-        "student": stableStudent(student),
-        "result": stableResult(result, concreteSubject: concreteSubject)
-    ]
-    let data = (try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])) ?? Data()
-    return String(decoding: data, as: UTF8.self)
+    jsonObject([
+        ("metadata", stableMetadata(projectMetadata)),
+        ("student", stableStudent(student)),
+        ("result", stableResult(result, concreteSubject: concreteSubject))
+    ])
 }
 
-private func stableMetadata(_ metadata: ProjectMetadata) -> [String: Any] {
-    [
-        "name": metadata.name,
-        "term": metadata.term,
-        "yearLevel": metadata.yearLevel.rawValue,
-        "useFirstNameOnly": metadata.useFirstNameOnly,
-        "selectedSubjectOrder": selectedSubjectKeys(metadata.selectedSubjects),
-        "reportLayout": stableReportLayout(metadata.reportLayout)
-    ]
+private func stableMetadata(_ metadata: ProjectMetadata) -> String {
+    jsonObject([
+        ("name", jsonString(metadata.name)),
+        ("term", jsonString(metadata.term)),
+        ("yearLevel", jsonString(metadata.yearLevel.rawValue)),
+        ("useFirstNameOnly", jsonBool(metadata.useFirstNameOnly)),
+        ("selectedSubjectOrder", jsonStringArray(selectedSubjectKeys(metadata.selectedSubjects))),
+        ("reportLayout", stableReportLayout(metadata.reportLayout))
+    ])
 }
 
-private func stableReportLayout(_ layout: ReportLayout?) -> [String: Any] {
+private func stableReportLayout(_ layout: ReportLayout?) -> String {
     let normalized = normalizeReportLayout(layout)
-    return [
-        "enabled": normalized.enabled,
-        "order": normalized.order.map(\.rawValue),
-        "include": [
-            "general": normalized.include[.general] != false,
-            "subject": normalized.include[.subject] != false,
-            "dispositions": normalized.include[.dispositions] != false,
-            "nextSteps": normalized.include[.nextSteps] != false
-        ]
-    ]
+    return jsonObject([
+        ("enabled", jsonBool(normalized.enabled)),
+        ("order", jsonStringArray(normalized.order.map(\.rawValue))),
+        ("include", jsonObject([
+            ("general", jsonBool(normalized.include[.general] != false)),
+            ("subject", jsonBool(normalized.include[.subject] != false)),
+            ("dispositions", jsonBool(normalized.include[.dispositions] != false)),
+            ("nextSteps", jsonBool(normalized.include[.nextSteps] != false))
+        ]))
+    ])
 }
 
-private func stableStudent(_ student: Student) -> [String: Any] {
-    [
-        "id": student.id,
-        "firstName": student.firstName,
-        "lastName": student.lastName,
-        "gender": student.gender?.rawValue ?? "",
-        "pronouns": student.pronouns ?? "",
-        "yearLevel": student.yearLevel.rawValue,
-        "reportEmphasisNote": student.reportEmphasisNote ?? "",
-        "attitudeDescriptor": student.attitudeDescriptor ?? ""
-    ]
+private func stableStudent(_ student: Student) -> String {
+    jsonObject([
+        ("id", jsonString(student.id)),
+        ("firstName", jsonString(student.firstName)),
+        ("lastName", jsonString(student.lastName)),
+        ("gender", jsonString(student.gender?.rawValue ?? "")),
+        ("pronouns", jsonString(student.pronouns ?? "")),
+        ("yearLevel", jsonString(student.yearLevel.rawValue)),
+        ("reportEmphasisNote", jsonString(student.reportEmphasisNote ?? "")),
+        ("attitudeDescriptor", jsonString(student.attitudeDescriptor ?? ""))
+    ])
 }
 
-private func stableResult(_ result: AchievementResult, concreteSubject: String?) -> [String: Any] {
-    var payload: [String: Any] = [
-        "studentId": result.studentId,
-        "subject": result.subject,
-        "concreteSubject": concreteSubject ?? "",
-        "achievementLevel": result.achievementLevel?.rawValue ?? "",
-        "focusStrand": result.focusStrand ?? "",
-        "evidenceText": result.evidenceText ?? "",
-        "flags": stableFlags(result.flags),
-        "reportEmphasisNote": result.reportEmphasisNote ?? "",
-        "englishFocusTags": stableOrderedArray(result.englishFocusTags),
-        "mathProficiencies": stableOrderedArray(result.mathProficiencies),
-        "mathMindsetToggles": stableOrderedArray(result.mathMindsetToggles),
-        "nextStepGoals": stableOrderedArray(result.nextStepGoals)
+private func stableResult(_ result: AchievementResult, concreteSubject: String?) -> String {
+    var fields: [(String, String)] = [
+        ("studentId", jsonString(result.studentId)),
+        ("subject", jsonString(result.subject)),
+        ("concreteSubject", jsonString(concreteSubject ?? "")),
+        ("achievementLevel", jsonString(result.achievementLevel?.rawValue ?? "")),
+        ("focusStrand", jsonString(result.focusStrand ?? "")),
+        ("evidenceText", jsonString(result.evidenceText ?? ""))
     ]
     if let textType = normalizeReportContextFieldForFingerprint(result.textType) {
-        payload["textType"] = textType
+        fields.append(("textType", jsonString(textType)))
     }
     if let learningContext = normalizeReportContextFieldForFingerprint(result.learningContext) {
-        payload["learningContext"] = learningContext
+        fields.append(("learningContext", jsonString(learningContext)))
     }
-    return payload
+    fields.append(contentsOf: [
+        ("flags", stableFlags(result.flags)),
+        ("reportEmphasisNote", jsonString(result.reportEmphasisNote ?? "")),
+        ("englishFocusTags", jsonStringArray(stableOrderedArray(result.englishFocusTags))),
+        ("mathProficiencies", jsonStringArray(stableOrderedArray(result.mathProficiencies))),
+        ("mathMindsetToggles", jsonStringArray(stableOrderedArray(result.mathMindsetToggles))),
+        ("nextStepGoals", jsonStringArray(stableOrderedArray(result.nextStepGoals)))
+    ])
+    return jsonObject(fields)
 }
 
 private func normalizeReportContextFieldForFingerprint(_ value: String?) -> String? {
@@ -663,12 +664,55 @@ private func normalizeReportContextFieldForFingerprint(_ value: String?) -> Stri
     return emptyMarkers.contains(normalized.lowercased()) ? nil : normalized
 }
 
-private func stableFlags(_ flags: [String: Bool]?) -> [String: Bool] {
-    Dictionary(uniqueKeysWithValues: (flags ?? [:]).filter { $0.value }.sorted { $0.key < $1.key })
+private func stableFlags(_ flags: [String: Bool]?) -> String {
+    jsonObject((flags ?? [:])
+        .filter { $0.value }
+        .sorted { $0.key < $1.key }
+        .map { (key, value) in (key, jsonBool(value)) })
 }
 
 private func stableOrderedArray(_ values: [String]?) -> [String] {
     (values ?? []).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+}
+
+private func jsonObject(_ fields: [(String, String)]) -> String {
+    "{\(fields.map { "\(jsonString($0.0)):\($0.1)" }.joined(separator: ","))}"
+}
+
+private func jsonStringArray(_ values: [String]) -> String {
+    "[\(values.map(jsonString).joined(separator: ","))]"
+}
+
+private func jsonBool(_ value: Bool) -> String {
+    value ? "true" : "false"
+}
+
+private func jsonString(_ value: String) -> String {
+    var output = "\""
+    for scalar in value.unicodeScalars {
+        switch scalar.value {
+        case 0x08:
+            output += "\\b"
+        case 0x09:
+            output += "\\t"
+        case 0x0A:
+            output += "\\n"
+        case 0x0C:
+            output += "\\f"
+        case 0x0D:
+            output += "\\r"
+        case 0x22:
+            output += "\\\""
+        case 0x5C:
+            output += "\\\\"
+        case 0x00..<0x20:
+            output += "\\u" + String(format: "%04x", scalar.value)
+        default:
+            output.append(String(scalar))
+        }
+    }
+    output += "\""
+    return output
 }
 
 private extension String {

@@ -16,12 +16,12 @@ extension AppFeature {
             let expectedRevision = project.metadata.persistence?.revision
             return .run { send in
                 do {
-                    let prepared = try await projectStoreClient.importRosterFile(url, project)
-                    let importedCount = prepared.roster.count
+                    let preview = try await projectStoreClient.importRosterFile(url, project)
+                    let importedCount = importCountLabel(preview.acceptedRows, singular: "student", plural: "students")
                     await send(.importPreviewPrepared(PendingImport(
-                        project: prepared,
+                        project: preview.change.project,
                         title: "Review roster import",
-                        detail: "\(importedCount) students validated. Confirm to save this roster import locally.",
+                        detail: "\(importedCount) validated from \(preview.sourceFormat.rawValue.uppercased()). Confirm to save this roster import locally.",
                         successMessage: "Roster imported, saved, and verified.",
                         expectedRevision: expectedRevision,
                         recoveryReason: .beforeSave
@@ -41,13 +41,12 @@ extension AppFeature {
             let expectedRevision = project.metadata.persistence?.revision
             return .run { send in
                 do {
-                    let prepared = try await projectStoreClient.importResultsFile(url, project)
-                    let importedCount = prepared.results.count
-                    let rowLabel = importedCount == 1 ? "1 result row" : "\(importedCount) result rows"
+                    let preview = try await projectStoreClient.importResultsFile(url, project)
+                    let rowLabel = importCountLabel(preview.acceptedRows, singular: "result row", plural: "result rows")
                     await send(.importPreviewPrepared(PendingImport(
-                        project: prepared,
+                        project: preview.change.project,
                         title: "Review results import",
-                        detail: "\(rowLabel) validated. Confirm to save these results locally.",
+                        detail: "\(rowLabel) validated from \(preview.sourceFormat.rawValue.uppercased()). Confirm to save these results locally.",
                         successMessage: "Results imported, saved, and verified.",
                         expectedRevision: expectedRevision,
                         recoveryReason: .beforeSave
@@ -137,6 +136,7 @@ extension AppFeature {
                 return .none
             }
             state.projectStorageStatus = .preparingFile
+            state.preparedFile = nil
             state.operationStatus = .busy("Preparing and verifying backup JSON.")
             return .run { send in
                 do {
@@ -152,6 +152,7 @@ extension AppFeature {
                 return .none
             }
             state.projectStorageStatus = .preparingFile
+            state.preparedFile = nil
             state.operationStatus = .busy("Checking readiness and preparing \(format.rawValue.uppercased()) export.")
             return .run { send in
                 do {
@@ -169,6 +170,7 @@ extension AppFeature {
 
         case let .filePreparationFailed(message):
             state.projectStorageStatus = .loaded
+            state.preparedFile = nil
             state.operationStatus = .failed("File could not be prepared: \(message)")
             return .none
 
@@ -193,4 +195,8 @@ extension AppFeature {
         }
     }
 
+}
+
+private func importCountLabel(_ count: Int, singular: String, plural: String) -> String {
+    count == 1 ? "1 \(singular)" : "\(count) \(plural)"
 }

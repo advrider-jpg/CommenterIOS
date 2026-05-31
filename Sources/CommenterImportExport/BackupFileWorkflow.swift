@@ -36,6 +36,22 @@ public func prepareProjectBackupFile(
     createdAt: Date = Date(),
     fileManager: FileManager = .default
 ) throws -> PreparedBackupFile {
+    try prepareProjectBackupFile(
+        project: project,
+        directory: directory,
+        createdAt: createdAt,
+        fileManager: fileManager,
+        verifyReadBack: parseProjectBackup(serialized:)
+    )
+}
+
+func prepareProjectBackupFile(
+    project: Project,
+    directory: URL,
+    createdAt: Date = Date(),
+    fileManager: FileManager = .default,
+    verifyReadBack: (String) throws -> Project
+) throws -> PreparedBackupFile {
     try ensureWritableDirectory(directory, fileManager: fileManager)
     let serialized = try serializeProjectBackup(project: project, createdAt: createdAt)
     let filename = backupFilename(project: project, createdAt: createdAt)
@@ -50,12 +66,14 @@ public func prepareProjectBackupFile(
     let readBack = try String(contentsOf: destination, encoding: .utf8)
     let verifiedProject: Project
     do {
-        verifiedProject = try parseProjectBackup(serialized: readBack)
+        verifiedProject = try verifyReadBack(readBack)
     } catch {
+        try? fileManager.removeItem(at: destination)
         throw BackupFileWorkflowError.verificationFailed(destination)
     }
 
     guard verifiedProject.metadata.id == project.metadata.id else {
+        try? fileManager.removeItem(at: destination)
         throw BackupFileWorkflowError.verificationFailed(destination)
     }
 

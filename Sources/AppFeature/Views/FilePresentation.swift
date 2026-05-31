@@ -49,11 +49,17 @@ struct PreparedExportDocument: FileDocument {
     init(configuration: ReadConfiguration) throws {
         self.url = URL(fileURLWithPath: "")
         self.data = configuration.file.regularFileContents ?? Data()
+        guard !data.isEmpty else {
+            throw Error.missingPreparedFile("selected file")
+        }
         self.contentType = configuration.contentType
         self.defaultFilename = "CommenterExport"
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        guard !data.isEmpty else {
+            throw Error.missingPreparedFile(defaultFilename)
+        }
         FileWrapper(regularFileWithContents: data)
     }
 }

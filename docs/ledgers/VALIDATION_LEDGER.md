@@ -224,6 +224,126 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO` remain
   blocked because `swift` and `xcodebuild` are not available on PATH in this
   Windows checkout.
+- Re-ran QA/truthfulness evidence after the project-storage action guard pass
+  and the concurrent import-preview source update:
+  `git diff --check` and `git diff --cached --check` passed; `git ls-files
+  --eol` showed tracked files as LF in the worktree, and
+  `git ls-files --eol --others --exclude-standard` showed the untracked
+  `Sources/CommenterImportExport/ImportPreviewPreparation.swift` as LF; direct
+  SQLite scan `rg -n "import SQLite3|\bsqlite3\b|sqlite3_|sqlite_" Sources
+  Tests Package.swift` returned no matches; direct ZIP-header scan found only
+  test ZIP magic-number assertions and no production direct ZIP writer markers;
+  the source network/privacy scan found no `URLSession`, Firebase, analytics,
+  or telemetry usage in production sources. Package import verification found
+  `GRDB`, `CodableCSV`, `CoreXLSX`, `OLEKit`, `ZIPFoundation`, and
+  `ComposableArchitecture` imports only where matching `Package.swift` products
+  are declared. `.build/checkouts` was not present, so package API source
+  inspection was limited to manifest/import checks.
+- Re-ran production dataset copy verification: raw CommenterV3 dataset SHA-256
+  remained `60BAB50DA5E7735AF545D39C1DF73EFD96A533B2871B83571A042ABF52E404F7`;
+  bundled LF-normalized dataset SHA-256 remained
+  `438950A8A72DE0CE3B6B0E4271F95858D6519162C9F530A295E36722618B9572`; Node
+  normalized-text comparison passed and reported 56,564 components, 5 recipes,
+  4,340 assembled variants, and 2 uniqueness rules.
+- `swift test` was attempted during the QA/truthfulness pass and failed because
+  `swift` is not recognized in this Windows environment. The app-target
+  `xcodebuild` command was also attempted and failed because `xcodebuild` is not
+  recognized in this Windows environment.
+- Re-ran final integration checks after the import-preview, generation, UI, and
+  persistence code lanes were integrated: `git diff --check`,
+  `git diff --cached --check`, full `git ls-files --eol`, untracked EOL scan,
+  direct SQLite scan, direct ZIP-header scan, package/import consistency scan
+  with Apple-native frameworks allowed, source network/privacy scan, Node
+  production dataset normalized-text/hash comparison, XcodeBuildMCP
+  `session_show_defaults`, `discover_projs`, and `list_schemes`. Hygiene,
+  EOL, source scans, package/import consistency, dataset parity, and Xcode
+  project discovery passed. XcodeBuildMCP found
+  `C:\CommenterIOS\CommenterIOS.xcodeproj`; scheme listing failed with
+  `spawn xcodebuild ENOENT`, matching the local `xcodebuild` blocker.
+- Final direct command attempts remained blocked on Windows:
+  `swift test` failed because `swift` is not recognized, and
+  `xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS
+  -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO`
+  failed because `xcodebuild` is not recognized.
+- During the follow-up integration pass, `git diff --check`,
+  `git diff --cached --check`, tracked CRLF/mixed EOL scan, and untracked EOL
+  scan were re-run after the import-preview wording polish. Hygiene remained
+  clean, and the new `ImportPreviewPreparation.swift` file remained LF. A direct
+  `swift package resolve` attempt failed because `swift` is not recognized, and
+  `swift test` continued to fail for the same reason.
+- After the monitor course-correction, four code-owning lanes produced
+  additional source/test changes: import/export privacy readback verification,
+  Worklist pending-import/prepared-file state controls, stale prepared-file
+  reducer cleanup, and CommenterV3 manual-edit readiness precedence. Scoped
+  worker hygiene checks reported `git diff --check` clean for touched files;
+  worker Swift test attempts remained blocked because `swift` is not available
+  on PATH.
+- Re-ran the final Windows-safe integration sweep after ledger updates:
+  `git diff --check` and `git diff --cached --check` passed; tracked CRLF/mixed
+  EOL scan returned no matches; untracked EOL scan showed
+  `Sources/CommenterImportExport/ImportPreviewPreparation.swift` as LF; direct
+  SQLite scan returned no matches; direct ZIP-header scan found only test
+  assertions; package/import consistency scan passed with imports
+  `AppFeature`, `CodableCSV`, `CommentEngine`, `CommenterDomain`,
+  `CommenterImportExport`, `CommenterPersistence`, `ComposableArchitecture`,
+  `CoreXLSX`, `DesignSystem`, `GRDB`, `OLEKit`, and `ZIPFoundation`;
+  no `URLSession`, Firebase, analytics, remote-config, TODO/FIXME, fake-success,
+  stateless, pretend, or decorative source hits were found. Dataset normalized
+  text still matched live CommenterV3 with raw source SHA-256
+  `60bab50da5e7735af545d39c1df73efd96a533b2871b83571a042abf52e404f7`, bundled
+  SHA-256 `438950a8a72de0ce3b6b0e4271f95858d6519162c9f530a295e36722618b9572`,
+  and counts `56564/5/4340/2`. XcodeBuildMCP defaults remained unset,
+  discovery found `C:\CommenterIOS\CommenterIOS.xcodeproj`, and scheme listing
+  failed with `spawn xcodebuild ENOENT`. Direct `swift package resolve`,
+  `swift test`, and app-target `xcodebuild` attempts failed because `swift` and
+  `xcodebuild` are not recognized on this Windows PATH.
+- Re-ran Windows-safe checks after tightening backup JSON export cleanup:
+  `git diff --check` and `git diff --cached --check` passed; tracked CRLF/mixed
+  EOL scan returned no matches; untracked EOL scan still showed
+  `ImportPreviewPreparation.swift` as LF; package/import consistency scan
+  passed with `@testable import CommenterImportExport` included; direct SQLite
+  scan returned no matches; direct ZIP-header scan found only test assertions;
+  no production `URLSession`, Firebase, analytics, remote-config, TODO/FIXME,
+  fake-success, stateless, pretend, or decorative source hits were found.
+  Production dataset normalized text still matched live CommenterV3 with source
+  raw SHA-256
+  `60bab50da5e7735af545d39c1df73efd96a533b2871b83571a042abf52e404f7`, bundled
+  SHA-256 `438950a8a72de0ce3b6b0e4271f95858d6519162c9f530a295e36722618b9572`,
+  and counts `56564/5/4340/2`. XcodeBuildMCP defaults remained unset,
+  discovery found `C:\CommenterIOS\CommenterIOS.xcodeproj`, and scheme listing
+  still failed with `spawn xcodebuild ENOENT`. Direct `swift package resolve`,
+  `swift test`, and app-target `xcodebuild` attempts still failed because
+  `swift` and `xcodebuild` are not recognized on this Windows PATH.
+- Re-ran checks after removing the stale unavailable import/export contract
+  surface. `git diff --check` and `git diff --cached --check` passed; exact
+  stale-contract scan for `FileWorkflowState`, `ImportPreview`,
+  `SpreadsheetImporting`, `ReportExporting`, `UnavailableImportExporter`, and
+  "not been ported yet" returned no matches; package/import consistency still
+  passed; direct SQLite, production network/privacy, TODO/FIXME, fake-success,
+  stateless, pretend, and decorative scans returned no matches. Dataset
+  normalized text still matched live CommenterV3 with the same hashes and
+  counts. Direct `swift package resolve`, `swift test`, and app-target
+  `xcodebuild` attempts remained blocked because `swift` and `xcodebuild` are
+  not recognized on this Windows PATH.
+- Re-ran Windows-safe integration checks after the new subagent code slices:
+  Support UI state wiring, import preview no-op blocking, recovery snapshot
+  readback validation, V3 placeholder-order parity, and empty export-document
+  hardening. `git diff --check` and `git diff --cached --check` passed; tracked
+  CRLF/mixed EOL scan returned no matches; untracked EOL scan still showed
+  `Sources/CommenterImportExport/ImportPreviewPreparation.swift` as LF;
+  package/import consistency passed; stale unavailable import/export contract
+  scan returned no matches; direct SQLite scan returned no matches; direct ZIP
+  header scan found only test assertions; production network/privacy,
+  TODO/FIXME, fake-success, stateless, pretend, and decorative scans returned
+  no matches. Production dataset normalized text still matched live
+  CommenterV3 with raw source SHA-256
+  `60bab50da5e7735af545d39c1df73efd96a533b2871b83571a042abf52e404f7`, bundled
+  SHA-256 `438950a8a72de0ce3b6b0e4271f95858d6519162c9f530a295e36722618b9572`,
+  and counts `56564/5/4340/2`. XcodeBuildMCP defaults remained unset,
+  discovery found `C:\CommenterIOS\CommenterIOS.xcodeproj`, and scheme listing
+  still failed with `spawn xcodebuild ENOENT`. Direct `swift package resolve`,
+  `swift test`, and app-target `xcodebuild` attempts still failed because
+  `swift` and `xcodebuild` are not recognized on this Windows PATH.
 
 ## Future Required Gates
 

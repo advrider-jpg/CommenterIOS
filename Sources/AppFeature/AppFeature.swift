@@ -109,6 +109,7 @@ public struct AppFeature: Sendable {
         case projectLoadFailed(String)
         case projectNameChanged(String)
         case projectTermChanged(String)
+        case projectYearLevelChanged(ProjectYearLevel)
         case useFirstNameOnlyChanged(Bool)
         case saveProjectTapped
         case projectSaved(Project, String)

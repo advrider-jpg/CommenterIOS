@@ -18,6 +18,8 @@ Current package posture:
 | CodableCSV | `from: "0.6.7"` | MIT | CSV parsing/writing infrastructure around Commenter-specific import/export validation. | Pure local file/data processing; suitable for offline teacher roster/result files when wrapped by all-or-nothing domain validation. |
 | CoreXLSX | `.upToNextMinor(from: "0.14.1")` | Apache License 2.0 | XLSX parsing infrastructure for Open XML workbook support. | Pure local workbook parsing; appropriate for offline spreadsheet import/export workflows when paired with Commenter validation and explicit unsupported-path errors. |
 | OLEKit | `.upToNextMinor(from: "0.2.0")` | Apache License 2.0, with bundled olefile-derived FreeBSD-style license notice | OLE compound file infrastructure for legacy Office binary containers. | Pure local binary-container handling; appropriate for legacy `.xls` work only as infrastructure, not as a substitute for full BIFF cell semantics. |
+| GRDB.swift | `from: "7.10.0"` | MIT | SQLite project index infrastructure in `CommenterPersistence`. | Pure local SQLite access; replaces direct `sqlite3` wrapper ownership with an approved local persistence dependency. |
+| ZIPFoundation | `from: "0.9.0"` | MIT | ZIP archive infrastructure for OOXML package assembly and verification. | Pure local archive read/write; appropriate as the generic ZIP layer for DOCX/XLSX payloads while higher-level document/workbook ownership remains under audit. |
 
 License references:
 
@@ -25,6 +27,36 @@ License references:
 - CodableCSV: https://github.com/dehesa/CodableCSV/blob/0.6.7/LICENSE
 - CoreXLSX: https://github.com/CoreOffice/CoreXLSX/blob/master/LICENSE.md
 - OLEKit: https://github.com/CoreOffice/OLEKit/blob/master/LICENSE and https://github.com/CoreOffice/OLEKit/blob/master/LICENSE-olefile
+- GRDB.swift: https://github.com/groue/GRDB.swift/blob/master/LICENSE
+- ZIPFoundation: https://github.com/weichsel/ZIPFoundation/blob/development/LICENSE
+
+Manifest/import consistency evidence:
+
+- `Package.swift` declares package products for every third-party source import
+  currently found under `Sources` and `Tests`: `ComposableArchitecture`,
+  `CodableCSV`, `CoreXLSX`, `OLEKit`, `GRDB`, and `ZIPFoundation`.
+- `CommenterPersistence` imports `GRDB` only in `SQLiteProjectIndex.swift`, and
+  the target declares `.product(name: "GRDB", package: "GRDB.swift")`.
+- `CommenterImportExport` imports `CodableCSV`, `CoreXLSX`, `OLEKit`, and
+  `ZIPFoundation`, and the target declares each matching package product.
+- `AppFeature` and `AppFeatureTests` import `ComposableArchitecture`, and both
+  targets declare the matching package product.
+- No `SwiftUIX`, `SwiftUIIntrospect`, `SwiftDocX`, `xlsxwriter`, `libxlsxwriter`,
+  or `libxls` imports were found in the current source scan.
+
+Custom generic infrastructure inventory from the current source scan:
+
+| Area | Current source evidence | Policy status |
+| --- | --- | --- |
+| CSV parsing/writing | `Sources/CommenterImportExport/CSVParser.swift` imports `CodableCSV` and layers Commenter-specific header normalization, row limits, formula guarding, and tabular validation. | Compliant adapter posture; not a standalone CSV parser. |
+| XLSX import | `Sources/CommenterImportExport/SpreadsheetImportFile.swift` imports `CoreXLSX` and maps worksheets into Commenter tabular validation. | Compliant adapter posture for XLSX import. |
+| Legacy XLS import | `SpreadsheetImportFile.swift` uses `OLEKit` for the OLE container, then decodes a narrow BIFF subset in custom code. | Temporary risk. This remains narrower than a full OLE reader, but full `.xls` parity needs `libxls`/equivalent evaluation or a recorded exception with fixture and target-app proof. |
+| DOCX generation | `Sources/CommenterImportExport/ReportDocumentFile.swift` hand-assembles WordprocessingML XML entries and uses `OOXMLZipWriter` for packaging. | Policy risk. `SwiftDocX` is not in the manifest and has not replaced this hand-written DOCX layer; keep this only as a temporary bridge until SwiftDocX is evaluated against Commenter fixtures. |
+| XLSX export | `Sources/CommenterImportExport/ReviewWorkbookFile.swift` hand-assembles SpreadsheetML XML entries and uses `OOXMLZipWriter` for packaging. | Policy risk. `libxlsxwriter`/approved XLSX writer evaluation is still required before treating this as release-complete infrastructure. |
+| OOXML ZIP packaging | `Sources/CommenterImportExport/OOXMLZipWriter.swift` imports `ZIPFoundation` and handles duplicate-entry, size, required-entry, and readback validation. | Acceptable small adapter around approved ZIP infrastructure, provided document/workbook XML generation above is tracked separately. |
+| Legacy XLS export | `Sources/CommenterImportExport/LegacyXLSWorkbookWriter.swift` hand-writes a narrow OLE compound file and BIFF workbook stream. | Highest remaining policy risk. No mature iOS SwiftPM BIFF writer is currently recorded as suitable; the code must stay fixture-limited and needs decision/validation evidence before release parity is claimed. |
+| SQLite project index | `Sources/CommenterPersistence/SQLiteProjectIndex.swift` imports `GRDB`; no direct `sqlite3` import was found. | Compliant with the approved persistence dependency posture. |
+| Reusable UI helpers | `Sources/DesignSystem` contains small SwiftUI views only; no SwiftUIX or introspection imports were found. | Compliant native SwiftUI posture for the current scan. |
 
 Packages not added yet:
 

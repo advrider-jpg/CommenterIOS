@@ -67,6 +67,14 @@ final class ReportGeneratorTests: XCTestCase {
         XCTAssertEqual(report.text, "Ava explains ideas in English.")
     }
 
+    func testZeroUsageEntriesDoNotBlockVariantSelection() throws {
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata(), existingUsage: ["v2": 0])
+        let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
+
+        XCTAssertEqual(report.variantIds, ["v1"])
+        XCTAssertEqual(generator.usageSnapshot(), ["v1": 1])
+    }
+
     func testRepairsAndAppendsEvidenceWhenItIsNotSafeAsSpecificTask() throws {
         var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
         var sourceResult = result()
@@ -271,6 +279,39 @@ final class ReportGeneratorTests: XCTestCase {
         XCTAssertTrue(left.contains(#""selectedSubjectOrder":["English","Mathematics"]"#))
         XCTAssertFalse(left.contains("not applicable"))
         XCTAssertTrue(left.contains(#""learningContext":"advertising unit""#))
+    }
+
+    func testGenerationFingerprintMatchesV3JSONStringShape() {
+        let fingerprint = buildGenerationFingerprint(
+            projectMetadata: metadata(),
+            student: student(),
+            result: result(),
+            concreteSubject: "English"
+        )
+
+        XCTAssertEqual(
+            fingerprint,
+            #"{"metadata":{"name":"Project","term":"Term 1","yearLevel":"Year5","useFirstNameOnly":true,"selectedSubjectOrder":["English"],"reportLayout":{"enabled":true,"order":["general","subject","dispositions","nextSteps"],"include":{"general":true,"subject":true,"dispositions":true,"nextSteps":true}}},"student":{"id":"s1","firstName":"Ava","lastName":"Ng","gender":"","pronouns":"","yearLevel":"Year 5","reportEmphasisNote":"","attitudeDescriptor":""},"result":{"studentId":"s1","subject":"English","concreteSubject":"English","achievementLevel":"At Standard","focusStrand":"Writing","evidenceText":"","flags":{},"reportEmphasisNote":"","englishFocusTags":[],"mathProficiencies":[],"mathMindsetToggles":[],"nextStepGoals":[]}}"#
+        )
+    }
+
+    func testGenerationFingerprintPreservesDisabledSubjectLayoutFlag() {
+        var sourceMetadata = metadata()
+        sourceMetadata.reportLayout = ReportLayout(
+            enabled: true,
+            order: [.nextSteps],
+            include: [.subject: false]
+        )
+
+        let fingerprint = buildGenerationFingerprint(
+            projectMetadata: sourceMetadata,
+            student: student(),
+            result: result(),
+            concreteSubject: "English"
+        )
+
+        XCTAssertTrue(fingerprint.contains(#""order":["nextSteps","general","subject","dispositions"]"#))
+        XCTAssertTrue(fingerprint.contains(#""subject":false"#))
     }
 
     private func fixtureData() -> CommentEngineData {

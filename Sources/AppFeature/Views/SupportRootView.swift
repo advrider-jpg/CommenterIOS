@@ -1,14 +1,57 @@
+import CommentEngine
+import CommenterDomain
 import DesignSystem
 import SwiftUI
 
 struct SupportRootView: View {
     let datasetStatus: AppFeature.DatasetStatus
+    let projectStorageStatus: AppFeature.ProjectStorageStatus
+    let projectStorageMessage: String
+    let projectCount: Int
+    let selectedProject: Project?
+    let readiness: ProjectReadiness?
+    let preparedFile: AppFeature.PreparedFile?
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Production Dataset") {
                     datasetStatusContent
+                }
+
+                Section("Local Projects") {
+                    LabeledContent("Storage", value: projectStorageStatusLabel)
+                    Text(projectStorageMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    LabeledContent("Projects on device", value: "\(projectCount)")
+                }
+
+                Section("Open Project") {
+                    if let selectedProject {
+                        LabeledContent("Project", value: selectedProject.metadata.name)
+                        if let readiness {
+                            LabeledContent("Export ready", value: "\(readiness.ready) of \(readiness.expected)")
+                        } else {
+                            LabeledContent("Export ready", value: "Not checked")
+                        }
+                    } else {
+                        LabeledContent("Project", value: "None open")
+                        LabeledContent("Export ready", value: "No project selected")
+                    }
+                }
+
+                Section("Prepared File") {
+                    if let preparedFile {
+                        LabeledContent("Ready file", value: preparedFile.url.lastPathComponent)
+                        Text(preparedFile.label)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        LabeledContent("Ready file", value: "None")
+                    }
                 }
 
                 Section("Privacy") {
@@ -51,6 +94,31 @@ struct SupportRootView: View {
                 .accessibilityLabel("Normalized source hash \(snapshot.normalizedSourceHash)")
         case let .failed(message):
             UnavailableFeatureNotice(title: "Dataset blocked", message: message)
+        }
+    }
+
+    private var projectStorageStatusLabel: String {
+        switch projectStorageStatus {
+        case .notLoaded:
+            "Not loaded"
+        case .loading:
+            "Loading"
+        case .loaded:
+            "Loaded"
+        case .creating:
+            "Creating project"
+        case .loadingProject:
+            "Loading project"
+        case .saving:
+            "Saving"
+        case .preparingFile:
+            "Preparing file"
+        case .importing:
+            "Importing"
+        case .generating:
+            "Generating reports"
+        case .failed:
+            "Failed"
         }
     }
 }

@@ -122,4 +122,33 @@ final class ProductionCommentDatasetTests: XCTestCase {
         XCTAssertTrue(resolved.unresolved.isEmpty)
         XCTAssertTrue(resolved.missingContext.isEmpty)
     }
+
+    func testPlaceholderResolutionTreatsSourceEmptyMarkersAsMissingContext() {
+        let metadata = ProjectMetadata(
+            id: "project-1",
+            name: "Room 1",
+            term: "Term 1",
+            yearLevel: .year5,
+            createdAt: 0,
+            updatedAt: 0,
+            useFirstNameOnly: true
+        )
+        let student = Student(id: "student-1", firstName: "Ada", lastName: "Lovelace", yearLevel: .year5)
+        let result = AchievementResult(
+            studentId: student.id,
+            subject: "English",
+            achievementLevel: .atStandard,
+            textType: "not applicable",
+            learningContext: "\u{2014}"
+        )
+        let context = buildPlaceholderContext(student: student, subject: "English", result: result, projectMetadata: metadata)
+
+        let resolved = resolveReportPlaceholders(
+            text: "[Student name] wrote a [text type] about [context].",
+            context: context
+        )
+
+        XCTAssertEqual(resolved.missingContext, ["[context]", "[text type]"])
+        XCTAssertEqual(resolved.unresolved, ["[context]", "[text type]"])
+    }
 }
