@@ -60,7 +60,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         let deselectAll = scrollToAny(buttons(identifier: "subject-deselect-all-button", label: "Deselect all"), name: "Deselect all", requireHittable: false)
         tapElement(deselectAll, named: "Deselect all")
-        let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle", requireHittable: false)
+        let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle")
         tapSwitch(englishToggle, named: "English subject toggle")
         capture("07-subject-selected-english")
 
