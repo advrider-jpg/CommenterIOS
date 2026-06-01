@@ -132,9 +132,8 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         )
         waitForEnabledElement(prepareDocx, named: "Prepare DOCX Reports")
         capture("12-export-ready")
-        prepareDocx.tap()
+        tapElement(prepareDocx, named: "Prepare DOCX Reports")
 
-        waitForDocxPreparation()
         ensureWorklistOpen()
         let preparedFile = scrollToAnyInWorklist(
             [element("prepared-file-ready")],

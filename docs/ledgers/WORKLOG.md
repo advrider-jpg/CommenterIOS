@@ -414,3 +414,6 @@ Append material work history here. Keep entries short, dated, and factual.
   every Work list-only interaction, scroll inside `worklist-list` rather than
   the app window, require hittable subject controls, and attach page/tab/list
   diagnostics to future failure screenshots.
+- After hosted screenshot run `26780285403` reached DOCX preparation but timed
+  out polling an offscreen operation-status row, changed the test to wait for
+  the verified `prepared-file-ready` row through the bounded Work list scroller.
