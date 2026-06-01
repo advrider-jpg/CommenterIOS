@@ -67,7 +67,7 @@ final class BackupEnvelopeTests: XCTestCase {
     }
 
     func testProjectFingerprintIgnoresPersistenceMetadata() throws {
-        var project = fixtureProject()
+        let project = fixtureProject()
         var saved = project
         saved.metadata.persistence = ProjectPersistenceMetadata(revision: 4, savedAt: 123, savedBy: "ios", fingerprint: "existing")
 

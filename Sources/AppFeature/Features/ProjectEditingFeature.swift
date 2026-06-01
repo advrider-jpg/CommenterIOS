@@ -64,6 +64,22 @@ extension AppFeature {
             }
             return .none
 
+        case .subjectSelectAllTapped:
+            updateSelectedProject(&state) { project in
+                teacherSubjectKeysInCurriculumOrder().forEach { subject in
+                    project.metadata.selectedSubjects[subject] = SelectedSubject(name: subject, allStrandsSelected: true)
+                }
+            }
+            return .none
+
+        case .subjectDeselectAllTapped:
+            updateSelectedProject(&state) { project in
+                project.metadata.selectedSubjects.removeAll()
+                project.results.removeAll()
+                project.reports.removeAll()
+            }
+            return .none
+
         case let .achievementLevelChanged(studentId, subject, level):
             updateResult(&state, studentId: studentId, subject: subject) { $0.achievementLevel = level }
             return .none

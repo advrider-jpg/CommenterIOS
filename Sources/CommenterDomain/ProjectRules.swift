@@ -51,7 +51,11 @@ public func normalizeReportLayout(_ layout: ReportLayout?) -> ReportLayout {
 }
 
 public func selectedSubjectKeys(_ selectedSubjects: [String: SelectedSubject]) -> [String] {
-    selectedSubjects.keys.sorted()
+    let curriculumOrder = teacherSubjectKeysInCurriculumOrder()
+    let curriculumSet = Set(curriculumOrder)
+    let orderedKnownSubjects = curriculumOrder.filter { selectedSubjects[$0] != nil }
+    let customSubjects = selectedSubjects.keys.filter { !curriculumSet.contains($0) }.sorted()
+    return orderedKnownSubjects + customSubjects
 }
 
 public func studentIdentityKey(_ student: Student) -> String {

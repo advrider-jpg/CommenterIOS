@@ -22,7 +22,7 @@ public struct ProjectSummary: Equatable, Identifiable, Sendable {
 
 public struct ProjectStoreClient: Sendable {
     public var listProjects: @Sendable () async throws -> [ProjectSummary]
-    public var createProject: @Sendable () async throws -> ProjectSummary
+    public var createProject: @Sendable (_ draft: AppFeature.ProjectCreationDraft) async throws -> ProjectSummary
     public var loadProject: @Sendable (_ id: String) async throws -> Project
     public var saveProject: @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project
     public var deleteProject: @Sendable (_ id: String) async throws -> [ProjectSummary]
@@ -34,7 +34,7 @@ public struct ProjectStoreClient: Sendable {
 
     public init(
         listProjects: @escaping @Sendable () async throws -> [ProjectSummary],
-        createProject: @escaping @Sendable () async throws -> ProjectSummary,
+        createProject: @escaping @Sendable (_ draft: AppFeature.ProjectCreationDraft) async throws -> ProjectSummary,
         loadProject: @escaping @Sendable (_ id: String) async throws -> Project,
         saveProject: @escaping @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project,
         deleteProject: @escaping @Sendable (_ id: String) async throws -> [ProjectSummary],
@@ -63,19 +63,19 @@ extension ProjectStoreClient: DependencyKey {
             let store = try FileProjectStore.applicationSupport()
             return try await store.listProjects().map(projectSummary).sorted { $0.updatedAt > $1.updatedAt }
         },
-        createProject: {
+        createProject: { draft in
             let store = try FileProjectStore.applicationSupport()
             let now = milliseconds(Date())
             let project = Project(
                 metadata: ProjectMetadata(
                     id: UUID().uuidString,
-                    name: "Untitled Project",
-                    term: "Term 1",
-                    yearLevel: .year5,
+                    name: draft.normalizedName,
+                    term: draft.normalizedTerm,
+                    yearLevel: draft.yearLevel,
                     createdAt: now,
                     updatedAt: now,
-                    selectedSubjects: [:],
-                    useFirstNameOnly: true
+                    selectedSubjects: Dictionary(uniqueKeysWithValues: teacherSubjectKeysInCurriculumOrder().map { ($0, SelectedSubject(name: $0, allStrandsSelected: true)) }),
+                    useFirstNameOnly: draft.useFirstNameOnly
                 )
             )
             let saved = try await store.saveProject(project, expectedRevision: nil)
@@ -150,7 +150,7 @@ extension ProjectStoreClient: DependencyKey {
         listProjects: {
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },
-        createProject: {
+        createProject: { _ in
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },
         loadProject: { _ in

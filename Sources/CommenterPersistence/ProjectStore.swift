@@ -109,7 +109,7 @@ public struct FileProjectStore: ProjectStore {
     private var exportsTempURL: URL { rootURL.appendingPathComponent("exports-temp", isDirectory: true) }
     private var datasetsURL: URL { rootURL.appendingPathComponent("datasets", isDirectory: true) }
 
-    public init(rootURL: URL, now: @escaping @Sendable () -> Date = Date.init) {
+    public init(rootURL: URL, now: @escaping @Sendable () -> Date = { Date() }) {
         self.rootURL = rootURL
         self.now = now
     }

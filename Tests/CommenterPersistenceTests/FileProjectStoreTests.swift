@@ -1,5 +1,6 @@
 import CommenterDomain
 import CommenterPersistence
+import Foundation
 import XCTest
 
 final class FileProjectStoreTests: XCTestCase {
@@ -28,11 +29,8 @@ final class FileProjectStoreTests: XCTestCase {
 
     func testSaveCreatesRecoverySnapshotBeforeVerifiedOverwrite() async throws {
         let root = temporaryRoot()
-        var tick = 1.0
-        let store = FileProjectStore(rootURL: root, now: {
-            defer { tick += 120 }
-            return Date(timeIntervalSince1970: tick)
-        })
+        let clock = TestClock(start: 1)
+        let store = FileProjectStore(rootURL: root, now: { clock.next() })
 
         let first = try store.saveProject(fixtureProject(), options: SaveProjectOptions(actorId: "test-ios"))
         var changed = first
@@ -206,5 +204,22 @@ final class FileProjectStoreTests: XCTestCase {
     private func fileSize(_ url: URL) throws -> UInt64 {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes[.size] as? NSNumber)?.uint64Value ?? 0
+    }
+}
+
+private final class TestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var tick: TimeInterval
+
+    init(start: TimeInterval) {
+        self.tick = start
+    }
+
+    func next() -> Date {
+        lock.lock()
+        defer { lock.unlock() }
+        let date = Date(timeIntervalSince1970: tick)
+        tick += 120
+        return date
     }
 }

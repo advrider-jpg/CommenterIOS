@@ -143,6 +143,7 @@ public enum ImportValidation {
         let subjectNames = Array(selectedSubjects.keys)
         let subjectsByNormalized = subjectNames.reduce(into: [String: String]()) { index, subject in
             index[normalizeSubjectLabel(subject)] = subject
+            index[normalizeSubjectLabel(displaySubjectName(subject))] = subject
         }
         var importedKeys = Set<String>()
         var rejectedRows: [String] = []
@@ -192,11 +193,11 @@ public enum ImportValidation {
             var canonicalFocus = focus
             if subjectRequiresConcreteFocus(canonicalSubjectName) {
                 guard !focus.isEmpty else {
-                    rejectedRows.append("\(rowLabel): \(canonicalSubjectName) requires a specific subject in Focus, such as Music or Digital Technologies")
+                    rejectedRows.append("\(rowLabel): \(displaySubjectName(canonicalSubjectName)) requires a specific subject in Focus, such as Music or Digital Technologies")
                     continue
                 }
                 guard let matchedFocus = getConcreteFocusOptions(canonicalSubjectName).first(where: { normalizeSubjectLabel($0) == normalizeSubjectLabel(focus) }) else {
-                    rejectedRows.append("\(rowLabel): Focus \"\(focus)\" is not a recognised specific subject for \(canonicalSubjectName)")
+                    rejectedRows.append("\(rowLabel): Focus \"\(focus)\" is not a recognised specific subject for \(displaySubjectName(canonicalSubjectName))")
                     continue
                 }
                 canonicalFocus = matchedFocus
@@ -209,7 +210,7 @@ public enum ImportValidation {
 
             let resultKey = "\(student.id)::\(canonicalSubjectName)"
             guard !importedKeys.contains(resultKey) else {
-                rejectedRows.append("\(rowLabel): duplicate result for \(firstName) \(lastName) / \(canonicalSubjectName)")
+                rejectedRows.append("\(rowLabel): duplicate result for \(firstName) \(lastName) / \(displaySubjectName(canonicalSubjectName))")
                 continue
             }
             importedKeys.insert(resultKey)

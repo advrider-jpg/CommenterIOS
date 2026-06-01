@@ -18,8 +18,14 @@ public struct AppFeature: Sendable {
         public var projectStorageMessage = "Checking local project storage."
         public var workflowMessage = "Open or create a project to manage roster, subjects, results, drafts, backups, and exports."
         public var operationStatus: OperationStatus = .idle
+        public var hasUnsavedProjectChanges = false
         public var preparedFile: PreparedFile?
         public var pendingImport: PendingImport?
+        public var projectCreationDraft: ProjectCreationDraft?
+        public var activeImportKind: ImportWorkflowKind?
+        public var rosterImportState: TabularImportState = .neverImported
+        public var resultsImportState: TabularImportState = .neverImported
+        public var lastPreparedFiles: [ImportExportFormat: PreparedFileRecord] = [:]
 
         public init() {}
     }
@@ -65,11 +71,69 @@ public struct AppFeature: Sendable {
     public struct PreparedFile: Equatable, Sendable {
         public var url: URL
         public var label: String
+        public var format: ImportExportFormat?
+        public var preparedAtMilliseconds: Int64?
 
-        public init(url: URL, label: String) {
+        public init(url: URL, label: String, format: ImportExportFormat? = nil, preparedAtMilliseconds: Int64? = nil) {
             self.url = url
             self.label = label
+            self.format = format
+            self.preparedAtMilliseconds = preparedAtMilliseconds
         }
+    }
+
+    public struct PreparedFileRecord: Equatable, Sendable {
+        public var format: ImportExportFormat
+        public var filename: String
+        public var label: String
+        public var preparedAtMilliseconds: Int64
+
+        public init(format: ImportExportFormat, filename: String, label: String, preparedAtMilliseconds: Int64) {
+            self.format = format
+            self.filename = filename
+            self.label = label
+            self.preparedAtMilliseconds = preparedAtMilliseconds
+        }
+    }
+
+    public struct ProjectCreationDraft: Equatable, Sendable {
+        public var name: String
+        public var term: String
+        public var yearLevel: ProjectYearLevel
+        public var useFirstNameOnly: Bool
+
+        public init(name: String = "", term: String = "Term 1", yearLevel: ProjectYearLevel = .year5, useFirstNameOnly: Bool = true) {
+            self.name = name
+            self.term = term
+            self.yearLevel = yearLevel
+            self.useFirstNameOnly = useFirstNameOnly
+        }
+
+        public var normalizedName: String {
+            name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        public var normalizedTerm: String {
+            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? "Term 1" : trimmed
+        }
+    }
+
+    public enum ImportWorkflowKind: Equatable, Sendable {
+        case roster
+        case results
+        case backup
+    }
+
+    public enum TabularImportState: Equatable, Sendable {
+        case neverImported
+        case loaded(count: Int, source: String)
+        case validating(String)
+        case previewReady(count: Int, source: String)
+        case zeroValidRecords(String)
+        case failed(String)
+        case success(count: Int, source: String)
+        case stale(String)
     }
 
     public struct PendingImport: Equatable, Sendable {
@@ -79,6 +143,9 @@ public struct AppFeature: Sendable {
         public var successMessage: String
         public var expectedRevision: Int?
         public var recoveryReason: RecoveryReason
+        public var kind: ImportWorkflowKind
+        public var acceptedRows: Int
+        public var sourceFormat: ImportExportFormat?
 
         public init(
             project: Project,
@@ -86,7 +153,10 @@ public struct AppFeature: Sendable {
             detail: String,
             successMessage: String,
             expectedRevision: Int?,
-            recoveryReason: RecoveryReason
+            recoveryReason: RecoveryReason,
+            kind: ImportWorkflowKind,
+            acceptedRows: Int,
+            sourceFormat: ImportExportFormat?
         ) {
             self.project = project
             self.title = title
@@ -94,6 +164,9 @@ public struct AppFeature: Sendable {
             self.successMessage = successMessage
             self.expectedRevision = expectedRevision
             self.recoveryReason = recoveryReason
+            self.kind = kind
+            self.acceptedRows = acceptedRows
+            self.sourceFormat = sourceFormat
         }
     }
 
@@ -105,6 +178,12 @@ public struct AppFeature: Sendable {
         case projectStoreLoaded([ProjectSummary])
         case projectStoreFailed(String)
         case createProjectTapped
+        case projectCreationNameChanged(String)
+        case projectCreationTermChanged(String)
+        case projectCreationYearLevelChanged(ProjectYearLevel)
+        case projectCreationUseFirstNameOnlyChanged(Bool)
+        case projectCreationCancelled
+        case confirmCreateProjectTapped
         case projectCreateSaved(ProjectSummary)
         case projectCreateFailed(String)
         case projectTapped(String)
@@ -123,6 +202,8 @@ public struct AppFeature: Sendable {
         case studentLastNameChanged(String, String)
         case studentYearLevelChanged(String, StudentYearLevel)
         case subjectToggled(String)
+        case subjectSelectAllTapped
+        case subjectDeselectAllTapped
         case achievementLevelChanged(String, String, AchievementLevel?)
         case focusChanged(String, String, String)
         case generateReportsTapped
@@ -141,9 +222,10 @@ public struct AppFeature: Sendable {
         case importFailed(String)
         case prepareBackupTapped
         case prepareReportExportTapped(ImportExportFormat)
-        case filePrepared(URL, String)
+        case filePrepared(URL, String, ImportExportFormat, Int64)
         case filePreparationFailed(String)
         case deleteProjectConfirmed(String)
+        case projectListDeleteConfirmed(String)
         case projectDeleted(String, [ProjectSummary], String)
         case projectDeleteFailed(String)
         case fileExportSaved(URL)
@@ -154,11 +236,17 @@ public struct AppFeature: Sendable {
         case fileShareCancelled
         case fileShareFailed(String)
         case preparedFileDismissed
+        case operationStatusDismissed
+        case copyDiagnosticsTapped
+        case copyDiagnosticsSucceeded
+        case copyDiagnosticsFailed(String)
     }
 
     @Dependency(\.datasetClient) var datasetClient
     @Dependency(\.projectStoreClient) var projectStoreClient
     @Dependency(\.commentEngineClient) var commentEngineClient
+    @Dependency(\.dateClient) var dateClient
+    @Dependency(\.clipboardClient) var clipboardClient
 
     public init() {}
 

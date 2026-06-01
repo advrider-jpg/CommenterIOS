@@ -1,4 +1,7 @@
+import CommenterDomain
+import CommenterImportExport
 import ComposableArchitecture
+import DesignSystem
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -25,7 +28,11 @@ public struct AppView: View {
                     operationStatus: viewStore.operationStatus,
                     onCreateProject: { viewStore.send(.createProjectTapped) },
                     onOpenProject: { viewStore.send(.projectTapped($0)) },
-                    onImportBackup: { importMode = .backup }
+                    onImportBackup: { importMode = .backup },
+                    onDeleteProject: { project in
+                        projectDeletionCandidate = ProjectDeletionCandidate(id: project.id, name: project.name)
+                    },
+                    onDismissStatus: { viewStore.send(.operationStatusDismissed) }
                 )
                 .tabItem { Label("Projects", systemImage: "folder") }
                 .tag(AppFeature.Tab.projects)
@@ -35,8 +42,14 @@ public struct AppView: View {
                     readiness: viewStore.selectedProjectReadiness,
                     status: viewStore.projectStorageStatus,
                     operationStatus: viewStore.operationStatus,
+                    hasUnsavedProjectChanges: viewStore.hasUnsavedProjectChanges,
                     preparedFile: viewStore.preparedFile,
                     pendingImport: viewStore.pendingImport,
+                    rosterImportState: viewStore.rosterImportState,
+                    resultsImportState: viewStore.resultsImportState,
+                    lastPreparedFiles: viewStore.lastPreparedFiles,
+                    datasetStatus: viewStore.datasetStatus,
+                    onGoToProjects: { viewStore.send(.tabSelected(.projects)) },
                     onProjectNameChanged: { viewStore.send(.projectNameChanged($0)) },
                     onProjectTermChanged: { viewStore.send(.projectTermChanged($0)) },
                     onProjectYearLevelChanged: { viewStore.send(.projectYearLevelChanged($0)) },
@@ -55,6 +68,8 @@ public struct AppView: View {
                     onStudentLastNameChanged: { viewStore.send(.studentLastNameChanged($0, $1)) },
                     onStudentYearChanged: { viewStore.send(.studentYearLevelChanged($0, $1)) },
                     onSubjectToggled: { viewStore.send(.subjectToggled($0)) },
+                    onSelectAllSubjects: { viewStore.send(.subjectSelectAllTapped) },
+                    onDeselectAllSubjects: { viewStore.send(.subjectDeselectAllTapped) },
                     onAchievementChanged: { viewStore.send(.achievementLevelChanged($0, $1, $2)) },
                     onFocusChanged: { viewStore.send(.focusChanged($0, $1, $2)) },
                     onGenerate: { viewStore.send(.generateReportsTapped) },
@@ -85,24 +100,23 @@ public struct AppView: View {
                         viewStore.send(.fileShareStarted(preparedFile.url))
                     },
                     onDismissPreparedFile: { viewStore.send(.preparedFileDismissed) },
+                    onDismissStatus: { viewStore.send(.operationStatusDismissed) },
                     onConfirmImport: { viewStore.send(.confirmImportTapped) },
                     onCancelImportPreview: { viewStore.send(.importPreviewCancelled) }
                 )
-                .tabItem { Label("Worklist", systemImage: "checklist") }
+                .tabItem { Label("Work list", systemImage: "checklist") }
                 .tag(AppFeature.Tab.worklist)
 
                 SupportRootView(
-                    datasetStatus: viewStore.datasetStatus,
-                    projectStorageStatus: viewStore.projectStorageStatus,
-                    projectStorageMessage: viewStore.projectStorageMessage,
-                    projectCount: viewStore.projects.count,
-                    selectedProject: viewStore.selectedProject,
-                    readiness: viewStore.selectedProjectReadiness,
-                    preparedFile: viewStore.preparedFile
+                    state: viewStore.state,
+                    onCopyDiagnostics: { viewStore.send(.copyDiagnosticsTapped) },
+                    onDismissStatus: { viewStore.send(.operationStatusDismissed) }
                 )
                     .tabItem { Label("Support", systemImage: "questionmark.circle") }
                     .tag(AppFeature.Tab.support)
             }
+            .tint(CommenterColors.accent)
+            .sensoryFeedback(.selection, trigger: viewStore.selectedTab)
             .task { await viewStore.send(.task).finish() }
             .fileImporter(
                 isPresented: importBinding,
@@ -124,6 +138,29 @@ public struct AppView: View {
                     handleShareResult(result, url: presentation.url, viewStore: viewStore)
                 }
             }
+            .sheet(
+                isPresented: Binding(
+                    get: { viewStore.projectCreationDraft != nil },
+                    set: { isPresented in
+                        if !isPresented, viewStore.projectCreationDraft != nil, !isCreatingProject(viewStore.projectStorageStatus) {
+                            viewStore.send(.projectCreationCancelled)
+                        }
+                    }
+                )
+            ) {
+                ProjectCreationSheet(
+                    draft: viewStore.projectCreationDraft ?? .init(),
+                    isSaving: isCreatingProject(viewStore.projectStorageStatus),
+                    onNameChanged: { viewStore.send(.projectCreationNameChanged($0)) },
+                    onTermChanged: { viewStore.send(.projectCreationTermChanged($0)) },
+                    onYearLevelChanged: { viewStore.send(.projectCreationYearLevelChanged($0)) },
+                    onUseFirstNameOnlyChanged: { viewStore.send(.projectCreationUseFirstNameOnlyChanged($0)) },
+                    onCancel: { viewStore.send(.projectCreationCancelled) },
+                    onCreate: { viewStore.send(.confirmCreateProjectTapped) }
+                )
+                .presentationDetents([.medium, .large])
+                .interactiveDismissDisabled(isCreatingProject(viewStore.projectStorageStatus))
+            }
             .confirmationDialog(
                 "Delete Project?",
                 isPresented: Binding(
@@ -137,7 +174,11 @@ public struct AppView: View {
             ) { candidate in
                 Button("Delete \(candidate.name)", role: .destructive) {
                     projectDeletionCandidate = nil
-                    viewStore.send(.deleteProjectConfirmed(candidate.id))
+                    if viewStore.selectedProject?.metadata.id == candidate.id {
+                        viewStore.send(.deleteProjectConfirmed(candidate.id))
+                    } else {
+                        viewStore.send(.projectListDeleteConfirmed(candidate.id))
+                    }
                 }
                 Button("Cancel", role: .cancel) {
                     projectDeletionCandidate = nil
@@ -151,11 +192,7 @@ public struct AppView: View {
     private var importBinding: Binding<Bool> {
         Binding(
             get: { importMode != nil },
-            set: { isPresented in
-                if !isPresented {
-                    importMode = nil
-                }
-            }
+            set: { _ in }
         )
     }
 
@@ -222,6 +259,72 @@ public struct AppView: View {
             } else {
                 viewStore.send(.fileShareFailed(error.localizedDescription))
             }
+        }
+    }
+}
+
+private func isCreatingProject(_ status: AppFeature.ProjectStorageStatus) -> Bool {
+    if case .creating = status { return true }
+    return false
+}
+
+private struct ProjectCreationSheet: View {
+    let draft: AppFeature.ProjectCreationDraft
+    let isSaving: Bool
+    let onNameChanged: (String) -> Void
+    let onTermChanged: (String) -> Void
+    let onYearLevelChanged: (ProjectYearLevel) -> Void
+    let onUseFirstNameOnlyChanged: (Bool) -> Void
+    let onCancel: () -> Void
+    let onCreate: () -> Void
+
+    @FocusState private var isNameFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Class name", text: Binding(get: { draft.name }, set: onNameChanged))
+                        .commenterWordsTextInput()
+                        .focused($isNameFocused)
+                        .accessibilityHint("Use a descriptive name, such as 5B Semester 1 2026.")
+                        .accessibilityIdentifier("project-creation-name-field")
+                    TextField("Term", text: Binding(get: { draft.term }, set: onTermChanged))
+                        .accessibilityIdentifier("project-creation-term-field")
+                    Picker("Year level", selection: Binding(get: { draft.yearLevel }, set: onYearLevelChanged)) {
+                        Text("Year 5").tag(ProjectYearLevel.year5)
+                        Text("Year 6").tag(ProjectYearLevel.year6)
+                        Text("Mixed").tag(ProjectYearLevel.mixed)
+                    }
+                    Toggle("Use first names in reports", isOn: Binding(get: { draft.useFirstNameOnly }, set: onUseFirstNameOnlyChanged))
+                } header: {
+                    CommenterSectionHeader("Project details", detail: "Name the class before the local project file is created.")
+                } footer: {
+                    Text("Projects are stored locally on this device. You can edit these details later from the Work list tab.")
+                }
+            }
+            .navigationTitle("Create project")
+            .commenterInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .disabled(isSaving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        onCreate()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("Create")
+                        }
+                    }
+                    .disabled(draft.normalizedName.isEmpty || isSaving)
+                    .accessibilityIdentifier("project-creation-create-button")
+                }
+            }
+            .onAppear { isNameFocused = true }
         }
     }
 }

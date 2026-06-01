@@ -1,3 +1,4 @@
+import CommentEngine
 import CommenterDomain
 import CommenterImportExport
 import CommenterPersistence
@@ -11,7 +12,10 @@ extension AppFeature {
                 state.operationStatus = .failed("Open a project before importing a roster.")
                 return .none
             }
+            guard canStartFileWorkflow(state: &state, label: "roster import") else { return .none }
             state.projectStorageStatus = .importing
+            state.activeImportKind = .roster
+            state.rosterImportState = .validating("Validating roster import before changing the project.")
             state.operationStatus = .busy("Validating roster import before changing the project.")
             let expectedRevision = project.metadata.persistence?.revision
             return .run { send in
@@ -24,7 +28,10 @@ extension AppFeature {
                         detail: "\(importedCount) validated from \(preview.sourceFormat.rawValue.uppercased()). Confirm to save this roster import locally.",
                         successMessage: "Roster imported, saved, and verified.",
                         expectedRevision: expectedRevision,
-                        recoveryReason: .beforeSave
+                        recoveryReason: .beforeSave,
+                        kind: .roster,
+                        acceptedRows: preview.acceptedRows,
+                        sourceFormat: preview.sourceFormat
                     )))
                 } catch {
                     await send(.importFailed(error.localizedDescription))
@@ -36,7 +43,16 @@ extension AppFeature {
                 state.operationStatus = .failed("Open a project before importing results.")
                 return .none
             }
+            guard canStartFileWorkflow(state: &state, label: "results import") else { return .none }
+            let prerequisites = resultsImportPrerequisiteMessages(project)
+            guard prerequisites.isEmpty else {
+                state.resultsImportState = .failed(prerequisites.joined(separator: " "))
+                state.operationStatus = .failed("Results import is unavailable: \(prerequisites.joined(separator: " "))")
+                return .none
+            }
             state.projectStorageStatus = .importing
+            state.activeImportKind = .results
+            state.resultsImportState = .validating("Validating results import before changing the project.")
             state.operationStatus = .busy("Validating results import before changing the project.")
             let expectedRevision = project.metadata.persistence?.revision
             return .run { send in
@@ -49,7 +65,10 @@ extension AppFeature {
                         detail: "\(rowLabel) validated from \(preview.sourceFormat.rawValue.uppercased()). Confirm to save these results locally.",
                         successMessage: "Results imported, saved, and verified.",
                         expectedRevision: expectedRevision,
-                        recoveryReason: .beforeSave
+                        recoveryReason: .beforeSave,
+                        kind: .results,
+                        acceptedRows: preview.acceptedRows,
+                        sourceFormat: preview.sourceFormat
                     )))
                 } catch {
                     await send(.importFailed(error.localizedDescription))
@@ -57,7 +76,9 @@ extension AppFeature {
             }
 
         case let .backupImportPicked(url):
+            guard canStartFileWorkflow(state: &state, label: "backup import") else { return .none }
             state.projectStorageStatus = .importing
+            state.activeImportKind = .backup
             state.operationStatus = .busy("Validating backup JSON before saving it locally.")
             return .run { send in
                 do {
@@ -68,7 +89,10 @@ extension AppFeature {
                         detail: "\(imported.metadata.name) was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.",
                         successMessage: "Backup imported, saved, and verified. A matching local project id was replaced only after a recovery snapshot was prepared.",
                         expectedRevision: nil,
-                        recoveryReason: .beforeImportReplace
+                        recoveryReason: .beforeImportReplace,
+                        kind: .backup,
+                        acceptedRows: 1,
+                        sourceFormat: .backupJSON
                     )))
                 } catch {
                     await send(.importFailed(error.localizedDescription))
@@ -77,6 +101,12 @@ extension AppFeature {
 
         case .importCancelled:
             state.projectStorageStatus = .loaded
+            if state.activeImportKind == .roster {
+                state.rosterImportState = .failed("Roster import cancelled. No project data changed.")
+            } else if state.activeImportKind == .results {
+                state.resultsImportState = .failed("Results import cancelled. No project data changed.")
+            }
+            state.activeImportKind = nil
             state.pendingImport = nil
             state.operationStatus = .cancelled("Import cancelled. No project data changed.")
             return .none
@@ -85,6 +115,12 @@ extension AppFeature {
             state.projectStorageStatus = .loaded
             state.pendingImport = preview
             state.selectedTab = .worklist
+            state.activeImportKind = nil
+            if preview.kind == .roster {
+                state.rosterImportState = .previewReady(count: preview.acceptedRows, source: importSourceLabel(preview.sourceFormat))
+            } else if preview.kind == .results {
+                state.resultsImportState = .previewReady(count: preview.acceptedRows, source: importSourceLabel(preview.sourceFormat))
+            }
             state.operationStatus = .prepared(preview.detail)
             state.workflowMessage = preview.detail
             return .none
@@ -95,6 +131,7 @@ extension AppFeature {
                 return .none
             }
             state.projectStorageStatus = .importing
+            state.activeImportKind = preview.kind
             state.operationStatus = .busy("Saving confirmed import and verifying local storage.")
             return .run { send in
                 do {
@@ -111,13 +148,28 @@ extension AppFeature {
             }
 
         case .importPreviewCancelled:
+            if let pendingImport = state.pendingImport {
+                if pendingImport.kind == .roster {
+                    state.rosterImportState = .failed("Roster import preview cancelled. No project data changed.")
+                } else if pendingImport.kind == .results {
+                    state.resultsImportState = .failed("Results import preview cancelled. No project data changed.")
+                }
+            }
             state.projectStorageStatus = .loaded
+            state.activeImportKind = nil
             state.pendingImport = nil
             state.operationStatus = .cancelled("Import preview cancelled. No project data changed.")
             return .none
 
         case let .importCommitted(project, message):
+            let committedImport = state.pendingImport
             state.pendingImport = nil
+            state.activeImportKind = nil
+            if committedImport?.kind == .roster {
+                state.rosterImportState = .success(count: committedImport?.acceptedRows ?? 0, source: importSourceLabel(committedImport?.sourceFormat))
+            } else if committedImport?.kind == .results {
+                state.resultsImportState = .success(count: committedImport?.acceptedRows ?? 0, source: importSourceLabel(committedImport?.sourceFormat))
+            }
             acceptVerifiedProject(&state, project: project, message: message)
             state.projects.removeAll { $0.id == project.metadata.id }
             state.projects.append(projectSummary(project))
@@ -125,8 +177,23 @@ extension AppFeature {
             return .none
 
         case let .importFailed(message):
+            let activeKind = state.activeImportKind ?? state.pendingImport?.kind
             state.projectStorageStatus = .loaded
             state.pendingImport = nil
+            state.activeImportKind = nil
+            if activeKind == .roster {
+                if isZeroAcceptedRowsMessage(message, rowLabel: "student") {
+                    state.rosterImportState = .zeroValidRecords(message)
+                } else {
+                    state.rosterImportState = .failed(message)
+                }
+            } else if activeKind == .results {
+                if isZeroAcceptedRowsMessage(message, rowLabel: "result") {
+                    state.resultsImportState = .zeroValidRecords(message)
+                } else {
+                    state.resultsImportState = .failed(message)
+                }
+            }
             state.operationStatus = .failed("Import failed. Project data was left unchanged: \(message)")
             return .none
 
@@ -135,12 +202,18 @@ extension AppFeature {
                 state.operationStatus = .failed("Open a project before exporting a backup.")
                 return .none
             }
+            guard canStartFileWorkflow(state: &state, label: "backup preparation") else { return .none }
+            guard !hasUnsavedChanges(state) else {
+                state.operationStatus = .failed("Save current changes before preparing Backup JSON so the backup reflects verified local storage.")
+                return .none
+            }
             state.projectStorageStatus = .preparingFile
             state.preparedFile = nil
             state.operationStatus = .busy("Preparing and verifying backup JSON.")
+            let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
                 do {
-                    await send(.filePrepared(try await projectStoreClient.prepareBackup(project), "Verified backup JSON is ready to export or share."))
+                    await send(.filePrepared(try await projectStoreClient.prepareBackup(project), "Verified backup JSON is ready to export or share.", .backupJSON, preparedAt))
                 } catch {
                     await send(.filePreparationFailed(error.localizedDescription))
                 }
@@ -151,20 +224,38 @@ extension AppFeature {
                 state.operationStatus = .failed("Open a project before exporting reports.")
                 return .none
             }
+            guard canStartFileWorkflow(state: &state, label: "report export preparation") else { return .none }
+            guard !hasUnsavedChanges(state) else {
+                state.operationStatus = .failed("Save current changes before preparing report exports so files reflect verified local storage.")
+                return .none
+            }
+            guard let readiness = state.selectedProjectReadiness, readiness.expected > 0, readiness.ready == readiness.expected else {
+                let ready = state.selectedProjectReadiness?.ready ?? 0
+                let expected = state.selectedProjectReadiness?.expected ?? 0
+                state.operationStatus = .failed("Report exports are not ready. \(ready) of \(expected) draft comments are export-ready.")
+                return .none
+            }
             state.projectStorageStatus = .preparingFile
             state.preparedFile = nil
             state.operationStatus = .busy("Checking readiness and preparing \(format.rawValue.uppercased()) export.")
+            let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
                 do {
-                    await send(.filePrepared(try await projectStoreClient.prepareReportExport(project, format), "\(format.rawValue.uppercased()) export file is verified and ready."))
+                    await send(.filePrepared(try await projectStoreClient.prepareReportExport(project, format), "\(format.rawValue.uppercased()) export file is verified and ready.", format, preparedAt))
                 } catch {
                     await send(.filePreparationFailed(error.localizedDescription))
                 }
             }
 
-        case let .filePrepared(url, label):
+        case let .filePrepared(url, label, format, preparedAt):
             state.projectStorageStatus = .loaded
-            state.preparedFile = PreparedFile(url: url, label: label)
+            state.preparedFile = PreparedFile(url: url, label: label, format: format, preparedAtMilliseconds: preparedAt)
+            state.lastPreparedFiles[format] = PreparedFileRecord(
+                format: format,
+                filename: url.lastPathComponent,
+                label: label,
+                preparedAtMilliseconds: preparedAt
+            )
             state.operationStatus = .prepared(label)
             return .none
 
@@ -204,15 +295,45 @@ extension AppFeature {
 
         case .preparedFileDismissed:
             state.preparedFile = nil
+            if case .prepared = state.operationStatus {
+                state.operationStatus = .idle
+            }
             return .none
 
         default:
             return .none
         }
     }
-
 }
 
 private func importCountLabel(_ count: Int, singular: String, plural: String) -> String {
     count == 1 ? "1 \(singular)" : "\(count) \(plural)"
+}
+
+private func resultsImportPrerequisiteMessages(_ project: Project) -> [String] {
+    var messages: [String] = []
+    if project.roster.isEmpty {
+        messages.append("Add at least one student before importing results.")
+    }
+    if selectedSubjectKeys(project.metadata.selectedSubjects).isEmpty {
+        messages.append("Select at least one subject before importing results.")
+    }
+    return messages
+}
+
+private func isZeroAcceptedRowsMessage(_ message: String, rowLabel: String) -> Bool {
+    let normalized = message.lowercased()
+    return normalized.contains("no ") && normalized.contains("accepted")
+}
+
+private func canStartFileWorkflow(state: inout AppFeature.State, label: String) -> Bool {
+    guard !isLongRunningProjectOperation(state.projectStorageStatus) else {
+        state.operationStatus = .failed("Wait for the current local operation to finish before starting \(label).")
+        return false
+    }
+    guard state.pendingImport == nil else {
+        state.operationStatus = .failed("Confirm or cancel the pending import before starting \(label).")
+        return false
+    }
+    return true
 }

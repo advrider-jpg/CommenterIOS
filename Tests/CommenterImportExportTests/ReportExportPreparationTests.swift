@@ -83,6 +83,33 @@ final class ReportExportPreparationTests: XCTestCase {
         XCTAssertEqual(studentRows[0].studentName, "Ben Stone")
     }
 
+
+    func testReportExportsUseFormalSubjectDisplayNamesWithoutChangingStorageKeys() throws {
+        let result = AchievementResult(studentId: "s1", subject: "Health and P.E.", achievementLevel: .atStandard, focusStrand: "teamwork")
+        var project = Project(
+            metadata: ProjectMetadata(
+                id: "p1",
+                name: "Project",
+                term: "Term 1",
+                yearLevel: .year5,
+                createdAt: 1,
+                updatedAt: 1,
+                selectedSubjects: ["Health and P.E.": SelectedSubject(name: "Health and P.E.", allStrandsSelected: true)],
+                useFirstNameOnly: false
+            ),
+            roster: [Student(id: "s1", firstName: "Ava", lastName: "Ng", yearLevel: .year5)],
+            results: [result]
+        )
+        project.reports = [readyReport(project: project, result: result, text: "Ava contributes constructively.")]
+
+        let rows = try reportReviewRows(project: project)
+        let packet = try prepareReportPacket(project: project)
+
+        XCTAssertEqual(rows[0].subject, "Health and Physical Education")
+        XCTAssertEqual(packet.students[0].sections[0].subject, "Health and Physical Education")
+        XCTAssertEqual(project.results[0].subject, "Health and P.E.")
+    }
+
     func testReportExportFilenamesMatchSourceTruthSanitizing() throws {
         var project = fixtureProject(useFirstNameOnly: false)
         project.metadata.name = "Term: Reports/2026?"

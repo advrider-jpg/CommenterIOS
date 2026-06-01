@@ -356,3 +356,67 @@ Append material work history here. Keep entries short, dated, and factual.
   screenshots but the raw output directory stays empty in CI, added an
   `xcresulttool export attachments` workflow step that extracts the kept
   XCTest screenshot attachments into stable PNG files before artifact upload.
+
+## 2026-06-01 - UI/UX defect patch integration
+
+- Applied the standalone UI/UX defect patch and kept the changes inside the
+  native SwiftUI/TCA, local-only, truthful-state architecture.
+- Added project creation naming before persistence, roster management entry
+  points, subject bulk selection, disabled prerequisite-gated actions, truthful
+  import/export/share/cancel states, prepared-file timestamps, and richer
+  support diagnostics.
+- Added formal subject display names, curriculum-order subject handling, support
+  copy diagnostics, and small native SwiftUI design-system components.
+- Repaired patch integration gaps found after application: successful imports no
+  longer lose their mode before completion handling, project creation cannot
+  report cancellation after a successful programmatic close, and local data
+  loaded from verified storage is not labelled as newly imported.
+- Ran Windows-feasible hygiene checks. SwiftPM and Xcode/simulator validation
+  remain blocked locally because `swift` and `xcodebuild` are not installed on
+  this machine.
+
+## 2026-06-01 - PR #4 screenshot CI repair
+
+- Investigated failing hosted screenshot CI run `26733506101`; Swift package
+  tests passed, but the UI test failed after selecting English because the
+  achievement control was not exposed to XCTest under the expected stable
+  identifier.
+- Replaced the Results achievement `.menu` picker with an explicit SwiftUI
+  `Menu` carrying the same reducer-backed update and a stable accessibility
+  identifier for simulator automation.
+- Reworked subject bulk-selection controls as real bordered buttons after the
+  next hosted run showed the borderless list-row button existed but was not
+  hittable to XCTest.
+- Tightened screenshot UI test tapping so visible SwiftUI controls that XCTest
+  reports as present but not hittable are still tapped through real screen
+  coordinates, with downstream app state continuing to prove the operation.
+- Made screenshot page waits accept the real tab page accessibility roots as
+  well as navigation-bar titles after hosted CI showed a tab page could render
+  without the expected title snapshot being observed.
+- Replaced the achievement menu with visible reducer-backed achievement buttons
+  after hosted CI proved SwiftUI menu controls were not exposing a stable
+  hittable automation element for the result-entry flow.
+- Replaced subject toggle rows with explicit reducer-backed selection buttons so
+  curriculum selection remains visible and automatable after bulk deselection.
+- Broadened the screenshot test subject lookup to accept visible row text as a
+  real tap target, switched screenshot scrolling to smaller drag steps, and
+  added failure-context captures for future hosted UI-test artifacts.
+- Made screenshot scrolling direction-aware and verified the saved operation
+  status through the same real list-scrolling path after hosted CI showed the
+  top workflow status can be virtualized offscreen when Save Project is tapped.
+- Tightened the generated-report lookup so the screenshot test no longer
+  accepts matching result-card static text as proof that a durable report row
+  exists.
+- Added separate root page and list accessibility identifiers for Projects,
+  Work list, and Support so UI tests can anchor to pages while scrolling the
+  actual list containers.
+- Reworked the core screenshot UI test to reopen and verify Work list before
+  every Work list-only interaction, scroll inside `worklist-list` rather than
+  the app window, require hittable subject controls, and attach page/tab/list
+  diagnostics to future failure screenshots.
+- After hosted screenshot run `26780285403` reached DOCX preparation but timed
+  out polling an offscreen operation-status row, changed the test to wait for
+  the verified `prepared-file-ready` row through the bounded Work list scroller.
+- After hosted screenshot run `26781195133` showed `prepared-file-ready` was
+  present but exposed by SwiftUI as multiple label child elements, changed the
+  generic identifier lookup helper to use the first matching accessibility node.
