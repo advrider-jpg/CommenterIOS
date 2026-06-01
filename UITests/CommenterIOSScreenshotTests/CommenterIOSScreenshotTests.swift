@@ -79,6 +79,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         let generateReports = scrollToAny(buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"), name: "Generate and Save Reports")
         generateReports.tap()
+        waitForOperationToSettle(action: "report generation")
 
         let reportRow = scrollToAny(reportRows(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)"), name: "generated Ava English report row")
         tapElement(reportRow, named: "generated Ava English report row")
@@ -92,9 +93,9 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         capture("12-export-ready")
         prepareDocx.tap()
 
-        let preparedFile = element("prepared-file-ready")
-        waitForElement(preparedFile, named: "verified prepared DOCX file")
-        _ = scrollToAny([preparedFile], name: "verified prepared DOCX file", requireHittable: false)
+        waitForDocxPreparation()
+        let preparedFile = scrollToAny([element("prepared-file-ready")], name: "verified prepared DOCX file", requireHittable: false)
+        _ = preparedFile
         capture("13-docx-prepared")
 
         openTab("Support")
@@ -391,6 +392,45 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             try screenshot.pngRepresentation.write(to: outputURL, options: [.atomic])
         } catch {
             XCTFail("Could not write screenshot \(name): \(error.localizedDescription)")
+        }
+    }
+
+    private func waitForOperationToSettle(action: String, timeout: TimeInterval = 30) {
+        let busy = element("operation-status-busy")
+        let failed = element("operation-status-failed")
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if failed.exists {
+                captureFailureContext("\(action)-failed")
+                XCTFail("\(action) failed: \(failed.label)")
+                return
+            }
+            if !busy.exists { return }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.5))
+        }
+        captureFailureContext("\(action)-timeout")
+        XCTFail("\(action) timed out (still busy): \(busy.label)")
+    }
+
+    private func waitForDocxPreparation() {
+        let prepared = element("operation-status-prepared")
+        let failed = element("operation-status-failed")
+        let deadline = Date().addingTimeInterval(30)
+        while Date() < deadline {
+            if prepared.exists { return }
+            if failed.exists {
+                captureFailureContext("docx-preparation-failed")
+                XCTFail("DOCX preparation failed: \(failed.label)")
+                return
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.5))
+        }
+        captureFailureContext("docx-preparation-timeout")
+        let busy = element("operation-status-busy")
+        if busy.exists {
+            XCTFail("DOCX preparation timed out (still busy): \(busy.label)")
+        } else {
+            XCTFail("DOCX preparation timed out with no recognised operation status.")
         }
     }
 
