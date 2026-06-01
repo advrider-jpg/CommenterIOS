@@ -417,3 +417,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - After hosted screenshot run `26780285403` reached DOCX preparation but timed
   out polling an offscreen operation-status row, changed the test to wait for
   the verified `prepared-file-ready` row through the bounded Work list scroller.
+- After hosted screenshot run `26781195133` showed `prepared-file-ready` was
+  present but exposed by SwiftUI as multiple label child elements, changed the
+  generic identifier lookup helper to use the first matching accessibility node.

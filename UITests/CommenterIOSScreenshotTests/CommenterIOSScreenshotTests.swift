@@ -193,7 +193,8 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func element(_ identifier: String) -> XCUIElement {
-        app.descendants(matching: .any)[identifier]
+        let predicate = NSPredicate(format: "identifier == %@", identifier)
+        return app.descendants(matching: .any).matching(predicate).firstMatch
     }
 
     private func button(identifier: String, label: String) -> XCUIElement {
