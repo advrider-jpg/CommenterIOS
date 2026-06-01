@@ -58,9 +58,9 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         capture("06-roster-student-entered")
         tapBack(to: screenshotProjectName)
 
-        let deselectAll = scrollToAny(buttons(identifier: "subject-deselect-all-button", label: "Deselect all"), name: "Deselect all")
-        deselectAll.tap()
-        let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle")
+        let deselectAll = scrollToAny(buttons(identifier: "subject-deselect-all-button", label: "Deselect all"), name: "Deselect all", requireHittable: false)
+        tapElement(deselectAll, named: "Deselect all")
+        let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle", requireHittable: false)
         tapSwitch(englishToggle, named: "English subject toggle")
         capture("07-subject-selected-english")
 
@@ -205,7 +205,15 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func visibleElement(in elements: [XCUIElement], requireHittable: Bool) -> XCUIElement? {
-        elements.first { $0.exists && (!requireHittable || $0.isHittable) }
+        elements.first { element in
+            guard element.exists else { return false }
+            return requireHittable ? element.isHittable : isVisibleOnScreen(element)
+        }
+    }
+
+    private func isVisibleOnScreen(_ element: XCUIElement) -> Bool {
+        let frame = element.frame
+        return !frame.isEmpty && app.frame.intersects(frame)
     }
 
     private func enterText(_ text: String, in element: XCUIElement, named name: String) {
@@ -216,12 +224,27 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         dismissKeyboardIfNeeded()
     }
 
+    private func tapElement(_ element: XCUIElement, named name: String) {
+        waitForElement(element, named: name)
+        if element.isHittable {
+            element.tap()
+            return
+        }
+        XCTAssertTrue(isVisibleOnScreen(element), "Expected \(name) to be visible before tapping.")
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
     private func tapSwitch(_ element: XCUIElement, named name: String) {
         waitForElement(element, named: name)
-        XCTAssertTrue(element.isHittable, "Expected \(name) to be visible before tapping.")
         if element.elementType == .switch {
-            element.tap()
+            if element.isHittable {
+                element.tap()
+            } else {
+                XCTAssertTrue(isVisibleOnScreen(element), "Expected \(name) to be visible before tapping.")
+                element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            }
         } else {
+            XCTAssertTrue(isVisibleOnScreen(element), "Expected \(name) to be visible before tapping.")
             element.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         }
     }

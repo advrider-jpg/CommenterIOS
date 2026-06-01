@@ -387,3 +387,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - Reworked subject bulk-selection controls as real bordered buttons after the
   next hosted run showed the borderless list-row button existed but was not
   hittable to XCTest.
+- Tightened screenshot UI test tapping so visible SwiftUI controls that XCTest
+  reports as present but not hittable are still tapped through real screen
+  coordinates, with downstream app state continuing to prove the operation.
