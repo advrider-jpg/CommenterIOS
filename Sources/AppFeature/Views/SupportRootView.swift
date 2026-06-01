@@ -148,11 +148,11 @@ struct SupportRootView: View {
                     CommenterSectionHeader("Backup and feedback")
                 }
             }
-            .listStyle(.insetGrouped)
+            .commenterGroupedListStyle()
             .scrollIndicators(.visible)
             .background(CommenterColors.groupedBackground)
             .navigationTitle("Support")
-            .navigationBarTitleDisplayMode(.large)
+            .commenterLargeNavigationTitle()
             .accessibilityIdentifier("support-page")
         }
     }

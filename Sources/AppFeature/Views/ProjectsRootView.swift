@@ -113,11 +113,11 @@ struct ProjectsRootView: View {
                     CommenterSectionHeader("Saved projects", detail: savedProjectsHeaderDetail)
                 }
             }
-            .listStyle(.insetGrouped)
+            .commenterGroupedListStyle()
             .scrollIndicators(.visible)
             .background(CommenterColors.groupedBackground)
             .navigationTitle("Projects")
-            .navigationBarTitleDisplayMode(.large)
+            .commenterLargeNavigationTitle()
             .accessibilityIdentifier("projects-page")
         }
     }

@@ -142,11 +142,11 @@ struct WorklistRootView: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+            .commenterGroupedListStyle()
             .scrollIndicators(.visible)
             .background(CommenterColors.groupedBackground)
             .navigationTitle(project?.metadata.name ?? "Work list")
-            .navigationBarTitleDisplayMode(.large)
+            .commenterLargeNavigationTitle()
             .accessibilityIdentifier("worklist-page")
         }
     }

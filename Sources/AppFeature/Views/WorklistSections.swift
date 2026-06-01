@@ -18,7 +18,7 @@ struct ProjectMetadataSection: View {
     var body: some View {
         Section {
             TextField("Project name", text: Binding(get: { project.metadata.name }, set: onNameChanged))
-                .textInputAutocapitalization(.words)
+                .commenterWordsTextInput()
                 .disabled(isDisabled)
                 .accessibilityHint("Use a descriptive class and year name.")
                 .accessibilityIdentifier("project-name-field")
@@ -226,11 +226,11 @@ private struct StudentEditorView: View {
         Form {
             Section {
                 TextField("First name", text: Binding(get: { student.firstName }, set: onFirstNameChanged))
-                    .textInputAutocapitalization(.words)
+                    .commenterWordsTextInput()
                     .disabled(isDisabled)
                     .accessibilityIdentifier("student-first-name-\(student.id)")
                 TextField("Last name", text: Binding(get: { student.lastName }, set: onLastNameChanged))
-                    .textInputAutocapitalization(.words)
+                    .commenterWordsTextInput()
                     .disabled(isDisabled)
                     .accessibilityIdentifier("student-last-name-\(student.id)")
                 Picker("Year", selection: Binding(get: { student.yearLevel }, set: onYearChanged)) {
@@ -250,7 +250,7 @@ private struct StudentEditorView: View {
             }
         }
         .navigationTitle(fullStudentName(student))
-        .navigationBarTitleDisplayMode(.inline)
+        .commenterInlineNavigationTitle()
     }
 }
 
@@ -532,7 +532,7 @@ private struct ReportEditorView: View {
             }
         }
         .navigationTitle(reportTitle(report, project: project))
-        .navigationBarTitleDisplayMode(.inline)
+        .commenterInlineNavigationTitle()
     }
 }
 

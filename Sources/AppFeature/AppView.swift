@@ -284,7 +284,7 @@ private struct ProjectCreationSheet: View {
             Form {
                 Section {
                     TextField("Class name", text: Binding(get: { draft.name }, set: onNameChanged))
-                        .textInputAutocapitalization(.words)
+                        .commenterWordsTextInput()
                         .focused($isNameFocused)
                         .accessibilityHint("Use a descriptive name, such as 5B Semester 1 2026.")
                         .accessibilityIdentifier("project-creation-name-field")
@@ -303,7 +303,7 @@ private struct ProjectCreationSheet: View {
                 }
             }
             .navigationTitle("Create project")
-            .navigationBarTitleDisplayMode(.inline)
+            .commenterInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)

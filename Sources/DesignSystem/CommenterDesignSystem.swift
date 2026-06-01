@@ -32,6 +32,44 @@ public enum CommenterColors {
     }
 }
 
+public extension View {
+    @ViewBuilder
+    func commenterGroupedListStyle() -> some View {
+        #if os(iOS)
+        self.listStyle(.insetGrouped)
+        #else
+        self.listStyle(.automatic)
+        #endif
+    }
+
+    @ViewBuilder
+    func commenterLargeNavigationTitle() -> some View {
+        #if os(iOS)
+        self.navigationBarTitleDisplayMode(.large)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func commenterInlineNavigationTitle() -> some View {
+        #if os(iOS)
+        self.navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func commenterWordsTextInput() -> some View {
+        #if os(iOS)
+        self.textInputAutocapitalization(.words)
+        #else
+        self
+        #endif
+    }
+}
+
 public struct CommenterSectionHeader: View {
     private let title: String
     private let step: Int?
