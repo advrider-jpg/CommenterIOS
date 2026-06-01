@@ -398,3 +398,6 @@ Append material work history here. Keep entries short, dated, and factual.
   hittable automation element for the result-entry flow.
 - Replaced subject toggle rows with explicit reducer-backed selection buttons so
   curriculum selection remains visible and automatable after bulk deselection.
+- Broadened the screenshot test subject lookup to accept visible row text as a
+  real tap target, switched screenshot scrolling to smaller drag steps, and
+  added failure-context captures for future hosted UI-test artifacts.

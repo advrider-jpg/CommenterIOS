@@ -60,13 +60,13 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         let deselectAll = scrollToAny(buttons(identifier: "subject-deselect-all-button", label: "Deselect all"), name: "Deselect all", requireHittable: false)
         tapElement(deselectAll, named: "Deselect all")
-        let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle")
+        let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle", requireHittable: false)
         tapSwitch(englishToggle, named: "English subject toggle")
         capture("07-subject-selected-english")
 
         let achievementOption = scrollToAny(buttons(identifier: "achievement-picker-\(screenshotStudentId)-\(screenshotSubjectKey)-atstandard", label: "At Standard"), name: "Ava English At Standard achievement option")
         capture("08-result-before-achievement")
-        achievementOption.tap()
+        tapElement(achievementOption, named: "Ava English At Standard achievement option")
 
         let focusField = scrollToAny(textFields(identifier: "focus-field-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Focus"), name: "Ava English focus field")
         enterText("reading comprehension", in: focusField, named: "Ava English focus")
@@ -179,6 +179,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             app.buttons[label],
             app.cells[identifier],
             app.cells[label],
+            app.staticTexts[label],
             element(identifier)
         ]
     }
@@ -210,20 +211,21 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             return visible
         }
 
-        for _ in 0..<12 {
-            app.swipeUp()
+        for _ in 0..<24 {
+            scrollBySmallStep(up: true)
             if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
                 return visible
             }
         }
 
-        for _ in 0..<12 {
-            app.swipeDown()
+        for _ in 0..<24 {
+            scrollBySmallStep(up: false)
             if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
                 return visible
             }
         }
 
+        captureFailureContext(name)
         let failureStatus = element("operation-status-failed")
         if failureStatus.exists {
             XCTFail("Expected \(name), but the app reported failure: \(failureStatus.label)")
@@ -243,6 +245,14 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     private func isVisibleOnScreen(_ element: XCUIElement) -> Bool {
         let frame = element.frame
         return !frame.isEmpty && app.frame.intersects(frame)
+    }
+
+    private func scrollBySmallStep(up: Bool) {
+        let startY: CGFloat = up ? 0.68 : 0.32
+        let endY: CGFloat = up ? 0.44 : 0.56
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+        start.press(forDuration: 0.01, thenDragTo: end)
     }
 
     private func enterText(_ text: String, in element: XCUIElement, named name: String) {
@@ -375,5 +385,20 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         } catch {
             XCTFail("Could not write screenshot \(name): \(error.localizedDescription)")
         }
+    }
+
+    private func captureFailureContext(_ name: String) {
+        let safeName = name
+            .lowercased()
+            .map { character in
+                character.isLetter || character.isNumber ? character : "-"
+            }
+            .reduce(into: "") { partial, character in
+                if character != "-" || partial.last != "-" {
+                    partial.append(character)
+                }
+            }
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        capture("failure-\(safeName)")
     }
 }
