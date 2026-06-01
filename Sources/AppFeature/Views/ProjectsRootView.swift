@@ -24,6 +24,7 @@ struct ProjectsRootView: View {
                         Label("Create Project", systemImage: "plus")
                     }
                     .disabled(!canStartProjectStorageAction)
+                    .accessibilityIdentifier("create-project-button")
                     Button(action: onImportBackup) {
                         Label("Import Project Backup", systemImage: "tray.and.arrow.down")
                     }

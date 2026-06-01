@@ -21,6 +21,7 @@ struct SupportRootView: View {
 
                 Section("Local Projects") {
                     LabeledContent("Storage", value: projectStorageStatusLabel)
+                        .accessibilityIdentifier("project-storage-status")
                     Text(projectStorageMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -45,6 +46,7 @@ struct SupportRootView: View {
                 Section("Prepared File") {
                     if let preparedFile {
                         LabeledContent("Ready file", value: preparedFile.url.lastPathComponent)
+                            .accessibilityIdentifier("support-ready-file")
                         Text(preparedFile.label)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -90,6 +92,7 @@ struct SupportRootView: View {
             ProgressView("Checking bundled comment engine")
         case let .loaded(snapshot):
             LabeledContent("Status", value: "Bundled dataset loaded")
+                .accessibilityIdentifier("dataset-loaded-status")
             LabeledContent("Checks", value: "Basic structural checks passed")
             LabeledContent("Subjects", value: "\(snapshot.subjectCount)")
             LabeledContent("Components", value: "\(snapshot.componentCount)")

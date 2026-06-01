@@ -18,8 +18,10 @@ struct ProjectMetadataSection: View {
         Section("Project") {
             TextField("Project name", text: Binding(get: { project.metadata.name }, set: onNameChanged))
                 .disabled(isDisabled)
+                .accessibilityIdentifier("project-name-field")
             TextField("Term", text: Binding(get: { project.metadata.term }, set: onTermChanged))
                 .disabled(isDisabled)
+                .accessibilityIdentifier("project-term-field")
             Picker("Project year level", selection: Binding(get: { project.metadata.yearLevel }, set: onYearLevelChanged)) {
                 Text("Year 5").tag(ProjectYearLevel.year5)
                 Text("Year 6").tag(ProjectYearLevel.year6)
@@ -32,6 +34,7 @@ struct ProjectMetadataSection: View {
                 Label("Save Project", systemImage: "externaldrive")
             }
             .disabled(isDisabled)
+            .accessibilityIdentifier("save-project-button")
             Button(role: .destructive, action: onDeleteProject) {
                 Label("Delete Project", systemImage: "trash")
             }
@@ -103,13 +106,16 @@ struct RosterSection: View {
                 Label("Add Student", systemImage: "person.badge.plus")
             }
             .disabled(isDisabled)
+            .accessibilityIdentifier("add-student-button")
             ForEach(project.roster) { student in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         TextField("First name", text: Binding(get: { student.firstName }, set: { onFirstNameChanged(student.id, $0) }))
                             .disabled(isDisabled)
+                            .accessibilityIdentifier("student-first-name-\(student.id)")
                         TextField("Last name", text: Binding(get: { student.lastName }, set: { onLastNameChanged(student.id, $0) }))
                             .disabled(isDisabled)
+                            .accessibilityIdentifier("student-last-name-\(student.id)")
                     }
                     Picker("Year", selection: Binding(get: { student.yearLevel }, set: { onYearChanged(student.id, $0) })) {
                         Text("Year 5").tag(StudentYearLevel.year5)
@@ -125,6 +131,7 @@ struct RosterSection: View {
                     .disabled(isDisabled)
                 }
                 .padding(.vertical, 4)
+                .accessibilityIdentifier("student-card-\(student.id)")
             }
         }
     }
@@ -146,6 +153,7 @@ struct SubjectsSection: View {
                     )
                 )
                 .disabled(isDisabled)
+                .accessibilityIdentifier("subject-toggle-\(accessibilityKey(subject))")
                 if subjectRequiresConcreteFocus(subject), project.metadata.selectedSubjects[subject] != nil {
                     Text("Specific focus is required for \(subject) results: \(getConcreteFocusOptions(subject).joined(separator: ", ")).")
                         .font(.footnote)
@@ -196,6 +204,7 @@ struct ResultsSection: View {
                             Text("Above Standard").tag(Optional(AchievementLevel.aboveStandard))
                         }
                         .disabled(isDisabled)
+                        .accessibilityIdentifier("achievement-picker-\(student.id)-\(accessibilityKey(subject))")
                         if subjectRequiresConcreteFocus(subject) {
                             Picker("Specific subject", selection: Binding(get: { result?.focusStrand ?? "" }, set: { onFocusChanged(student.id, subject, $0) })) {
                                 Text("Choose").tag("")
@@ -207,6 +216,7 @@ struct ResultsSection: View {
                         } else {
                             TextField("Focus", text: Binding(get: { result?.focusStrand ?? "" }, set: { onFocusChanged(student.id, subject, $0) }))
                                 .disabled(isDisabled)
+                                .accessibilityIdentifier("focus-field-\(student.id)-\(accessibilityKey(subject))")
                         }
                         if let entry = readiness?.entries.first(where: { $0.studentId == student.id && $0.subject == subject }) {
                             Label(entry.message, systemImage: isReadyForExport(entry.status) ? "checkmark.circle" : "exclamationmark.triangle")
@@ -215,6 +225,7 @@ struct ResultsSection: View {
                         }
                     }
                     .padding(.vertical, 4)
+                    .accessibilityIdentifier("result-card-\(student.id)-\(accessibilityKey(subject))")
                 }
             }
         }
@@ -234,6 +245,7 @@ struct ReportsSection: View {
                 Label("Generate and Save Reports", systemImage: "sparkles")
             }
             .disabled(isDisabled || project.roster.isEmpty || selectedSubjectKeys(project.metadata.selectedSubjects).isEmpty)
+            .accessibilityIdentifier("generate-reports-button")
             if project.roster.isEmpty || selectedSubjectKeys(project.metadata.selectedSubjects).isEmpty {
                 Text("Add students and selected subjects before generating draft comments.")
                     .font(.footnote)
@@ -250,6 +262,7 @@ struct ReportsSection: View {
                     ))
                     .frame(minHeight: 120)
                     .disabled(isDisabled)
+                    .accessibilityIdentifier("report-editor-\(report.studentId)-\(accessibilityKey(report.subject))")
                     Toggle("Lock against regeneration", isOn: Binding(get: { report.isLocked }, set: { onLockChanged(report.studentId, report.subject, $0) }))
                         .disabled(isDisabled)
                 }
@@ -280,6 +293,7 @@ struct ExportSection: View {
                 Label("Prepare DOCX Reports", systemImage: "doc.richtext")
             }
             .disabled(isDisabled || !canPrepareReports)
+            .accessibilityIdentifier("prepare-docx-reports-button")
             Button { onPrepareExport(.xlsx) } label: {
                 Label("Prepare XLSX Review Workbook", systemImage: "tablecells")
             }
@@ -360,4 +374,10 @@ private extension GeneratedReport {
     var reportListIdentifier: String {
         "\(studentId)::\(subject)"
     }
+}
+
+private func accessibilityKey(_ value: String) -> String {
+    value
+        .lowercased()
+        .filter { $0.isLetter || $0.isNumber }
 }
