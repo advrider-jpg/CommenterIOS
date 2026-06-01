@@ -31,7 +31,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         waitForPage(named: "Untitled Project")
         capture("04-project-created")
 
-        let addStudent = element("add-student-button")
+        let addStudent = app.buttons["Add Student"]
         scrollTo(addStudent, name: "Add Student")
         capture("05-roster-before-student")
         addStudent.tap()
@@ -57,7 +57,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         enterText("reading comprehension", in: focusField, named: "Ava English focus")
         capture("09-result-ready-for-generation")
 
-        let generateReports = element("generate-reports-button")
+        let generateReports = app.buttons["Generate and Save Reports"]
         scrollTo(generateReports, name: "Generate and Save Reports")
         generateReports.tap()
 
@@ -65,7 +65,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         waitForElement(reportEditor, named: "generated Ava English report")
         capture("10-generated-report-comment")
 
-        let prepareDocx = element("prepare-docx-reports-button")
+        let prepareDocx = app.buttons["Prepare DOCX Reports"]
         scrollTo(prepareDocx, name: "Prepare DOCX Reports")
         capture("11-export-ready")
         prepareDocx.tap()
