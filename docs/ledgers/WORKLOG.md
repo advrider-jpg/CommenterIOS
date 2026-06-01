@@ -393,3 +393,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - Made screenshot page waits accept the real tab page accessibility roots as
   well as navigation-bar titles after hosted CI showed a tab page could render
   without the expected title snapshot being observed.
+- Replaced the achievement menu with visible reducer-backed achievement buttons
+  after hosted CI proved SwiftUI menu controls were not exposing a stable
+  hittable automation element for the result-entry flow.

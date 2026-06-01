@@ -366,7 +366,7 @@ struct ResultsSection: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("\(fullStudentName(student)) - \(displaySubjectName(subject))")
                             .font(.headline)
-                        AchievementLevelMenu(
+                        AchievementLevelSelector(
                             selection: result?.achievementLevel,
                             onSelectionChanged: { onAchievementChanged(student.id, subject, $0) },
                             isDisabled: isDisabled,
@@ -424,44 +424,84 @@ struct ResultsSection: View {
     }
 }
 
-private struct AchievementLevelMenu: View {
+private struct AchievementLevelSelector: View {
     let selection: AchievementLevel?
     let onSelectionChanged: (AchievementLevel?) -> Void
     let isDisabled: Bool
     let accessibilityIdentifier: String
 
     var body: some View {
-        Menu {
-            Button("Missing") {
-                onSelectionChanged(nil)
-            }
-            Divider()
-            ForEach(achievementLevelOptions, id: \.rawValue) { level in
-                Button(level.rawValue) {
-                    onSelectionChanged(level)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Achievement")
+                .font(.subheadline.weight(.semibold))
+            LazyVGrid(columns: optionColumns, alignment: .leading, spacing: 8) {
+                AchievementLevelButton(
+                    title: "Missing",
+                    isSelected: selection == nil,
+                    isDisabled: isDisabled,
+                    accessibilityIdentifier: "\(accessibilityIdentifier)-missing",
+                    action: { onSelectionChanged(nil) }
+                )
+
+                ForEach(achievementLevelOptions, id: \.rawValue) { level in
+                    AchievementLevelButton(
+                        title: level.rawValue,
+                        isSelected: selection == level,
+                        isDisabled: isDisabled,
+                        accessibilityIdentifier: "\(accessibilityIdentifier)-\(accessibilityKey(level.rawValue))",
+                        action: { onSelectionChanged(level) }
+                    )
                 }
             }
-        } label: {
-            HStack(spacing: 10) {
-                Text("Achievement")
-                    .foregroundStyle(.primary)
-                Spacer(minLength: 8)
-                Text(selection?.rawValue ?? "Missing")
-                    .foregroundStyle(selection == nil ? .secondary : CommenterColors.accent)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
+        }
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var optionColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8)
+        ]
+    }
+}
+
+private struct AchievementLevelButton: View {
+    let title: String
+    let isSelected: Bool
+    let isDisabled: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 4)
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(CommenterColors.accent)
+                        .accessibilityHidden(true)
+                }
             }
-            .contentShape(Rectangle())
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier(accessibilityIdentifier)
+            .frame(maxWidth: .infinity, minHeight: 34)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(isSelected ? CommenterColors.accentSoft : CommenterColors.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? CommenterColors.accent : Color.secondary.opacity(0.28), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
         .accessibilityIdentifier(accessibilityIdentifier)
-        .accessibilityLabel("Achievement")
-        .accessibilityValue(selection?.rawValue ?? "Missing")
+        .accessibilityLabel("Achievement \(title)")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 }
 

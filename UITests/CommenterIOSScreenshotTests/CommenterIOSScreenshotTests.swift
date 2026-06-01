@@ -64,9 +64,9 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         tapSwitch(englishToggle, named: "English subject toggle")
         capture("07-subject-selected-english")
 
-        let achievementPicker = scrollToAny(pickers(identifier: "achievement-picker-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Achievement"), name: "Ava English achievement picker")
+        let achievementOption = scrollToAny(buttons(identifier: "achievement-picker-\(screenshotStudentId)-\(screenshotSubjectKey)-atstandard", label: "At Standard"), name: "Ava English At Standard achievement option")
         capture("08-result-before-achievement")
-        chooseAchievement("At Standard", picker: achievementPicker)
+        achievementOption.tap()
 
         let focusField = scrollToAny(textFields(identifier: "focus-field-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Focus"), name: "Ava English focus field")
         enterText("reading comprehension", in: focusField, named: "Ava English focus")
