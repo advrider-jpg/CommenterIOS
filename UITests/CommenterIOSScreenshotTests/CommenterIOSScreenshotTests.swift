@@ -266,11 +266,23 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
     private func dismissKeyboardIfNeeded() {
         guard app.keyboards.firstMatch.exists else { return }
-        if app.keyboards.buttons["Return"].exists {
-            app.keyboards.buttons["Return"].tap()
-        } else if app.keyboards.buttons["Done"].exists {
-            app.keyboards.buttons["Done"].tap()
+        if tapKeyboardButton("Done") {
+            return
         }
+        if tapKeyboardButton("Return") {
+            return
+        }
+        if tapKeyboardButton("return") {
+            return
+        }
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
+    }
+
+    private func tapKeyboardButton(_ label: String) -> Bool {
+        let button = app.keyboards.buttons[label]
+        guard button.exists else { return false }
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        return true
     }
 
     private func capture(_ name: String) {

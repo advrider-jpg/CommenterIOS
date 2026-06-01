@@ -174,16 +174,16 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.projectStoreClient = testProjectStoreClient(
-                importRosterFile: { _, project in
-                    XCTAssertEqual(project, original)
-                    return preview
-                },
                 saveProject: { project, expectedRevision, createRecoverySnapshot, reason in
                     XCTAssertEqual(project, imported)
                     XCTAssertEqual(expectedRevision, original.metadata.persistence?.revision)
                     XCTAssertTrue(createRecoverySnapshot)
                     XCTAssertEqual(reason, .beforeSave)
                     return imported
+                },
+                importRosterFile: { _, project in
+                    XCTAssertEqual(project, original)
+                    return preview
                 }
             )
         }
@@ -323,8 +323,11 @@ final class AppFeatureTests: XCTestCase {
 
     func testGenerationSuccessSavesAfterDeterministicEngineResultAndMarksStaleImports() async {
         let original = project(subjects: ["English"], roster: [student()], results: [AchievementResult(studentId: "s1", subject: "English", achievementLevel: .atStandard, focusStrand: "Reading")])
-        var generated = original
-        generated.reports = [readyReport(project: original, result: original.results[0], text: "Ava is reading well.")]
+        let generated = {
+            var project = original
+            project.reports = [readyReport(project: original, result: original.results[0], text: "Ava is reading well.")]
+            return project
+        }()
         var initial = loadedState(project: original)
         initial.datasetStatus = .loaded(datasetSnapshot())
         initial.resultsImportState = .success(count: 1, source: "CSV")
@@ -401,8 +404,11 @@ final class AppFeatureTests: XCTestCase {
 
     func testSaveSuccessUpdatesLastSavedProjectState() async {
         let original = project(subjects: ["English"], roster: [student()])
-        var saved = original
-        saved.metadata.persistence = ProjectPersistenceMetadata(revision: 2, savedAt: 999, savedBy: "local-ios", fingerprint: "abc")
+        let saved = {
+            var project = original
+            project.metadata.persistence = ProjectPersistenceMetadata(revision: 2, savedAt: 999, savedBy: "local-ios", fingerprint: "abc")
+            return project
+        }()
         var initial = loadedState(project: original)
         initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         let store = TestStore(initialState: initial) {
@@ -683,10 +689,16 @@ final class AppFeatureTests: XCTestCase {
 
     func testProjectYearLevelEditMarksProjectDirtyAndSaveUsesVerifiedStorePath() async {
         let original = project(subjects: ["English"])
-        var edited = original
-        edited.metadata.yearLevel = .year6
-        var saved = edited
-        saved.metadata.persistence = ProjectPersistenceMetadata(revision: 2, savedAt: 2_000, savedBy: "local-ios", fingerprint: "saved")
+        let edited = {
+            var project = original
+            project.metadata.yearLevel = .year6
+            return project
+        }()
+        let saved = {
+            var project = edited
+            project.metadata.persistence = ProjectPersistenceMetadata(revision: 2, savedAt: 2_000, savedBy: "local-ios", fingerprint: "saved")
+            return project
+        }()
         let store = TestStore(initialState: loadedState(project: original)) {
             AppFeature()
         } withDependencies: {
@@ -722,11 +734,14 @@ final class AppFeatureTests: XCTestCase {
 
     func testManualMetadataEditsStayDirtyUntilVerifiedSaveReturns() async {
         let original = project(subjects: ["English"])
-        var saved = original
-        saved.metadata.name = "Room 6"
-        saved.metadata.term = "Term 3"
-        saved.metadata.useFirstNameOnly = false
-        saved.metadata.persistence = ProjectPersistenceMetadata(revision: 2, savedAt: 3_000, savedBy: "local-ios", fingerprint: "saved")
+        let saved = {
+            var project = original
+            project.metadata.name = "Room 6"
+            project.metadata.term = "Term 3"
+            project.metadata.useFirstNameOnly = false
+            project.metadata.persistence = ProjectPersistenceMetadata(revision: 2, savedAt: 3_000, savedBy: "local-ios", fingerprint: "saved")
+            return project
+        }()
         let store = TestStore(initialState: loadedState(project: original)) {
             AppFeature()
         } withDependencies: {
@@ -771,9 +786,12 @@ final class AppFeatureTests: XCTestCase {
 
     func testManualRosterSubjectResultAndReportEditsAreSavedOnlyThroughStoreResponse() async {
         let original = readyProject()
-        var edited = original
-        edited.reports[0].manualEdit = "Teacher reviewed draft."
-        edited.reports[0].isLocked = true
+        let edited = {
+            var project = original
+            project.reports[0].manualEdit = "Teacher reviewed draft."
+            project.reports[0].isLocked = true
+            return project
+        }()
         var initial = loadedState(project: original)
         let store = TestStore(initialState: initial) {
             AppFeature()
@@ -868,8 +886,11 @@ final class AppFeatureTests: XCTestCase {
 
     func testGenerationSuccessMessageReportsLockedSkipsTruthfully() async {
         let original = project(subjects: ["English"], roster: [student()], results: [AchievementResult(studentId: "s1", subject: "English", achievementLevel: .atStandard, focusStrand: "Reading")])
-        var generated = original
-        generated.reports = [readyReport(project: original, result: original.results[0], text: "Ava is reading well.")]
+        let generated = {
+            var project = original
+            project.reports = [readyReport(project: original, result: original.results[0], text: "Ava is reading well.")]
+            return project
+        }()
         var initial = loadedState(project: original)
         initial.datasetStatus = .loaded(datasetSnapshot())
         let store = TestStore(initialState: initial) {
