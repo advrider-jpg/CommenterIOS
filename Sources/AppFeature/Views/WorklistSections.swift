@@ -263,16 +263,24 @@ struct SubjectsSection: View {
 
     var body: some View {
         Section {
-            HStack {
-                Button("Select all", action: onSelectAll)
-                    .disabled(isDisabled || selectedSubjectCount == availableTeacherSubjects().count)
-                Spacer()
-                Button("Deselect all", role: .destructive, action: onDeselectAll)
-                    .disabled(isDisabled || selectedSubjectCount == 0)
-                    .accessibilityIdentifier("subject-deselect-all-button")
+            HStack(spacing: 12) {
+                Button(action: onSelectAll) {
+                    Label("Select all", systemImage: "checkmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isDisabled || selectedSubjectCount == availableTeacherSubjects().count)
+                .accessibilityIdentifier("subject-select-all-button")
+
+                Button(role: .destructive, action: onDeselectAll) {
+                    Label("Deselect all", systemImage: "xmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isDisabled || selectedSubjectCount == 0)
+                .accessibilityIdentifier("subject-deselect-all-button")
             }
-            .font(.subheadline.weight(.semibold))
-            .buttonStyle(.borderless)
+            .controlSize(.regular)
             Text("Select the curriculum areas to include in this reporting cycle. At least one subject is required before results can be imported or drafts generated.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)

@@ -384,3 +384,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - Replaced the Results achievement `.menu` picker with an explicit SwiftUI
   `Menu` carrying the same reducer-backed update and a stable accessibility
   identifier for simulator automation.
+- Reworked subject bulk-selection controls as real bordered buttons after the
+  next hosted run showed the borderless list-row button existed but was not
+  hittable to XCTest.
