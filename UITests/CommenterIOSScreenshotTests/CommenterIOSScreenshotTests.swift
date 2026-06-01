@@ -111,10 +111,31 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
     private func waitForPage(named name: String) {
         let navigationBar = app.navigationBars[name]
-        XCTAssertTrue(
-            navigationBar.waitForExistence(timeout: 30),
-            "Expected \(name) page to be visible before capturing a screenshot."
-        )
+        let deadline = Date().addingTimeInterval(30)
+        while Date() < deadline {
+            if navigationBar.exists {
+                return
+            }
+            if let pageIdentifier = pageAccessibilityIdentifier(for: name), element(pageIdentifier).exists {
+                return
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+        }
+        let pageExists = pageAccessibilityIdentifier(for: name).map { element($0).exists } ?? false
+        XCTAssertTrue(navigationBar.exists || pageExists, "Expected \(name) page to be visible before capturing a screenshot.")
+    }
+
+    private func pageAccessibilityIdentifier(for name: String) -> String? {
+        switch name {
+        case "Projects":
+            return "projects-page"
+        case "Work list":
+            return "worklist-page"
+        case "Support":
+            return "support-page"
+        default:
+            return nil
+        }
     }
 
     private func waitForEnabledElement(_ element: XCUIElement, named name: String) {

@@ -390,3 +390,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - Tightened screenshot UI test tapping so visible SwiftUI controls that XCTest
   reports as present but not hittable are still tapped through real screen
   coordinates, with downstream app state continuing to prove the operation.
+- Made screenshot page waits accept the real tab page accessibility roots as
+  well as navigation-bar titles after hosted CI showed a tab page could render
+  without the expected title snapshot being observed.
