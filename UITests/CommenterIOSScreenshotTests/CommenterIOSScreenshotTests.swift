@@ -72,9 +72,9 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         enterText("reading comprehension", in: focusField, named: "Ava English focus")
         capture("09-result-ready-for-generation")
 
-        let saveProject = scrollToAny(buttons(identifier: "save-project-button", label: "Save Project"), name: "Save Project")
+        let saveProject = scrollToAny(buttons(identifier: "save-project-button", label: "Save Project"), name: "Save Project", directions: [false, true])
         saveProject.tap()
-        waitForElement(element("operation-status-saved"), named: "verified project save status")
+        _ = scrollToAny([element("operation-status-saved")], name: "verified project save status", requireHittable: false, directions: [false, true])
         capture("10-project-saved-before-generation")
 
         let generateReports = scrollToAny(buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"), name: "Generate and Save Reports")
@@ -202,26 +202,29 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func waitForElement(_ element: XCUIElement, named name: String, timeout: TimeInterval = 30) {
-        XCTAssertTrue(element.waitForExistence(timeout: timeout), "Expected \(name) to exist.")
+        if !element.waitForExistence(timeout: timeout) {
+            captureFailureContext(name)
+            XCTFail("Expected \(name) to exist.")
+        }
     }
 
-    private func scrollToAny(_ elements: [XCUIElement], name: String, requireHittable: Bool = true) -> XCUIElement {
+    private func scrollToAny(
+        _ elements: [XCUIElement],
+        name: String,
+        requireHittable: Bool = true,
+        directions: [Bool] = [true, false]
+    ) -> XCUIElement {
         precondition(!elements.isEmpty, "scrollToAny requires at least one candidate element.")
         if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
             return visible
         }
 
-        for _ in 0..<24 {
-            scrollBySmallStep(up: true)
-            if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
-                return visible
-            }
-        }
-
-        for _ in 0..<24 {
-            scrollBySmallStep(up: false)
-            if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
-                return visible
+        for direction in directions {
+            for _ in 0..<24 {
+                scrollBySmallStep(up: direction)
+                if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
+                    return visible
+                }
             }
         }
 

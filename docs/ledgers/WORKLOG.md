@@ -401,3 +401,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - Broadened the screenshot test subject lookup to accept visible row text as a
   real tap target, switched screenshot scrolling to smaller drag steps, and
   added failure-context captures for future hosted UI-test artifacts.
+- Made screenshot scrolling direction-aware and verified the saved operation
+  status through the same real list-scrolling path after hosted CI showed the
+  top workflow status can be virtualized offscreen when Save Project is tapped.
