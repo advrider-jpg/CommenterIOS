@@ -14,6 +14,7 @@ func updateSelectedProject(_ state: inout AppFeature.State, mutate: (inout Proje
     state.pendingImport = nil
     state.preparedFile = nil
     markImportStatesStaleAfterManualEdit(&state)
+    state.hasUnsavedProjectChanges = true
     state.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
 }
 
@@ -59,6 +60,7 @@ func acceptVerifiedProject(_ state: inout AppFeature.State, project: Project, me
     state.selectedProjectReadiness = getProjectReadiness(project)
     state.pendingImport = nil
     state.preparedFile = nil
+    state.hasUnsavedProjectChanges = false
     state.operationStatus = .saved(message)
     state.workflowMessage = message
     state.projects.removeAll { $0.id == project.metadata.id }
@@ -106,8 +108,11 @@ func isLongRunningProjectOperation(_ status: AppFeature.ProjectStorageStatus) ->
     }
 }
 
-func hasUnsavedChanges(_ operationStatus: AppFeature.OperationStatus) -> Bool {
-    if case .dirty = operationStatus {
+func hasUnsavedChanges(_ state: AppFeature.State) -> Bool {
+    if state.hasUnsavedProjectChanges {
+        return true
+    }
+    if case .dirty = state.operationStatus {
         return true
     }
     return false

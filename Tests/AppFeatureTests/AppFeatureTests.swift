@@ -146,21 +146,25 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.addStudentTapped) {
             $0.selectedProject?.roster = [Student(id: "student-1", firstName: "", lastName: "", yearLevel: .year5)]
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.studentFirstNameChanged("student-1", "Ava")) {
             $0.selectedProject?.roster[0].firstName = "Ava"
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.studentLastNameChanged("student-1", "Ng")) {
             $0.selectedProject?.roster[0].lastName = "Ng"
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.deleteStudentTapped("student-1")) {
             $0.selectedProject?.roster = []
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
     }
@@ -249,6 +253,7 @@ final class AppFeatureTests: XCTestCase {
                 state.selectedProject?.metadata.selectedSubjects[subject] = SelectedSubject(name: subject, allStrandsSelected: true)
             }
             state.selectedProjectReadiness = getProjectReadiness(state.selectedProject!)
+            state.hasUnsavedProjectChanges = true
             state.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.subjectDeselectAllTapped) {
@@ -256,6 +261,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProject?.results = []
             $0.selectedProject?.reports = []
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
     }
@@ -391,6 +397,7 @@ final class AppFeatureTests: XCTestCase {
 
     func testReportExportAndBackupAreBlockedForDirtyOrUnreadyState() async {
         var initial = loadedState(project: project(subjects: ["English"], roster: [student()]))
+        initial.hasUnsavedProjectChanges = true
         initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         let store = TestStore(initialState: initial) { AppFeature() }
 
@@ -410,6 +417,7 @@ final class AppFeatureTests: XCTestCase {
             return project
         }()
         var initial = loadedState(project: original)
+        initial.hasUnsavedProjectChanges = true
         initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         let store = TestStore(initialState: initial) {
             AppFeature()
@@ -433,6 +441,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness(saved)
             $0.pendingImport = nil
             $0.preparedFile = nil
+            $0.hasUnsavedProjectChanges = false
             $0.operationStatus = .saved("Project saved locally and verified.")
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(saved)]
@@ -442,6 +451,7 @@ final class AppFeatureTests: XCTestCase {
 
     func testDismissStatusDoesNotClearDirtySaveGate() async {
         var initial = loadedState(project: project(subjects: ["English"]))
+        initial.hasUnsavedProjectChanges = true
         initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         let store = TestStore(initialState: initial) { AppFeature() }
 
@@ -451,6 +461,7 @@ final class AppFeatureTests: XCTestCase {
 
     func testDirtyProjectBlocksOpeningAnotherProject() async {
         var initial = loadedState(project: project(id: "p1", subjects: ["English"]))
+        initial.hasUnsavedProjectChanges = true
         initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         let store = TestStore(initialState: initial) { AppFeature() }
 
@@ -656,6 +667,7 @@ final class AppFeatureTests: XCTestCase {
 
     func testDirtyProjectCannotBeDeletedUntilVerifiedStorageReflectsCurrentState() async {
         var initial = loadedState(project: project(id: "p1", name: "Room 5", subjects: ["English"]))
+        initial.hasUnsavedProjectChanges = true
         initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         let store = TestStore(initialState: initial) { AppFeature() }
 
@@ -714,6 +726,7 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.projectYearLevelChanged(.year6)) {
             $0.selectedProject?.metadata.yearLevel = .year6
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.saveProjectTapped) {
@@ -726,6 +739,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness(saved)
             $0.pendingImport = nil
             $0.preparedFile = nil
+            $0.hasUnsavedProjectChanges = false
             $0.operationStatus = .saved("Project saved locally and verified.")
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(saved)]
@@ -756,16 +770,19 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.projectNameChanged("Room 6")) {
             $0.selectedProject?.metadata.name = "Room 6"
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.projectTermChanged("Term 3")) {
             $0.selectedProject?.metadata.term = "Term 3"
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.useFirstNameOnlyChanged(false)) {
             $0.selectedProject?.metadata.useFirstNameOnly = false
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.saveProjectTapped) {
@@ -778,6 +795,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness(saved)
             $0.pendingImport = nil
             $0.preparedFile = nil
+            $0.hasUnsavedProjectChanges = false
             $0.operationStatus = .saved("Project saved locally and verified.")
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(saved)]
@@ -806,11 +824,13 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.reportManualEditChanged("s1", "English", "Teacher reviewed draft.")) {
             $0.selectedProject?.reports[0].manualEdit = "Teacher reviewed draft."
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.reportLockChanged("s1", "English", true)) {
             $0.selectedProject?.reports[0].isLocked = true
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         }
         await store.send(.saveProjectTapped) {
@@ -823,6 +843,7 @@ final class AppFeatureTests: XCTestCase {
             $0.selectedProjectReadiness = getProjectReadiness(edited)
             $0.pendingImport = nil
             $0.preparedFile = nil
+            $0.hasUnsavedProjectChanges = false
             $0.operationStatus = .saved("Project saved locally and verified.")
             $0.workflowMessage = "Project saved locally and verified."
             $0.projects = [projectSummary(edited)]
@@ -832,6 +853,7 @@ final class AppFeatureTests: XCTestCase {
     func testManualEditSaveFailureDoesNotReportSuccessOrReplaceDirtyProject() async {
         let original = project(subjects: ["English"])
         var initial = loadedState(project: original)
+        initial.hasUnsavedProjectChanges = true
         initial.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
         let store = TestStore(initialState: initial) {
             AppFeature()

@@ -42,6 +42,7 @@ public struct AppView: View {
                     readiness: viewStore.selectedProjectReadiness,
                     status: viewStore.projectStorageStatus,
                     operationStatus: viewStore.operationStatus,
+                    hasUnsavedProjectChanges: viewStore.hasUnsavedProjectChanges,
                     preparedFile: viewStore.preparedFile,
                     pendingImport: viewStore.pendingImport,
                     rosterImportState: viewStore.rosterImportState,

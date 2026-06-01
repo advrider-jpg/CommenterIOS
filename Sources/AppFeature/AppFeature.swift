@@ -18,6 +18,7 @@ public struct AppFeature: Sendable {
         public var projectStorageMessage = "Checking local project storage."
         public var workflowMessage = "Open or create a project to manage roster, subjects, results, drafts, backups, and exports."
         public var operationStatus: OperationStatus = .idle
+        public var hasUnsavedProjectChanges = false
         public var preparedFile: PreparedFile?
         public var pendingImport: PendingImport?
         public var projectCreationDraft: ProjectCreationDraft?

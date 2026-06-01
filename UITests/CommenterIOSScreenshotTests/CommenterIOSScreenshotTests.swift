@@ -61,7 +61,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         let deselectAll = scrollToAny(buttons(identifier: "subject-deselect-all-button", label: "Deselect all"), name: "Deselect all")
         deselectAll.tap()
         let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle")
-        englishToggle.tap()
+        tapSwitch(englishToggle, named: "English subject toggle")
         capture("07-subject-selected-english")
 
         let achievementPicker = scrollToAny(pickers(identifier: "achievement-picker-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Achievement"), name: "Ava English achievement picker")
@@ -151,11 +151,20 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func switches(identifier: String, label: String) -> [XCUIElement] {
-        [app.switches[identifier], app.switches[label], element(identifier)]
+        [app.switches[identifier], app.switches[label], app.cells[identifier], app.cells[label], element(identifier)]
     }
 
     private func pickers(identifier: String, label: String) -> [XCUIElement] {
-        [app.buttons[identifier], app.buttons[label], app.cells[identifier], app.cells[label], element(identifier)]
+        [
+            app.buttons[identifier],
+            app.buttons[label],
+            app.pickers[identifier],
+            app.pickers[label],
+            app.cells[identifier],
+            app.cells[label],
+            app.otherElements[identifier],
+            element(identifier)
+        ]
     }
 
     private func textViews(identifier: String, label: String) -> [XCUIElement] {
@@ -205,6 +214,16 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         element.tap()
         element.typeText(text)
         dismissKeyboardIfNeeded()
+    }
+
+    private func tapSwitch(_ element: XCUIElement, named name: String) {
+        waitForElement(element, named: name)
+        XCTAssertTrue(element.isHittable, "Expected \(name) to be visible before tapping.")
+        if element.elementType == .switch {
+            element.tap()
+        } else {
+            element.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
     }
 
     private func chooseAchievement(_ value: String, picker: XCUIElement) {

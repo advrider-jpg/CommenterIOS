@@ -371,6 +371,7 @@ struct ResultsSection: View {
                             Text("At Standard").tag(Optional(AchievementLevel.atStandard))
                             Text("Above Standard").tag(Optional(AchievementLevel.aboveStandard))
                         }
+                        .pickerStyle(.menu)
                         .disabled(isDisabled)
                         .accessibilityIdentifier("achievement-picker-\(student.id)-\(accessibilityKey(subject))")
                         if subjectRequiresConcreteFocus(subject) {
@@ -380,7 +381,9 @@ struct ResultsSection: View {
                                     Text(focus).tag(focus)
                                 }
                             }
+                            .pickerStyle(.menu)
                             .disabled(isDisabled)
+                            .accessibilityIdentifier("focus-picker-\(student.id)-\(accessibilityKey(subject))")
                         } else {
                             TextField("Focus", text: Binding(get: { result?.focusStrand ?? "" }, set: { onFocusChanged(student.id, subject, $0) }))
                                 .disabled(isDisabled)

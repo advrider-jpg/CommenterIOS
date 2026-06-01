@@ -86,7 +86,7 @@ extension AppFeature {
                 state.operationStatus = .failed("Finish the current local operation before opening another project.")
                 return .none
             }
-            if state.selectedProject?.metadata.id != id, hasUnsavedChanges(state.operationStatus) {
+            if state.selectedProject?.metadata.id != id, hasUnsavedChanges(state) {
                 state.operationStatus = .failed("Save or reopen the current project before opening another project.")
                 return .none
             }
@@ -107,6 +107,7 @@ extension AppFeature {
             state.preparedFile = nil
             state.pendingImport = nil
             state.activeImportKind = nil
+            state.hasUnsavedProjectChanges = false
             state.workflowMessage = "\(project.metadata.name) is open."
             state.operationStatus = .saved("Project opened from verified local storage.")
             state.selectedTab = .worklist
@@ -207,6 +208,7 @@ extension AppFeature {
             if state.selectedProject?.metadata.id == id {
                 state.selectedProject = nil
                 state.selectedProjectReadiness = nil
+                state.hasUnsavedProjectChanges = false
                 state.workflowMessage = "Open or create a project to manage roster, subjects, results, drafts, backups, and exports."
                 state.selectedTab = .projects
             }
@@ -256,7 +258,7 @@ extension AppFeature {
             state.operationStatus = .failed("\(pendingImport.title) is waiting. Confirm or cancel the import before deleting this project.")
             return .none
         }
-        if !allowDirtySelectedProject, state.selectedProject?.metadata.id == id, hasUnsavedChanges(state.operationStatus) {
+        if !allowDirtySelectedProject, state.selectedProject?.metadata.id == id, hasUnsavedChanges(state) {
             state.operationStatus = .failed("Save or reopen the project before deleting it so the recovery snapshot reflects verified local storage.")
             return .none
         }

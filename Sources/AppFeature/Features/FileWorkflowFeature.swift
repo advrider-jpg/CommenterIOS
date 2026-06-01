@@ -203,7 +203,7 @@ extension AppFeature {
                 return .none
             }
             guard canStartFileWorkflow(state: &state, label: "backup preparation") else { return .none }
-            guard !hasUnsavedChanges(state.operationStatus) else {
+            guard !hasUnsavedChanges(state) else {
                 state.operationStatus = .failed("Save current changes before preparing Backup JSON so the backup reflects verified local storage.")
                 return .none
             }
@@ -225,7 +225,7 @@ extension AppFeature {
                 return .none
             }
             guard canStartFileWorkflow(state: &state, label: "report export preparation") else { return .none }
-            guard !hasUnsavedChanges(state.operationStatus) else {
+            guard !hasUnsavedChanges(state) else {
                 state.operationStatus = .failed("Save current changes before preparing report exports so files reflect verified local storage.")
                 return .none
             }

@@ -9,6 +9,7 @@ struct WorklistRootView: View {
     let readiness: ProjectReadiness?
     let status: AppFeature.ProjectStorageStatus
     let operationStatus: AppFeature.OperationStatus
+    let hasUnsavedProjectChanges: Bool
     let preparedFile: AppFeature.PreparedFile?
     let pendingImport: AppFeature.PendingImport?
     let rosterImportState: AppFeature.TabularImportState
@@ -207,6 +208,9 @@ struct WorklistRootView: View {
     }
 
     private var hasUnsavedChanges: Bool {
+        if hasUnsavedProjectChanges {
+            return true
+        }
         if case .dirty = operationStatus {
             return true
         }
