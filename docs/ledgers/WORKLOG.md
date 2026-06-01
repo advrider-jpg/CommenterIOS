@@ -374,3 +374,13 @@ Append material work history here. Keep entries short, dated, and factual.
 - Ran Windows-feasible hygiene checks. SwiftPM and Xcode/simulator validation
   remain blocked locally because `swift` and `xcodebuild` are not installed on
   this machine.
+
+## 2026-06-01 - PR #4 screenshot CI repair
+
+- Investigated failing hosted screenshot CI run `26733506101`; Swift package
+  tests passed, but the UI test failed after selecting English because the
+  achievement control was not exposed to XCTest under the expected stable
+  identifier.
+- Replaced the Results achievement `.menu` picker with an explicit SwiftUI
+  `Menu` carrying the same reducer-backed update and a stable accessibility
+  identifier for simulator automation.

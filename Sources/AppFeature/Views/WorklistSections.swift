@@ -358,22 +358,12 @@ struct ResultsSection: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("\(fullStudentName(student)) - \(displaySubjectName(subject))")
                             .font(.headline)
-                        Picker(
-                            "Achievement",
-                            selection: Binding(
-                                get: { result?.achievementLevel },
-                                set: { onAchievementChanged(student.id, subject, $0) }
-                            )
-                        ) {
-                            Text("Missing").tag(Optional<AchievementLevel>.none)
-                            Text("Beginning").tag(Optional(AchievementLevel.beginning))
-                            Text("Developing").tag(Optional(AchievementLevel.developing))
-                            Text("At Standard").tag(Optional(AchievementLevel.atStandard))
-                            Text("Above Standard").tag(Optional(AchievementLevel.aboveStandard))
-                        }
-                        .pickerStyle(.menu)
-                        .disabled(isDisabled)
-                        .accessibilityIdentifier("achievement-picker-\(student.id)-\(accessibilityKey(subject))")
+                        AchievementLevelMenu(
+                            selection: result?.achievementLevel,
+                            onSelectionChanged: { onAchievementChanged(student.id, subject, $0) },
+                            isDisabled: isDisabled,
+                            accessibilityIdentifier: "achievement-picker-\(student.id)-\(accessibilityKey(subject))"
+                        )
                         if subjectRequiresConcreteFocus(subject) {
                             Picker("Specific subject", selection: Binding(get: { result?.focusStrand ?? "" }, set: { onFocusChanged(student.id, subject, $0) })) {
                                 Text("Choose").tag("")
@@ -425,6 +415,54 @@ struct ResultsSection: View {
         return messages.isEmpty ? nil : messages.joined(separator: " ")
     }
 }
+
+private struct AchievementLevelMenu: View {
+    let selection: AchievementLevel?
+    let onSelectionChanged: (AchievementLevel?) -> Void
+    let isDisabled: Bool
+    let accessibilityIdentifier: String
+
+    var body: some View {
+        Menu {
+            Button("Missing") {
+                onSelectionChanged(nil)
+            }
+            Divider()
+            ForEach(achievementLevelOptions, id: \.rawValue) { level in
+                Button(level.rawValue) {
+                    onSelectionChanged(level)
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Text("Achievement")
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                Text(selection?.rawValue ?? "Missing")
+                    .foregroundStyle(selection == nil ? .secondary : CommenterColors.accent)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier(accessibilityIdentifier)
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityLabel("Achievement")
+        .accessibilityValue(selection?.rawValue ?? "Missing")
+    }
+}
+
+private let achievementLevelOptions: [AchievementLevel] = [
+    .beginning,
+    .developing,
+    .atStandard,
+    .aboveStandard
+]
 
 struct ReportsSection: View {
     let project: Project
