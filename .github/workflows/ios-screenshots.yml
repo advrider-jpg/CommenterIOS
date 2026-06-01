@@ -114,9 +114,26 @@ jobs:
 
           walk(manifest)
 
-          if len(screenshots) < 10:
+          required = [
+              "01-projects-empty",
+              "02-worklist-no-project",
+              "03-support-diagnostics",
+              "04-project-created",
+              "05-roster-before-student",
+              "06-roster-student-entered",
+              "07-subject-selected-english",
+              "08-result-before-achievement",
+              "09-result-ready-for-generation",
+              "10-project-saved-before-generation",
+              "11-generated-report-comment",
+              "12-export-ready",
+              "13-docx-prepared",
+              "14-support-after-report",
+          ]
+          missing = [name for name in required if name not in screenshots]
+          if missing:
               names = ", ".join(sorted(screenshots)) or "none"
-              raise SystemExit(f"Expected at least 10 screenshots from xcresult, found {len(screenshots)}: {names}")
+              raise SystemExit(f"Missing required core-flow screenshots: {', '.join(missing)}. Found: {names}")
 
           for name, source in sorted(screenshots.items()):
               shutil.copy2(source, os.path.join(output_dir, f"{name}.png"))
@@ -126,7 +143,26 @@ jobs:
         run: |
           set -euo pipefail
           count="$(find "$COMMENTER_SCREENSHOT_DIR" -type f -name '*.png' | wc -l | tr -d ' ')"
-          test "$count" -ge 10
+          test "$count" -ge 14
+          required=(
+            01-projects-empty
+            02-worklist-no-project
+            03-support-diagnostics
+            04-project-created
+            05-roster-before-student
+            06-roster-student-entered
+            07-subject-selected-english
+            08-result-before-achievement
+            09-result-ready-for-generation
+            10-project-saved-before-generation
+            11-generated-report-comment
+            12-export-ready
+            13-docx-prepared
+            14-support-after-report
+          )
+          for name in "${required[@]}"; do
+            test -s "$COMMENTER_SCREENSHOT_DIR/$name.png"
+          done
           find "$COMMENTER_SCREENSHOT_DIR" -type f -name '*.png' | sort
 
       - name: Upload screenshots
