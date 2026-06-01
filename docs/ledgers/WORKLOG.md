@@ -396,3 +396,5 @@ Append material work history here. Keep entries short, dated, and factual.
 - Replaced the achievement menu with visible reducer-backed achievement buttons
   after hosted CI proved SwiftUI menu controls were not exposing a stable
   hittable automation element for the result-entry flow.
+- Replaced subject toggle rows with explicit reducer-backed selection buttons so
+  curriculum selection remains visible and automatable after bulk deselection.

@@ -286,20 +286,15 @@ struct SubjectsSection: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(australianCurriculumSubjectOrder) { descriptor in
-                Toggle(isOn: Binding(
-                    get: { project.metadata.selectedSubjects[descriptor.key] != nil },
-                    set: { _ in onSubjectToggled(descriptor.key) }
-                )) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(descriptor.displayName)
-                        Text(descriptor.subtitle)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .disabled(isDisabled)
-                .accessibilityIdentifier("subject-toggle-\(accessibilityKey(descriptor.key))")
+                let isSelected = project.metadata.selectedSubjects[descriptor.key] != nil
+                SubjectSelectionButton(
+                    title: descriptor.displayName,
+                    subtitle: descriptor.subtitle,
+                    isSelected: isSelected,
+                    isDisabled: isDisabled,
+                    accessibilityIdentifier: "subject-toggle-\(accessibilityKey(descriptor.key))",
+                    action: { onSubjectToggled(descriptor.key) }
+                )
                 if subjectRequiresConcreteFocus(descriptor.key), project.metadata.selectedSubjects[descriptor.key] != nil {
                     Text("Specific focus required: \(getConcreteFocusOptions(descriptor.key).joined(separator: ", ")).")
                         .font(.footnote)
@@ -314,6 +309,42 @@ struct SubjectsSection: View {
 
     private var selectedSubjectCount: Int {
         selectedSubjectKeys(project.metadata.selectedSubjects).count
+    }
+}
+
+private struct SubjectSelectionButton: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+    let isDisabled: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(isSelected ? CommenterColors.accent : Color.secondary)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
     }
 }
 

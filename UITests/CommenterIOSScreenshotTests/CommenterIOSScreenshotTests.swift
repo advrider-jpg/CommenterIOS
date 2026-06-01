@@ -172,7 +172,15 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func switches(identifier: String, label: String) -> [XCUIElement] {
-        [app.switches[identifier], app.switches[label], app.cells[identifier], app.cells[label], element(identifier)]
+        [
+            app.switches[identifier],
+            app.switches[label],
+            app.buttons[identifier],
+            app.buttons[label],
+            app.cells[identifier],
+            app.cells[label],
+            element(identifier)
+        ]
     }
 
     private func pickers(identifier: String, label: String) -> [XCUIElement] {
@@ -257,7 +265,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
     private func tapSwitch(_ element: XCUIElement, named name: String) {
         waitForElement(element, named: name)
-        if element.elementType == .switch {
+        if element.elementType == .switch || element.elementType == .button {
             if element.isHittable {
                 element.tap()
             } else {
