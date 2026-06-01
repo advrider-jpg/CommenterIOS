@@ -118,8 +118,9 @@ struct ProjectsRootView: View {
             .background(CommenterColors.groupedBackground)
             .navigationTitle("Projects")
             .commenterLargeNavigationTitle()
-            .accessibilityIdentifier("projects-page")
+            .accessibilityIdentifier("projects-list")
         }
+        .accessibilityIdentifier("projects-page")
     }
 
     private var canStartProjectStorageAction: Bool {

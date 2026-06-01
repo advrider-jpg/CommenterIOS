@@ -407,3 +407,10 @@ Append material work history here. Keep entries short, dated, and factual.
 - Tightened the generated-report lookup so the screenshot test no longer
   accepts matching result-card static text as proof that a durable report row
   exists.
+- Added separate root page and list accessibility identifiers for Projects,
+  Work list, and Support so UI tests can anchor to pages while scrolling the
+  actual list containers.
+- Reworked the core screenshot UI test to reopen and verify Work list before
+  every Work list-only interaction, scroll inside `worklist-list` rather than
+  the app window, require hittable subject controls, and attach page/tab/list
+  diagnostics to future failure screenshots.

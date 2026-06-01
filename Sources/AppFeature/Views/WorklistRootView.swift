@@ -148,8 +148,9 @@ struct WorklistRootView: View {
             .background(CommenterColors.groupedBackground)
             .navigationTitle(project?.metadata.name ?? "Work list")
             .commenterLargeNavigationTitle()
-            .accessibilityIdentifier("worklist-page")
+            .accessibilityIdentifier("worklist-list")
         }
+        .accessibilityIdentifier("worklist-page")
     }
 
     private var workflowStatusSection: some View {

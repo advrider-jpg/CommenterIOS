@@ -22,10 +22,12 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         openTab("Work list")
         waitForPage(named: "Work list")
+        waitForElement(element("worklist-page"), named: "empty Work list page")
         capture("02-worklist-no-project")
 
         openTab("Support")
         waitForPage(named: "Support")
+        waitForElement(element("support-page"), named: "Support page")
         waitForElement(element("dataset-loaded-status"), named: "bundled production dataset loaded status")
         capture("03-support-diagnostics")
 
@@ -44,11 +46,12 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         waitForPage(named: screenshotProjectName)
         capture("04-project-created")
 
-        let addStudent = scrollToAny(buttons(identifier: "add-student-button", label: "Add Student"), name: "Add Student")
+        ensureWorklistOpen()
+        let addStudent = scrollToAnyInWorklist(buttons(identifier: "add-student-button", label: "Add Student"), name: "Add Student")
         capture("05-roster-before-student")
         addStudent.tap()
 
-        let studentRow = scrollToAny(cells(identifier: "student-row-\(screenshotStudentId)", label: "Student"), name: "new student row")
+        let studentRow = scrollToAnyInWorklist(cells(identifier: "student-row-\(screenshotStudentId)", label: "Student"), name: "new student row")
         studentRow.tap()
 
         let firstName = scrollToAny(textFields(identifier: "student-first-name-\(screenshotStudentId)", label: "First name"), name: "student first name field")
@@ -57,50 +60,94 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         enterText("Ng", in: lastName, named: "student last name")
         capture("06-roster-student-entered")
         tapBack(to: screenshotProjectName)
+        ensureWorklistOpen()
 
-        let deselectAll = scrollToAny(buttons(identifier: "subject-deselect-all-button", label: "Deselect all"), name: "Deselect all", requireHittable: false)
+        let deselectAll = scrollToAnyInWorklist(
+            buttons(identifier: "subject-deselect-all-button", label: "Deselect all"),
+            name: "Deselect all",
+            requireHittable: true
+        )
         tapElement(deselectAll, named: "Deselect all")
-        let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle", requireHittable: false)
+        ensureWorklistOpen()
+
+        let englishToggle = scrollToAnyInWorklist(
+            switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"),
+            name: "English subject toggle",
+            requireHittable: true
+        )
         tapSwitch(englishToggle, named: "English subject toggle")
         capture("07-subject-selected-english")
 
-        let achievementOption = scrollToAny(buttons(identifier: "achievement-picker-\(screenshotStudentId)-\(screenshotSubjectKey)-atstandard", label: "At Standard"), name: "Ava English At Standard achievement option")
+        let achievementOption = scrollToAnyInWorklist(
+            buttons(identifier: "achievement-picker-\(screenshotStudentId)-\(screenshotSubjectKey)-atstandard", label: "At Standard"),
+            name: "Ava English At Standard achievement option"
+        )
         capture("08-result-before-achievement")
         tapElement(achievementOption, named: "Ava English At Standard achievement option")
 
-        let focusField = scrollToAny(textFields(identifier: "focus-field-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Focus"), name: "Ava English focus field")
+        let focusField = scrollToAnyInWorklist(
+            textFields(identifier: "focus-field-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Focus"),
+            name: "Ava English focus field"
+        )
         enterText("reading comprehension", in: focusField, named: "Ava English focus")
         capture("09-result-ready-for-generation")
 
-        let saveProject = scrollToAny(buttons(identifier: "save-project-button", label: "Save Project"), name: "Save Project", directions: [false, true])
+        let saveProject = scrollToAnyInWorklist(
+            buttons(identifier: "save-project-button", label: "Save Project"),
+            name: "Save Project",
+            directions: [false, true]
+        )
         saveProject.tap()
-        _ = scrollToAny([element("operation-status-saved")], name: "verified project save status", requireHittable: false, directions: [false, true])
+        ensureWorklistOpen()
+        _ = scrollToAnyInWorklist(
+            [element("operation-status-saved")],
+            name: "verified project save status",
+            requireHittable: false,
+            directions: [false, true]
+        )
         capture("10-project-saved-before-generation")
 
-        let generateReports = scrollToAny(buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"), name: "Generate and Save Reports")
+        let generateReports = scrollToAnyInWorklist(
+            buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"),
+            name: "Generate and Save Reports"
+        )
         generateReports.tap()
         waitForOperationToSettle(action: "report generation")
+        ensureWorklistOpen()
 
-        let reportRow = scrollToAny(reportRows(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)"), name: "generated Ava English report row")
+        let reportRow = scrollToAnyInWorklist(
+            reportRows(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)"),
+            name: "generated Ava English report row"
+        )
         tapElement(reportRow, named: "generated Ava English report row")
         let reportEditor = scrollToAny(textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"), name: "generated Ava English report", requireHittable: false)
         waitForElement(reportEditor, named: "generated Ava English report")
         capture("11-generated-report-comment")
         tapBack(to: screenshotProjectName)
+        ensureWorklistOpen()
 
-        let prepareDocx = scrollToAny(buttons(identifier: "prepare-docx-reports-button", label: "Prepare DOCX Reports"), name: "Prepare DOCX Reports")
+        let prepareDocx = scrollToAnyInWorklist(
+            buttons(identifier: "prepare-docx-reports-button", label: "Prepare DOCX Reports"),
+            name: "Prepare DOCX Reports"
+        )
         waitForEnabledElement(prepareDocx, named: "Prepare DOCX Reports")
         capture("12-export-ready")
         prepareDocx.tap()
 
         waitForDocxPreparation()
-        let preparedFile = scrollToAny([element("prepared-file-ready")], name: "verified prepared DOCX file", requireHittable: false)
+        ensureWorklistOpen()
+        let preparedFile = scrollToAnyInWorklist(
+            [element("prepared-file-ready")],
+            name: "verified prepared DOCX file",
+            requireHittable: false
+        )
         _ = preparedFile
         capture("13-docx-prepared")
 
         openTab("Support")
         waitForPage(named: "Support")
-        _ = scrollToAny([element("support-ready-file")], name: "support ready file status", requireHittable: false)
+        waitForElement(element("support-page"), named: "Support page")
+        _ = scrollToAnyInSupport([element("support-ready-file")], name: "support ready file status", requireHittable: false)
         capture("14-support-after-report")
     }
 
@@ -217,7 +264,8 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         _ elements: [XCUIElement],
         name: String,
         requireHittable: Bool = true,
-        directions: [Bool] = [true, false]
+        directions: [Bool] = [true, false],
+        container: XCUIElement? = nil
     ) -> XCUIElement {
         precondition(!elements.isEmpty, "scrollToAny requires at least one candidate element.")
         if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
@@ -226,7 +274,11 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         for direction in directions {
             for _ in 0..<24 {
-                scrollBySmallStep(up: direction)
+                if let container {
+                    scrollWithin(container, up: direction)
+                } else {
+                    scrollBySmallStep(up: direction)
+                }
                 if let visible = visibleElement(in: elements, requireHittable: requireHittable) {
                     return visible
                 }
@@ -243,6 +295,40 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         return elements[0]
     }
 
+    private func scrollToAnyInWorklist(
+        _ elements: [XCUIElement],
+        name: String,
+        requireHittable: Bool = true,
+        directions: [Bool] = [true, false],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> XCUIElement {
+        ensureWorklistOpen(file: file, line: line)
+        return scrollToAny(
+            elements,
+            name: name,
+            requireHittable: requireHittable,
+            directions: directions,
+            container: worklistScrollContainer()
+        )
+    }
+
+    private func scrollToAnyInSupport(
+        _ elements: [XCUIElement],
+        name: String,
+        requireHittable: Bool = true,
+        directions: [Bool] = [true, false]
+    ) -> XCUIElement {
+        waitForElement(element("support-page"), named: "Support page")
+        return scrollToAny(
+            elements,
+            name: name,
+            requireHittable: requireHittable,
+            directions: directions,
+            container: supportScrollContainer()
+        )
+    }
+
     private func visibleElement(in elements: [XCUIElement], requireHittable: Bool) -> XCUIElement? {
         elements.first { element in
             guard element.exists else { return false }
@@ -253,6 +339,48 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     private func isVisibleOnScreen(_ element: XCUIElement) -> Bool {
         let frame = element.frame
         return !frame.isEmpty && app.frame.intersects(frame)
+    }
+
+    private func worklistScrollContainer() -> XCUIElement {
+        let list = element("worklist-list")
+        if list.exists {
+            return list
+        }
+        if app.collectionViews.firstMatch.exists {
+            return app.collectionViews.firstMatch
+        }
+        if app.tables.firstMatch.exists {
+            return app.tables.firstMatch
+        }
+        return list
+    }
+
+    private func supportScrollContainer() -> XCUIElement {
+        let list = element("support-list")
+        if list.exists {
+            return list
+        }
+        if app.collectionViews.firstMatch.exists {
+            return app.collectionViews.firstMatch
+        }
+        if app.tables.firstMatch.exists {
+            return app.tables.firstMatch
+        }
+        return list
+    }
+
+    private func scrollWithin(_ container: XCUIElement, up: Bool) {
+        if !container.waitForExistence(timeout: 5) {
+            captureFailureContext("missing-scroll-container")
+            XCTFail("Expected scroll container to exist before scrolling.")
+            return
+        }
+
+        let startY: CGFloat = up ? 0.75 : 0.30
+        let endY: CGFloat = up ? 0.35 : 0.65
+        let start = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: startY))
+        let end = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: endY))
+        start.press(forDuration: 0.01, thenDragTo: end)
     }
 
     private func scrollBySmallStep(up: Bool) {
@@ -344,6 +472,27 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             backButton.tap()
         }
         waitForPage(named: screenshotProjectName)
+    }
+
+    private func ensureWorklistOpen(file: StaticString = #filePath, line: UInt = #line) {
+        openTab("Work list")
+        waitForPage(named: screenshotProjectName)
+        let worklistPage = element("worklist-page")
+        if element("support-page").exists && !worklistPage.exists {
+            captureFailureContext("unexpected-support-tab")
+            XCTFail("Expected Work list, but Support is visible.", file: file, line: line)
+            return
+        }
+        if !worklistPage.waitForExistence(timeout: 5) {
+            captureFailureContext("missing-worklist-page")
+            XCTFail("Expected Work list page to be visible.", file: file, line: line)
+            return
+        }
+        let worklistList = worklistScrollContainer()
+        if !worklistList.waitForExistence(timeout: 5) {
+            captureFailureContext("missing-worklist-list")
+            XCTFail("Expected Work list scroll container to exist.", file: file, line: line)
+        }
     }
 
     private func tapBack(to pageName: String) {
@@ -447,5 +596,47 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             }
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
         capture("failure-\(safeName)")
+
+        let context = XCTAttachment(string: failureDiagnosticSummary())
+        context.name = "failure-\(safeName)-context"
+        context.lifetime = .keepAlways
+        add(context)
+    }
+
+    private func failureDiagnosticSummary() -> String {
+        let rootIdentifiers = [
+            "projects-page",
+            "projects-list",
+            "worklist-page",
+            "worklist-list",
+            "support-page",
+            "support-list",
+            "operation-status-busy",
+            "operation-status-failed"
+        ]
+        let roots = rootIdentifiers.map { identifier -> String in
+            let candidate = element(identifier)
+            if candidate.exists {
+                return "\(identifier): exists=true hittable=\(candidate.isHittable) frame=\(String(describing: candidate.frame)) label=\(candidate.label)"
+            }
+            return "\(identifier): exists=false"
+        }
+        let navigationBars = app.navigationBars.allElementsBoundByIndex.map { bar -> String in
+            "identifier=\(bar.identifier) label=\(bar.label) exists=\(bar.exists)"
+        }
+        let tabButtons = app.tabBars.buttons.allElementsBoundByIndex.map { button -> String in
+            let value = button.value.map { String(describing: $0) } ?? "nil"
+            return "identifier=\(button.identifier) label=\(button.label) exists=\(button.exists) hittable=\(button.isHittable) value=\(value)"
+        }
+        return """
+        Root identifiers:
+        \(roots.joined(separator: "\n"))
+
+        Navigation bars:
+        \(navigationBars.joined(separator: "\n"))
+
+        Tab buttons:
+        \(tabButtons.joined(separator: "\n"))
+        """
     }
 }

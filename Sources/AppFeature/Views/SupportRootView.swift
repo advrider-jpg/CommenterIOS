@@ -153,8 +153,9 @@ struct SupportRootView: View {
             .background(CommenterColors.groupedBackground)
             .navigationTitle("Support")
             .commenterLargeNavigationTitle()
-            .accessibilityIdentifier("support-page")
+            .accessibilityIdentifier("support-list")
         }
+        .accessibilityIdentifier("support-page")
     }
 
     @ViewBuilder
