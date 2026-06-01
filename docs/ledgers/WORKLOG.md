@@ -404,3 +404,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - Made screenshot scrolling direction-aware and verified the saved operation
   status through the same real list-scrolling path after hosted CI showed the
   top workflow status can be virtualized offscreen when Save Project is tapped.
+- Tightened the generated-report lookup so the screenshot test no longer
+  accepts matching result-card static text as proof that a durable report row
+  exists.

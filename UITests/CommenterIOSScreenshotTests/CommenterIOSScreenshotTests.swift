@@ -80,8 +80,8 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         let generateReports = scrollToAny(buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"), name: "Generate and Save Reports")
         generateReports.tap()
 
-        let reportRow = scrollToAny(cells(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava Ng - English"), name: "generated Ava English report row")
-        reportRow.tap()
+        let reportRow = scrollToAny(reportRows(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)"), name: "generated Ava English report row")
+        tapElement(reportRow, named: "generated Ava English report row")
         let reportEditor = scrollToAny(textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"), name: "generated Ava English report", requireHittable: false)
         waitForElement(reportEditor, named: "generated Ava English report")
         capture("11-generated-report-comment")
@@ -165,6 +165,10 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
     private func cells(identifier: String, label: String) -> [XCUIElement] {
         [app.cells[identifier], app.buttons[identifier], app.staticTexts[label], element(identifier)]
+    }
+
+    private func reportRows(identifier: String) -> [XCUIElement] {
+        [app.cells[identifier], app.buttons[identifier], app.otherElements[identifier], element(identifier)]
     }
 
     private func textFields(identifier: String, label: String) -> [XCUIElement] {
