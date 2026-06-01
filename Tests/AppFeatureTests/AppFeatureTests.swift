@@ -909,14 +909,14 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.projectStoreClient = testProjectStoreClient(
-                importBackup: { _ in imported },
                 saveProject: { project, expectedRevision, createRecoverySnapshot, reason in
                     XCTAssertEqual(project, imported)
                     XCTAssertNil(expectedRevision)
                     XCTAssertTrue(createRecoverySnapshot)
                     XCTAssertEqual(reason, .beforeImportReplace)
                     return imported
-                }
+                },
+                importBackup: { _ in imported }
             )
         }
 
@@ -1025,8 +1025,8 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.projectStoreClient = testProjectStoreClient(
-                importResultsFile: { _, _ in preview },
-                saveProject: { project, _, _, _ in project }
+                saveProject: { project, _, _, _ in project },
+                importResultsFile: { _, _ in preview }
             )
         }
 
