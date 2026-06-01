@@ -8,10 +8,20 @@ extension AppFeature {
              .datasetLoaded(_),
              .datasetFailed(_),
              .projectStoreLoaded(_),
-             .projectStoreFailed(_):
+             .projectStoreFailed(_),
+             .operationStatusDismissed,
+             .copyDiagnosticsTapped,
+             .copyDiagnosticsSucceeded,
+             .copyDiagnosticsFailed(_):
             return reduceAppLifecycle(&state, action)
 
         case .createProjectTapped,
+             .projectCreationNameChanged(_),
+             .projectCreationTermChanged(_),
+             .projectCreationYearLevelChanged(_),
+             .projectCreationUseFirstNameOnlyChanged(_),
+             .projectCreationCancelled,
+             .confirmCreateProjectTapped,
              .projectCreateSaved(_),
              .projectCreateFailed(_),
              .projectTapped(_),
@@ -24,6 +34,7 @@ extension AppFeature {
              .reportsGeneratedAndSaved(_, _),
              .reportsGenerationFailed(_),
              .deleteProjectConfirmed(_),
+             .projectListDeleteConfirmed(_),
              .projectDeleted(_, _, _),
              .projectDeleteFailed(_):
             return reduceProjectWorkflow(&state, action)
@@ -38,6 +49,8 @@ extension AppFeature {
              .studentLastNameChanged(_, _),
              .studentYearLevelChanged(_, _),
              .subjectToggled(_),
+             .subjectSelectAllTapped,
+             .subjectDeselectAllTapped,
              .achievementLevelChanged(_, _, _),
              .focusChanged(_, _, _),
              .reportManualEditChanged(_, _, _),
@@ -55,7 +68,7 @@ extension AppFeature {
              .importFailed(_),
              .prepareBackupTapped,
              .prepareReportExportTapped(_),
-             .filePrepared(_, _),
+             .filePrepared(_, _, _, _),
              .filePreparationFailed(_),
              .fileExportSaved(_),
              .fileExportCancelled,

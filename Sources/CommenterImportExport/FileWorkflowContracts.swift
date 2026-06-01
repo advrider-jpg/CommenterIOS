@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ImportExportFormat: String, Codable, Equatable, Sendable {
+public enum ImportExportFormat: String, Codable, Equatable, Hashable, Sendable {
     case csv
     case xlsx
     case xls

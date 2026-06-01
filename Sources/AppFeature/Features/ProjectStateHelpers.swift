@@ -1,18 +1,9 @@
 import CommentEngine
 import CommenterDomain
-
-private let supportedSubjects = [
-    "English",
-    "Mathematics",
-    "Science",
-    "HASS",
-    "Health and P.E.",
-    "The Arts",
-    "Technologies"
-]
+import CommenterImportExport
 
 public func availableTeacherSubjects() -> [String] {
-    supportedSubjects
+    teacherSubjectKeysInCurriculumOrder()
 }
 
 func updateSelectedProject(_ state: inout AppFeature.State, mutate: (inout Project) -> Void) {
@@ -21,6 +12,8 @@ func updateSelectedProject(_ state: inout AppFeature.State, mutate: (inout Proje
     state.selectedProject = project
     state.selectedProjectReadiness = getProjectReadiness(project)
     state.pendingImport = nil
+    state.preparedFile = nil
+    markImportStatesStaleAfterManualEdit(&state)
     state.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
 }
 
@@ -79,19 +72,19 @@ func sortedProjects(_ projects: [ProjectSummary]) -> [ProjectSummary] {
 
 func projectStorageLoadedMessage(projectCount: Int) -> String {
     if projectCount == 0 {
-        return "Project storage is available. No saved projects were found on this device."
+        return "Project storage is available and ready."
     }
     let label = projectCount == 1 ? "project" : "projects"
     return "\(projectCount) saved \(label) loaded from local storage."
 }
 
 func generationSuccessMessage(_ result: CommentGenerationResult) -> String {
-    let generatedLabel = result.generatedCount == 1 ? "1 report" : "\(result.generatedCount) reports"
+    let generatedLabel = result.generatedCount == 1 ? "1 draft comment" : "\(result.generatedCount) draft comments"
     guard result.skippedLockedCount > 0 else {
-        return "\(generatedLabel) generated, saved, and verified."
+        return "\(generatedLabel) generated deterministically, saved, and verified."
     }
-    let lockedLabel = result.skippedLockedCount == 1 ? "1 locked report" : "\(result.skippedLockedCount) locked reports"
-    return "\(generatedLabel) generated, \(lockedLabel) left unchanged, saved, and verified."
+    let lockedLabel = result.skippedLockedCount == 1 ? "1 locked draft" : "\(result.skippedLockedCount) locked drafts"
+    return "\(generatedLabel) generated deterministically, \(lockedLabel) left unchanged, saved, and verified."
 }
 
 func projectSummary(_ project: Project) -> ProjectSummary {
@@ -102,4 +95,104 @@ func projectSummary(_ project: Project) -> ProjectSummary {
         updatedAt: project.metadata.updatedAt,
         revision: project.metadata.persistence?.revision
     )
+}
+
+func isLongRunningProjectOperation(_ status: AppFeature.ProjectStorageStatus) -> Bool {
+    switch status {
+    case .creating, .loadingProject, .saving, .deleting, .preparingFile, .importing, .generating:
+        return true
+    case .notLoaded, .loading, .loaded, .failed:
+        return false
+    }
+}
+
+func hasUnsavedChanges(_ operationStatus: AppFeature.OperationStatus) -> Bool {
+    if case .dirty = operationStatus {
+        return true
+    }
+    return false
+}
+
+func importSourceLabel(_ format: ImportExportFormat?) -> String {
+    format?.rawValue.uppercased() ?? "file"
+}
+
+func markImportStatesStaleAfterManualEdit(_ state: inout AppFeature.State) {
+    if case .success = state.rosterImportState {
+        state.rosterImportState = .stale("Roster was edited after the last import. Save the project to verify the current roster.")
+    } else if case .loaded = state.rosterImportState {
+        state.rosterImportState = .stale("Roster changed after the project was opened. Save the project to verify the current roster.")
+    }
+    if case .success = state.resultsImportState {
+        state.resultsImportState = .stale("Project data changed after the last results import. Review results before regenerating draft comments.")
+    } else if case .loaded = state.resultsImportState {
+        state.resultsImportState = .stale("Project data changed after the project was opened. Review results before regenerating draft comments.")
+    }
+}
+
+func generationPrerequisiteMessages(project: Project?, datasetStatus: AppFeature.DatasetStatus) -> [String] {
+    guard let project else {
+        return ["Open a project."]
+    }
+    var messages: [String] = []
+    if project.roster.isEmpty {
+        messages.append("Add at least one student.")
+    }
+    if selectedSubjectKeys(project.metadata.selectedSubjects).isEmpty {
+        messages.append("Select at least one subject.")
+    }
+    let resultReadiness = getExpectedReportKeys(project: project).map {
+        getResultReadiness(project: project, studentId: $0.student.id, subject: $0.subject)
+    }
+    if !resultReadiness.isEmpty {
+        let blockedResults = resultReadiness.filter { $0.status != .ready }
+        if !blockedResults.isEmpty {
+            messages.append("Complete achievement results for \(blockedResults.count) student-subject \(blockedResults.count == 1 ? "entry" : "entries").")
+        }
+    }
+    if case .loaded = datasetStatus {
+    } else {
+        messages.append("Wait for the bundled production dataset to load.")
+    }
+    return messages
+}
+
+func reportGenerationButtonTitle(project: Project, readiness: ProjectReadiness?) -> String {
+    guard let readiness, readiness.expected > 0 else {
+        return "Generate Draft Comments"
+    }
+    if readiness.entries.contains(where: { $0.status == .staleReport || $0.status == .lockedStale }) {
+        return "Regenerate Draft Comments"
+    }
+    if readiness.expected > 0, readiness.ready == readiness.expected {
+        return "Draft Comments Up to Date"
+    }
+    if project.reports.isEmpty {
+        return "Generate Draft Comments"
+    }
+    return "Review Draft Comments"
+}
+
+func reportGenerationDisabledReason(project: Project, readiness: ProjectReadiness?, datasetStatus: AppFeature.DatasetStatus? = nil) -> String? {
+    let prerequisiteMessages = generationPrerequisiteMessages(project: project, datasetStatus: datasetStatus ?? .loaded(DatasetSnapshot(hash: "", normalizedSourceHash: "", subjectCount: 0, componentCount: 0, recipeCount: 0, assembledVariantCount: 0, uniquenessGuardCount: 0, warnings: [], summary: "")))
+    let relevant = prerequisiteMessages.filter { !$0.contains("dataset") && !$0.contains("Open") }
+    if !relevant.isEmpty {
+        return relevant.joined(separator: " ")
+    }
+    guard let readiness else {
+        return "Results must be reviewed before draft comments can be generated."
+    }
+    if readiness.expected == 0 {
+        return "Add students, select subjects, and enter results before generating draft comments."
+    }
+    let resultBlocked = readiness.entries.filter { entry in
+        entry.status == .missingAchievementLevel || entry.status == .missingConcreteFocus
+    }
+    if !resultBlocked.isEmpty {
+        return "Complete results for \(resultBlocked.count) student-subject \(resultBlocked.count == 1 ? "entry" : "entries") before generating."
+    }
+    if readiness.ready == readiness.expected {
+        return "All draft comments are up to date and export-ready."
+    }
+    return nil
 }

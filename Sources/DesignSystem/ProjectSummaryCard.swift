@@ -12,17 +12,20 @@ public struct ProjectSummaryCard: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(name)
-                .font(.headline)
-            Text(term)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if let revision {
-                Text("Revision \(revision)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .font(.body.weight(.semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+            HStack(spacing: 6) {
+                Text(term)
+                if let revision {
+                    Text("-")
+                    Text("Revision \(revision)")
+                }
             }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
     }

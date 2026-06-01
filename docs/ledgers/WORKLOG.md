@@ -356,3 +356,21 @@ Append material work history here. Keep entries short, dated, and factual.
   screenshots but the raw output directory stays empty in CI, added an
   `xcresulttool export attachments` workflow step that extracts the kept
   XCTest screenshot attachments into stable PNG files before artifact upload.
+
+## 2026-06-01 - UI/UX defect patch integration
+
+- Applied the standalone UI/UX defect patch and kept the changes inside the
+  native SwiftUI/TCA, local-only, truthful-state architecture.
+- Added project creation naming before persistence, roster management entry
+  points, subject bulk selection, disabled prerequisite-gated actions, truthful
+  import/export/share/cancel states, prepared-file timestamps, and richer
+  support diagnostics.
+- Added formal subject display names, curriculum-order subject handling, support
+  copy diagnostics, and small native SwiftUI design-system components.
+- Repaired patch integration gaps found after application: successful imports no
+  longer lose their mode before completion handling, project creation cannot
+  report cancellation after a successful programmatic close, and local data
+  loaded from verified storage is not labelled as newly imported.
+- Ran Windows-feasible hygiene checks. SwiftPM and Xcode/simulator validation
+  remain blocked locally because `swift` and `xcodebuild` are not installed on
+  this machine.

@@ -1,6 +1,7 @@
 import CommentEngine
 import CommenterDomain
 import CommenterImportExport
+import DesignSystem
 import SwiftUI
 
 struct WorklistRootView: View {
@@ -10,6 +11,11 @@ struct WorklistRootView: View {
     let operationStatus: AppFeature.OperationStatus
     let preparedFile: AppFeature.PreparedFile?
     let pendingImport: AppFeature.PendingImport?
+    let rosterImportState: AppFeature.TabularImportState
+    let resultsImportState: AppFeature.TabularImportState
+    let lastPreparedFiles: [ImportExportFormat: AppFeature.PreparedFileRecord]
+    let datasetStatus: AppFeature.DatasetStatus
+    let onGoToProjects: () -> Void
     let onProjectNameChanged: (String) -> Void
     let onProjectTermChanged: (String) -> Void
     let onProjectYearLevelChanged: (ProjectYearLevel) -> Void
@@ -22,6 +28,8 @@ struct WorklistRootView: View {
     let onStudentLastNameChanged: (String, String) -> Void
     let onStudentYearChanged: (String, StudentYearLevel) -> Void
     let onSubjectToggled: (String) -> Void
+    let onSelectAllSubjects: () -> Void
+    let onDeselectAllSubjects: () -> Void
     let onAchievementChanged: (String, String, AchievementLevel?) -> Void
     let onFocusChanged: (String, String, String) -> Void
     let onGenerate: () -> Void
@@ -34,6 +42,7 @@ struct WorklistRootView: View {
     let onSavePreparedFile: () -> Void
     let onSharePreparedFile: () -> Void
     let onDismissPreparedFile: () -> Void
+    let onDismissStatus: () -> Void
     let onConfirmImport: () -> Void
     let onCancelImportPreview: () -> Void
 
@@ -65,6 +74,7 @@ struct WorklistRootView: View {
                     )
                     RosterSection(
                         project: project,
+                        importState: rosterImportState,
                         onAddStudent: onAddStudent,
                         onDeleteStudent: onDeleteStudent,
                         onFirstNameChanged: onStudentFirstNameChanged,
@@ -73,10 +83,17 @@ struct WorklistRootView: View {
                         onImportRoster: onImportRoster,
                         isDisabled: isEditingLocked
                     )
-                    SubjectsSection(project: project, onSubjectToggled: onSubjectToggled, isDisabled: isEditingLocked)
+                    SubjectsSection(
+                        project: project,
+                        onSubjectToggled: onSubjectToggled,
+                        onSelectAll: onSelectAllSubjects,
+                        onDeselectAll: onDeselectAllSubjects,
+                        isDisabled: isEditingLocked
+                    )
                     ResultsSection(
                         project: project,
                         readiness: readiness,
+                        importState: resultsImportState,
                         onAchievementChanged: onAchievementChanged,
                         onFocusChanged: onFocusChanged,
                         onImportResults: onImportResults,
@@ -84,43 +101,64 @@ struct WorklistRootView: View {
                     )
                     ReportsSection(
                         project: project,
+                        readiness: readiness,
+                        datasetStatus: datasetStatus,
+                        isGenerating: isGeneratingReports,
                         onGenerate: onGenerate,
                         onManualEditChanged: onManualEditChanged,
                         onLockChanged: onLockChanged,
                         isDisabled: isEditingLocked
                     )
-                    ExportSection(
-                        preparedFile: hasUnsavedChanges ? nil : preparedFile,
-                        hasHiddenStalePreparedFile: hasUnsavedChanges && preparedFile != nil,
+                    ReportExportsSection(
                         readiness: readiness,
-                        onPrepareBackup: onPrepareBackup,
+                        records: lastPreparedFiles,
                         onPrepareExport: onPrepareExport,
-                        onSavePreparedFile: onSavePreparedFile,
-                        onSharePreparedFile: onSharePreparedFile,
-                        onDismissPreparedFile: onDismissPreparedFile,
                         isDisabled: isEditingLocked || hasUnsavedChanges,
                         disabledReason: exportDisabledReason
                     )
+                    BackupSection(
+                        record: lastPreparedFiles[.backupJSON],
+                        onPrepareBackup: onPrepareBackup,
+                        isDisabled: isEditingLocked || hasUnsavedChanges,
+                        disabledReason: backupDisabledReason
+                    )
+                    PreparedFileSection(
+                        preparedFile: hasUnsavedChanges ? nil : preparedFile,
+                        hasHiddenStalePreparedFile: hasUnsavedChanges && preparedFile != nil,
+                        onSavePreparedFile: onSavePreparedFile,
+                        onSharePreparedFile: onSharePreparedFile,
+                        onDismissPreparedFile: onDismissPreparedFile,
+                        isDisabled: isEditingLocked
+                    )
                 } else if pendingImport == nil {
                     Section {
-                        ContentUnavailableView(
-                            "No Project Open",
-                            systemImage: "folder",
-                            description: Text("Create or open a local project from Projects.")
+                        CommenterEmptyState(
+                            systemImage: "folder.badge.questionmark",
+                            title: "No project open",
+                            message: "Create or open a local project from Projects to manage roster, subjects, results, drafts, reports, and backups.",
+                            primaryActionTitle: "Go to Projects",
+                            primaryAction: onGoToProjects
                         )
                     }
                 }
             }
-            .navigationTitle(project?.metadata.name ?? "Worklist")
+            .listStyle(.insetGrouped)
+            .scrollIndicators(.visible)
+            .background(CommenterColors.groupedBackground)
+            .navigationTitle(project?.metadata.name ?? "Work list")
+            .navigationBarTitleDisplayMode(.large)
             .accessibilityIdentifier("worklist-page")
         }
     }
 
     private var workflowStatusSection: some View {
         Section {
-            OperationStatusView(status: operationStatus)
-            if let readiness {
+            OperationStatusView(status: operationStatus, onDismiss: onDismissStatus)
+            if let readiness, readiness.expected > 0 {
                 LabeledContent("Export ready", value: "\(readiness.ready) of \(readiness.expected)")
+                    .accessibilityLabel("Export ready \(readiness.ready) of \(readiness.expected)")
+            } else if project != nil {
+                StatusChip("Add students to get started", systemImage: "person.badge.plus", tone: .neutral)
             }
             if case .saving = status {
                 ProgressView("Saving and verifying project")
@@ -129,7 +167,7 @@ struct WorklistRootView: View {
                 ProgressView("Creating recovery snapshot and deleting project")
             }
             if case .generating = status {
-                ProgressView("Generating and saving reports")
+                ProgressView("Generating deterministic draft comments")
             }
             if case .importing = status {
                 ProgressView("Validating import")
@@ -155,6 +193,8 @@ struct WorklistRootView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        } header: {
+            CommenterSectionHeader("Workflow", detail: "Local state, progress, and recovery prompts")
         }
     }
 
@@ -163,12 +203,7 @@ struct WorklistRootView: View {
     }
 
     private var isWorkflowBusy: Bool {
-        switch status {
-        case .creating, .loadingProject, .saving, .deleting, .preparingFile, .importing, .generating:
-            return true
-        case .notLoaded, .loading, .loaded, .failed:
-            return false
-        }
+        isLongRunningProjectOperation(status)
     }
 
     private var hasUnsavedChanges: Bool {
@@ -178,15 +213,33 @@ struct WorklistRootView: View {
         return false
     }
 
+    private var isGeneratingReports: Bool {
+        if case .generating = status { return true }
+        return false
+    }
+
     private var exportDisabledReason: String? {
         if let pendingImport {
-            return "\(pendingImport.title) is waiting. Confirm or cancel the import before preparing backup or report files."
+            return "\(pendingImport.title) is waiting. Confirm or cancel the import before preparing report files."
         }
         if isWorkflowBusy {
-            return "Wait for the current local operation to finish before preparing backup or report files."
+            return "Wait for the current local operation to finish before preparing report files."
         }
         if hasUnsavedChanges {
-            return "Save current changes before preparing backup or report files so exported files reflect verified local state."
+            return "Save current changes before preparing report files so exported files reflect verified local state."
+        }
+        return nil
+    }
+
+    private var backupDisabledReason: String? {
+        if let pendingImport {
+            return "\(pendingImport.title) is waiting. Confirm or cancel the import before preparing a backup."
+        }
+        if isWorkflowBusy {
+            return "Wait for the current local operation to finish before preparing a backup."
+        }
+        if hasUnsavedChanges {
+            return "Save current changes before preparing a backup so it reflects verified local state."
         }
         return nil
     }

@@ -162,15 +162,15 @@ public func reportReviewRows(project: Project, studentId: String? = nil) throws 
     return try scope.students.flatMap { student in
         try scope.subjects.map { subject in
             guard let report = project.reports.first(where: { $0.studentId == student.id && $0.subject == subject }) else {
-                throw ReportExportPreparationError.notReady(["\(displayStudentName(project: project, student: student)) does not have a generated report for \(subject)."])
+                throw ReportExportPreparationError.notReady(["\(displayStudentName(project: project, student: student)) does not have a generated report for \(displaySubjectName(subject))."])
             }
             guard let result = project.results.first(where: { $0.studentId == student.id && $0.subject == subject }) else {
-                throw ReportExportPreparationError.notReady(["\(displayStudentName(project: project, student: student)) is missing an achievement result for \(subject)."])
+                throw ReportExportPreparationError.notReady(["\(displayStudentName(project: project, student: student)) is missing an achievement result for \(displaySubjectName(subject))."])
             }
             return ReportReviewRow(
                 studentName: spreadsheetSafeText(fullStudentName(student)),
                 yearLevel: spreadsheetSafeText(student.yearLevel.rawValue),
-                subject: spreadsheetSafeText(subject),
+                subject: spreadsheetSafeText(displaySubjectName(subject)),
                 specificSubject: spreadsheetSafeText(result.focusStrand ?? ""),
                 achievementLevel: spreadsheetSafeText(result.achievementLevel?.rawValue ?? ""),
                 reportText: spreadsheetSafeText(try exportReportText(report)),
@@ -191,11 +191,11 @@ public func prepareReportPacket(project: Project, studentId: String? = nil) thro
                   let result = project.results.first(where: { $0.studentId == student.id && $0.subject == subject }),
                   let achievement = result.achievementLevel
             else {
-                throw ReportExportPreparationError.notReady(["\(displayStudentName(project: project, student: student)) is missing export-ready data for \(subject)."])
+                throw ReportExportPreparationError.notReady(["\(displayStudentName(project: project, student: student)) is missing export-ready data for \(displaySubjectName(subject))."])
             }
             let focus = result.focusStrand?.trimmingCharacters(in: .whitespacesAndNewlines)
             return PreparedSubjectReport(
-                subject: subject,
+                subject: displaySubjectName(subject),
                 achievement: achievement.rawValue,
                 focus: focus?.isEmpty == false && focus != subject ? focus : nil,
                 paragraphs: reportParagraphs(try exportReportText(report))
@@ -289,7 +289,7 @@ private func exportReportText(_ report: GeneratedReport) throws -> String {
     let text = report.manualEdit?.isEmpty == false ? report.manualEdit ?? "" : report.text
     let placeholders = findUnresolvedPlaceholders(text)
     if !placeholders.isEmpty {
-        throw ReportExportPreparationError.notReady(["\(report.subject) report contains template text that must be replaced."])
+        throw ReportExportPreparationError.notReady(["\(displaySubjectName(report.subject)) report contains template text that must be replaced."])
     }
     return text
 }

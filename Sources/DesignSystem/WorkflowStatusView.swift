@@ -13,19 +13,45 @@ public struct WorkflowStatusView: View {
     private let message: String?
     private let systemImage: String
     private let tone: WorkflowStatusTone
+    private let onDismiss: (() -> Void)?
 
-    public init(_ message: String?, systemImage: String, tone: WorkflowStatusTone = .neutral) {
+    public init(
+        _ message: String?,
+        systemImage: String,
+        tone: WorkflowStatusTone = .neutral,
+        onDismiss: (() -> Void)? = nil
+    ) {
         self.message = message
         self.systemImage = systemImage
         self.tone = tone
+        self.onDismiss = onDismiss
     }
 
     public var body: some View {
         if let message, !message.isEmpty {
-            Label(message, systemImage: systemImage)
-                .foregroundStyle(color)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityElement(children: .combine)
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.headline)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(color)
+                    .accessibilityHidden(true)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(color)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                if let onDismiss {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss status message")
+                }
+            }
+            .padding(.vertical, 8)
+            .accessibilityElement(children: .combine)
         }
     }
 
@@ -34,13 +60,13 @@ public struct WorkflowStatusView: View {
         case .neutral, .busy:
             return .secondary
         case .success:
-            return .green
+            return CommenterColors.success
         case .warning:
-            return .orange
+            return CommenterColors.warning
         case .failure:
-            return .red
+            return CommenterColors.failure
         case .prepared:
-            return .blue
+            return CommenterColors.accent
         }
     }
 }

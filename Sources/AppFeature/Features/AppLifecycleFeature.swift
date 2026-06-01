@@ -24,6 +24,13 @@ extension AppFeature {
             state.selectedTab = tab
             return .none
 
+        case .operationStatusDismissed:
+            if case .dirty = state.operationStatus {
+                return .none
+            }
+            state.operationStatus = .idle
+            return .none
+
         case let .datasetLoaded(snapshot):
             state.datasetStatus = .loaded(snapshot)
             return .none
@@ -41,6 +48,26 @@ extension AppFeature {
         case let .projectStoreFailed(message):
             state.projectStorageStatus = .failed(message)
             state.projectStorageMessage = message
+            return .none
+
+        case .copyDiagnosticsTapped:
+            let diagnostics = supportDiagnosticsText(state: state)
+            state.operationStatus = .busy("Copying support diagnostics.")
+            return .run { send in
+                do {
+                    try await clipboardClient.copy(diagnostics)
+                    await send(.copyDiagnosticsSucceeded)
+                } catch {
+                    await send(.copyDiagnosticsFailed(error.localizedDescription))
+                }
+            }
+
+        case .copyDiagnosticsSucceeded:
+            state.operationStatus = .saved("Diagnostics copied to clipboard.")
+            return .none
+
+        case let .copyDiagnosticsFailed(message):
+            state.operationStatus = .failed("Diagnostics could not be copied: \(message)")
             return .none
 
         default:

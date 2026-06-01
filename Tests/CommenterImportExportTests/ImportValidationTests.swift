@@ -179,6 +179,22 @@ final class ImportValidationTests: XCTestCase {
         }
     }
 
+
+    func testResultsCSVImportAcceptsFormalHealthAndPhysicalEducationLabel() throws {
+        let imported = try ImportValidation.parseResultsImportCSV(
+            [
+                "First Name,Last Name,Subject,Achievement Level,Focus",
+                "Ava,Ng,Health and Physical Education,At Standard,teamwork"
+            ].joined(separator: "\n"),
+            roster: roster,
+            selectedSubjects: selectedSubjects.merging(["Health and P.E.": SelectedSubject(name: "Health and P.E.", allStrandsSelected: true)]) { current, _ in current }
+        )
+
+        XCTAssertEqual(imported.count, 1)
+        XCTAssertEqual(imported[0].subject, "Health and P.E.")
+        XCTAssertEqual(displaySubjectName(imported[0].subject), "Health and Physical Education")
+    }
+
     private var roster: [Student] {
         [Student(id: "s1", firstName: "Ava", lastName: "Ng", yearLevel: .year5)]
     }

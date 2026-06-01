@@ -4,6 +4,7 @@ import XCTest
 
 final class CommenterIOSScreenshotTests: XCTestCase {
     private var app: XCUIApplication!
+    private let screenshotProjectName = "Room 5"
     private let screenshotStudentId = "student-1"
     private let screenshotSubjectKey = "english"
 
@@ -19,8 +20,8 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         waitForPage(named: "Projects")
         capture("01-projects-empty")
 
-        openTab("Worklist")
-        waitForPage(named: "Worklist")
+        openTab("Work list")
+        waitForPage(named: "Work list")
         capture("02-worklist-no-project")
 
         openTab("Support")
@@ -33,19 +34,32 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         waitForEnabledElement(createProject, named: "Create Project")
         createProject.tap()
 
-        waitForPage(named: "Untitled Project")
+        waitForPage(named: "Create project")
+        let projectName = textField(identifier: "project-creation-name-field", label: "Class name")
+        enterText(screenshotProjectName, in: projectName, named: "project creation class name")
+        let confirmCreate = button(identifier: "project-creation-create-button", label: "Create")
+        waitForEnabledElement(confirmCreate, named: "Create project confirmation")
+        confirmCreate.tap()
+
+        waitForPage(named: screenshotProjectName)
         capture("04-project-created")
 
         let addStudent = scrollToAny(buttons(identifier: "add-student-button", label: "Add Student"), name: "Add Student")
         capture("05-roster-before-student")
         addStudent.tap()
 
+        let studentRow = scrollToAny(cells(identifier: "student-row-\(screenshotStudentId)", label: "Student"), name: "new student row")
+        studentRow.tap()
+
         let firstName = scrollToAny(textFields(identifier: "student-first-name-\(screenshotStudentId)", label: "First name"), name: "student first name field")
         enterText("Ava", in: firstName, named: "student first name")
         let lastName = scrollToAny(textFields(identifier: "student-last-name-\(screenshotStudentId)", label: "Last name"), name: "student last name field")
         enterText("Ng", in: lastName, named: "student last name")
         capture("06-roster-student-entered")
+        tapBack(to: screenshotProjectName)
 
+        let deselectAll = scrollToAny(buttons(identifier: "subject-deselect-all-button", label: "Deselect all"), name: "Deselect all")
+        deselectAll.tap()
         let englishToggle = scrollToAny(switches(identifier: "subject-toggle-\(screenshotSubjectKey)", label: "English"), name: "English subject toggle")
         englishToggle.tap()
         capture("07-subject-selected-english")
@@ -66,9 +80,12 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         let generateReports = scrollToAny(buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"), name: "Generate and Save Reports")
         generateReports.tap()
 
+        let reportRow = scrollToAny(cells(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava Ng - English"), name: "generated Ava English report row")
+        reportRow.tap()
         let reportEditor = scrollToAny(textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"), name: "generated Ava English report", requireHittable: false)
         waitForElement(reportEditor, named: "generated Ava English report")
         capture("11-generated-report-comment")
+        tapBack(to: screenshotProjectName)
 
         let prepareDocx = scrollToAny(buttons(identifier: "prepare-docx-reports-button", label: "Prepare DOCX Reports"), name: "Prepare DOCX Reports")
         waitForEnabledElement(prepareDocx, named: "Prepare DOCX Reports")
@@ -116,8 +133,17 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         return identified.exists ? identified : app.buttons[label]
     }
 
+    private func textField(identifier: String, label: String) -> XCUIElement {
+        let identified = app.textFields[identifier]
+        return identified.exists ? identified : app.textFields[label]
+    }
+
     private func buttons(identifier: String, label: String) -> [XCUIElement] {
         [app.buttons[identifier], app.buttons[label], element(identifier)]
+    }
+
+    private func cells(identifier: String, label: String) -> [XCUIElement] {
+        [app.cells[identifier], app.buttons[identifier], app.staticTexts[label], element(identifier)]
     }
 
     private func textFields(identifier: String, label: String) -> [XCUIElement] {
@@ -220,15 +246,22 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func returnToWorklistIfNeeded() {
-        if app.navigationBars["Worklist"].exists {
+        if app.navigationBars[screenshotProjectName].exists {
             return
         }
 
-        let backButton = app.navigationBars.buttons["Worklist"]
+        let backButton = app.navigationBars.buttons[screenshotProjectName]
         if backButton.waitForExistence(timeout: 3) {
             backButton.tap()
         }
-        waitForPage(named: "Worklist")
+        waitForPage(named: screenshotProjectName)
+    }
+
+    private func tapBack(to pageName: String) {
+        let backButton = app.navigationBars.buttons[pageName]
+        waitForEnabledElement(backButton, named: "\(pageName) back button")
+        backButton.tap()
+        waitForPage(named: pageName)
     }
 
     private func dismissKeyboardIfNeeded() {

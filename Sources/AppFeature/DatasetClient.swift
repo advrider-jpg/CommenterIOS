@@ -12,6 +12,7 @@ public struct DatasetSnapshot: Equatable, Sendable {
     public var uniquenessGuardCount: Int
     public var warnings: [String]
     public var summary: String
+    public var loadedAtMilliseconds: Int64?
 
     public init(
         hash: String,
@@ -22,7 +23,8 @@ public struct DatasetSnapshot: Equatable, Sendable {
         assembledVariantCount: Int,
         uniquenessGuardCount: Int,
         warnings: [String],
-        summary: String
+        summary: String,
+        loadedAtMilliseconds: Int64? = nil
     ) {
         self.hash = hash
         self.normalizedSourceHash = normalizedSourceHash
@@ -33,6 +35,7 @@ public struct DatasetSnapshot: Equatable, Sendable {
         self.uniquenessGuardCount = uniquenessGuardCount
         self.warnings = warnings
         self.summary = summary
+        self.loadedAtMilliseconds = loadedAtMilliseconds
     }
 }
 
@@ -57,7 +60,8 @@ extension DatasetClient: DependencyKey {
             assembledVariantCount: diagnostics.assembledVariantCount,
             uniquenessGuardCount: diagnostics.uniquenessGuardCount,
             warnings: diagnostics.warnings,
-            summary: ProductionCommentDataset.diagnosticSummary(diagnostics)
+            summary: ProductionCommentDataset.diagnosticSummary(diagnostics),
+            loadedAtMilliseconds: Int64((Date().timeIntervalSince1970 * 1000).rounded())
         )
     }
 
