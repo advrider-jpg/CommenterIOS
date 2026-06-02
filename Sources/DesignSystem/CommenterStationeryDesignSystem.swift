@@ -675,13 +675,12 @@ public struct WorkflowTimeline: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { pair in
-                let index = pair.offset
-                let item = pair.element
+            ForEach(items, id: \.id) { item in
+                let isLast = item.id == items.last?.id
                 HStack(alignment: .top, spacing: 12) {
                     VStack(spacing: 0) {
                         StatusIconBubble(systemImage: item.systemImage, tone: item.tone)
-                        if index < items.count - 1 {
+                        if !isLast {
                             Rectangle()
                                 .fill(CommenterStationeryTheme.Colors.paperLine)
                                 .frame(width: 2, minHeight: 24)
@@ -702,7 +701,7 @@ public struct WorkflowTimeline: View {
                     .padding(.top, 3)
                     Spacer(minLength: 0)
                 }
-                .padding(.bottom, index < items.count - 1 ? 10 : 0)
+                .padding(.bottom, isLast ? 0 : 10)
                 .accessibilityElement(children: .combine)
             }
         }
