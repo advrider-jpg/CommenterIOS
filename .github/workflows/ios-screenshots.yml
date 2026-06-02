@@ -14,8 +14,28 @@ jobs:
     timeout-minutes: 45
     env:
       COMMENTER_SCREENSHOT_DIR: ${{ github.workspace }}/build/screenshots
+      DERIVED_DATA_PATH: ${{ github.workspace }}/build/DerivedData
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            .swiftpm
+          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-
+
+      - name: Cache Xcode derived data
+        uses: actions/cache@v4
+        with:
+          path: build/DerivedData
+          key: ${{ runner.os }}-xcode-screenshots-${{ hashFiles('Package.resolved', 'Package.swift', 'CommenterIOS.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-screenshots-
+            ${{ runner.os }}-xcode-
 
       - name: Resolve packages
         run: swift package resolve
@@ -56,27 +76,34 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$COMMENTER_SCREENSHOT_DIR"
+          mkdir -p build
           xcodebuild test \
             -project CommenterIOS.xcodeproj \
             -scheme CommenterIOS \
             -destination '${{ steps.simulator.outputs.destination }}' \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
             -only-testing:CommenterIOSScreenshotTests/CommenterIOSScreenshotTests/testCoreReportFlowScreenshots \
             -resultBundlePath build/CommenterIOSScreenshots.xcresult \
             -skipPackagePluginValidation \
             -skipMacroValidation \
             ARCHS=arm64 \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO | tee build/screenshot-xcodebuild.log
 
       - name: Export screenshot PNGs from xcresult
+        if: always()
         run: |
           set -euo pipefail
           attachment_dir="$RUNNER_TEMP/commenter-ios-xcresult-attachments"
-          rm -rf "$attachment_dir" "$COMMENTER_SCREENSHOT_DIR"
+          rm -rf "$attachment_dir"
           mkdir -p "$attachment_dir" "$COMMENTER_SCREENSHOT_DIR"
 
-          xcrun xcresulttool export attachments \
-            --path build/CommenterIOSScreenshots.xcresult \
-            --output-path "$attachment_dir"
+          if [ -d build/CommenterIOSScreenshots.xcresult ]; then
+            xcrun xcresulttool export attachments \
+              --path build/CommenterIOSScreenshots.xcresult \
+              --output-path "$attachment_dir" || true
+          else
+            echo "No xcresult bundle found at build/CommenterIOSScreenshots.xcresult"
+          fi
 
           python3 - "$attachment_dir" "$COMMENTER_SCREENSHOT_DIR" <<'PY'
           import json
@@ -87,13 +114,28 @@ jobs:
 
           attachment_dir, output_dir = sys.argv[1:3]
           manifest_path = os.path.join(attachment_dir, "manifest.json")
-          if not os.path.exists(manifest_path):
-              raise SystemExit("xcresult attachment export did not produce manifest.json")
-
-          with open(manifest_path, encoding="utf-8") as handle:
-              manifest = json.load(handle)
-
           screenshots = {}
+          required = [
+              "01-projects-empty",
+              "02-worklist-no-project",
+              "03-support-diagnostics",
+              "04-project-created",
+              "05-roster-before-student",
+              "06-roster-student-entered",
+              "07-subject-selected-english",
+              "08-result-before-achievement",
+              "09-result-ready-for-generation",
+              "10-project-saved-before-generation",
+              "11-generated-report-comment",
+              "12-export-ready",
+              "13-docx-prepared",
+              "14-support-after-report",
+          ]
+
+          for name in required:
+              existing = os.path.join(output_dir, f"{name}.png")
+              if os.path.isfile(existing):
+                  screenshots[name] = existing
 
           def walk(value):
               if isinstance(value, dict):
@@ -112,31 +154,34 @@ jobs:
                   for child in value:
                       walk(child)
 
-          walk(manifest)
+          if os.path.exists(manifest_path):
+              with open(manifest_path, encoding="utf-8") as handle:
+                  walk(json.load(handle))
+          else:
+              print("xcresult attachment export did not produce manifest.json; falling back to recursive PNG scan.")
 
-          required = [
-              "01-projects-empty",
-              "02-worklist-no-project",
-              "03-support-diagnostics",
-              "04-project-created",
-              "05-roster-before-student",
-              "06-roster-student-entered",
-              "07-subject-selected-english",
-              "08-result-before-achievement",
-              "09-result-ready-for-generation",
-              "10-project-saved-before-generation",
-              "11-generated-report-comment",
-              "12-export-ready",
-              "13-docx-prepared",
-              "14-support-after-report",
-          ]
+          for root, _, files in os.walk(attachment_dir):
+              for filename in files:
+                  if not filename.lower().endswith(".png"):
+                      continue
+                  source = os.path.join(root, filename)
+                  name = os.path.splitext(filename)[0]
+                  name = re.sub(r"_\d+_[0-9A-Fa-f-]{36}$", "", name)
+                  if re.fullmatch(r"\d{2}-[A-Za-z0-9-]+", name):
+                      screenshots.setdefault(name, source)
+
           missing = [name for name in required if name not in screenshots]
           if missing:
-              names = ", ".join(sorted(screenshots)) or "none"
-              raise SystemExit(f"Missing required core-flow screenshots: {', '.join(missing)}. Found: {names}")
+              print(f"Missing required core-flow screenshots after export fallback: {', '.join(missing)}")
+              print("Found screenshots:", ", ".join(sorted(screenshots)) or "none")
+              for root, _, files in os.walk(attachment_dir):
+                  for filename in files[:50]:
+                      print("attachment:", os.path.join(root, filename))
 
           for name, source in sorted(screenshots.items()):
-              shutil.copy2(source, os.path.join(output_dir, f"{name}.png"))
+              destination = os.path.join(output_dir, f"{name}.png")
+              if os.path.abspath(source) != os.path.abspath(destination):
+                  shutil.copy2(source, destination)
           PY
 
       - name: Verify screenshot output
@@ -161,7 +206,11 @@ jobs:
             14-support-after-report
           )
           for name in "${required[@]}"; do
-            test -s "$COMMENTER_SCREENSHOT_DIR/$name.png"
+            if [ ! -s "$COMMENTER_SCREENSHOT_DIR/$name.png" ]; then
+              echo "Missing screenshot: $COMMENTER_SCREENSHOT_DIR/$name.png"
+              find "$COMMENTER_SCREENSHOT_DIR" -type f -print | sort || true
+              exit 1
+            fi
           done
           find "$COMMENTER_SCREENSHOT_DIR" -type f -name '*.png' | sort
 
@@ -173,4 +222,5 @@ jobs:
           path: |
             build/screenshots/*.png
             build/CommenterIOSScreenshots.xcresult
-          if-no-files-found: error
+            build/screenshot-xcodebuild.log
+          if-no-files-found: warn

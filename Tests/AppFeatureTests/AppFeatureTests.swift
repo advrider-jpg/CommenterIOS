@@ -1239,7 +1239,7 @@ private func testProjectStoreClient(
     importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in importPreview(format: .csv, kind: .results, count: 0, project: project) },
     importBackup: @escaping @Sendable (_ url: URL) async throws -> Project = { _ in project(id: "imported") },
     prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL = { _ in URL(fileURLWithPath: "/tmp/report-writer-backup.json") },
-    prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL = { _, format in URL(fileURLWithPath: "/tmp/commenter-report.\(format.rawValue)") }
+    prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL = { _, format in URL(fileURLWithPath: "/tmp/report-writer-report.\(format.rawValue)") }
 ) -> ProjectStoreClient {
     ProjectStoreClient(
         listProjects: listProjects,

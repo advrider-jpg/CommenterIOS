@@ -2,6 +2,17 @@
 
 Append material work history here. Keep entries short, dated, and factual.
 
+## 2026-06-02 - CI and screenshot workflow hardening
+
+- Updated iOS CI to cache SwiftPM artifacts and Xcode derived data, bound the
+  main CI job with a timeout, and uploaded xcodebuild logs/result bundles for
+  failure diagnostics.
+- Hardened screenshot attachment export to keep direct screenshot files, fall
+  back when the xcresult manifest shape changes, and upload the xcodebuild log
+  with screenshot artifacts.
+- Updated validation ledger wording to the current
+  `testCoreReportFlowScreenshots` 14-screenshot workflow.
+
 ## 2026-06-01 - Preferred stationery redesign and Report Writer naming
 
 - Applied the preferred stationery handoff to native SwiftUI project, worklist,
