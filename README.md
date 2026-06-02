@@ -36,6 +36,7 @@ simulator on macOS.
 
 Start with:
 
+- [iOS CI and workflow recommendations](docs/IOS_CI_SKILL_RECOMMENDATIONS.md)
 - [Chat handoff](docs/CHAT_HANDOFF.md)
 - [Production MVP plan](docs/PRODUCTION_MVP_PLAN.md)
 - [Scaffold decision](docs/decisions/0001-native-swiftui-tca.md)

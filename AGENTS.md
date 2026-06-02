@@ -162,6 +162,55 @@ When staging, inspect the staged diff and run:
 git diff --cached --check
 ```
 
+## iOS CI Debugging Rules
+
+Use these in this order for iOS CI/debugging work:
+
+| Rank | Skill / repo | Why it matters for your iOS CI work |
+| ---: | --- | --- |
+| 1 | OpenAI `gh-fix-ci` (`openai/skills`) | Official Codex skill for GitHub Actions check inspection, failing-job log retrieval, and fix planning |
+| 2 | `getsentry/XcodeBuildMCP` (`xcodebuildmcp`) | Best iOS-specific build/test/run companion with simulator/device workflows, logs, LLDB, and automation |
+| 3 | `twostraws/SwiftUI-Agent-Skill` | SwiftUI-focused correctness pass for API/deprecation/accessibility/performance issues |
+| 4 | `Dimillian/Skills` (`ios-debugger-agent`) | Strong debugger workflow using XcodeBuildMCP for install, run, and runtime investigation |
+| 5 | `AvdLee/SwiftUI-Agent-Skill` | Secondary SwiftUI quality pass for state management and modern patterns |
+
+Practical recommendation:
+
+1. Use `gh-fix-ci` first.
+2. Reproduce on local iOS stack through XcodeBuildMCP before changing code.
+3. Apply the smallest production-quality fix for the exact observed failure.
+4. Re-run the narrowest build/test first, then broader commands.
+
+When CI fails:
+
+1. First use `gh-fix-ci` to inspect the exact failing job logs.
+2. Do not infer failures from filenames or recent edits alone.
+3. For local reproduction, prefer XcodeBuildMCP over handwritten `xcodebuild`, `xcrun`, or `simctl` commands unless logs are incomplete.
+4. Identify project/workspace, scheme, destination simulator, and failing test target before code changes.
+
+Suggested install commands:
+
+```bash
+$ skill-installer gh-fix-ci
+```
+
+```bash
+# Install XcodeBuildMCP
+brew tap getsentry/xcodebuildmcp
+brew install xcodebuildmcp
+
+# Or:
+npm install -g xcodebuildmcp@latest
+
+# Then initialize its agent skills
+xcodebuildmcp init
+```
+
+```bash
+# Broader Swift/iOS coverage
+npx skills add dpearson2699/swift-ios-skills --all
+```
+
 ## Definition of Done
 
 A task is done only when:
