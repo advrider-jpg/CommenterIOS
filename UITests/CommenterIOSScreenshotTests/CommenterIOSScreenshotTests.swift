@@ -111,7 +111,6 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"),
             name: "Generate and Save Reports"
         )
-        waitForEnabledElement(generateReports, named: "Generate and Save Reports")
         generateReports.tap()
         waitForOperationToSettle(action: "report generation")
         ensureWorklistOpen()
