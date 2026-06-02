@@ -6,29 +6,17 @@ import AppKit
 #endif
 
 public enum CommenterColors {
-    public static let accent = Color(red: 0.12, green: 0.36, blue: 0.40)
-    public static let accentSoft = Color(red: 0.86, green: 0.94, blue: 0.94)
-    public static let success = Color(red: 0.16, green: 0.48, blue: 0.28)
-    public static let warning = Color(red: 0.66, green: 0.42, blue: 0.08)
-    public static let failure = Color(red: 0.70, green: 0.18, blue: 0.16)
+    public static let accent = CommenterStationeryTheme.Colors.actionBlue
+    public static let accentSoft = CommenterStationeryTheme.Colors.actionBlueSoft
+    public static let success = CommenterStationeryTheme.Colors.localGreen
+    public static let warning = CommenterStationeryTheme.Colors.attentionOrange
+    public static let failure = CommenterStationeryTheme.Colors.destructiveRed
     public static var surface: Color {
-        #if canImport(UIKit)
-        Color(UIColor.secondarySystemGroupedBackground)
-        #elseif canImport(AppKit)
-        Color(NSColor.windowBackgroundColor)
-        #else
-        Color.secondary.opacity(0.08)
-        #endif
+        CommenterStationeryTheme.Colors.paperSurface
     }
 
     public static var groupedBackground: Color {
-        #if canImport(UIKit)
-        Color(UIColor.systemGroupedBackground)
-        #elseif canImport(AppKit)
-        Color(NSColor.controlBackgroundColor)
-        #else
-        Color.secondary.opacity(0.06)
-        #endif
+        CommenterStationeryTheme.Colors.paperBackground
     }
 }
 
@@ -86,22 +74,20 @@ public struct CommenterSectionHeader: View {
             if let step {
                 Text("\(step)")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(CommenterStationeryTheme.Colors.localGreen)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Capsule().fill(CommenterColors.accent))
+                    .background(Capsule().fill(CommenterStationeryTheme.Colors.localGreenSoft))
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.footnote.weight(.semibold))
-                    .tracking(0.9)
-                    .foregroundStyle(.secondary)
+                TapeLabel(title)
                 if let detail, !detail.isEmpty {
                     Text(detail)
                         .font(.caption)
                         .textCase(nil)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                        .padding(.top, 4)
                 }
             }
             Spacer(minLength: 0)
@@ -123,30 +109,7 @@ public struct StatusChip: View {
     }
 
     public var body: some View {
-        Label(text, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .lineLimit(2)
-            .minimumScaleFactor(0.8)
-            .foregroundStyle(color)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(color.opacity(0.14)))
-            .accessibilityElement(children: .combine)
-    }
-
-    private var color: Color {
-        switch tone {
-        case .neutral, .busy:
-            return .secondary
-        case .success:
-            return CommenterColors.success
-        case .warning:
-            return CommenterColors.warning
-        case .failure:
-            return CommenterColors.failure
-        case .prepared:
-            return CommenterColors.accent
-        }
+        StationeryStatusChip(text, systemImage: systemImage, tone: tone.stationeryTone)
     }
 }
 
@@ -175,46 +138,15 @@ public struct CommenterActionRow: View {
     }
 
     public var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.headline)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(iconColor)
-                .frame(width: 28)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(textColor)
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 8)
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-        }
-        .contentShape(Rectangle())
-        .opacity(isEnabled ? 1 : 0.48)
-        .accessibilityElement(children: .combine)
+        StationeryActionRow(
+            title: title,
+            subtitle: subtitle,
+            systemImage: systemImage,
+            tone: isDestructive ? .failure : .action,
+            isEnabled: isEnabled,
+            showsChevron: showsChevron
+        )
         .accessibilityAddTraits(.isButton)
-    }
-
-    private var iconColor: Color {
-        if !isEnabled { return .secondary }
-        return isDestructive ? CommenterColors.failure : CommenterColors.accent
-    }
-
-    private var textColor: Color {
-        if !isEnabled { return .secondary }
-        return isDestructive ? CommenterColors.failure : .primary
     }
 }
 
@@ -243,36 +175,14 @@ public struct CommenterEmptyState: View {
     }
 
     public var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: systemImage)
-                .font(.system(size: 42, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(CommenterColors.accent)
-                .accessibilityHidden(true)
-            VStack(spacing: 6) {
-                Text(title)
-                    .font(.title3.weight(.medium))
-                    .multilineTextAlignment(.center)
-                Text(message)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let primaryActionTitle, let primaryAction {
-                Button(action: primaryAction) {
-                    Label(primaryActionTitle, systemImage: "arrow.right.circle")
-                        .font(.body.weight(.semibold))
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isActionDisabled)
-                .accessibilityIdentifier("empty-state-primary-action")
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
-        .padding(.horizontal, 8)
-        .accessibilityElement(children: .contain)
+        StationeryEmptyState(
+            systemImage: systemImage,
+            title: title,
+            message: message,
+            primaryActionTitle: primaryActionTitle,
+            isActionDisabled: isActionDisabled,
+            primaryAction: primaryAction
+        )
     }
 }
 
@@ -299,7 +209,7 @@ public struct HashBlock: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(CommenterColors.accentSoft)
+                        .fill(CommenterStationeryTheme.Colors.actionBlueSoft)
                 )
         }
         .accessibilityElement(children: .combine)

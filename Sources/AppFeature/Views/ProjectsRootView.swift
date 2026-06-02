@@ -15,110 +15,78 @@ struct ProjectsRootView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    OperationStatusView(status: operationStatus, onDismiss: onDismissStatus)
-                    storageStatusContent
-                } header: {
-                    CommenterSectionHeader("Storage", detail: "Verified local project files on this device")
+            StationeryScreen(scrollAccessibilityIdentifier: "projects-list") {
+                StationeryPageHeader("Report Writer", subtitle: "Your reporting companion")
+
+                if hasVisibleOperationStatus {
+                    NotebookCard(showsPerforation: false) {
+                        OperationStatusView(status: operationStatus, onDismiss: onDismissStatus)
+                    }
                 }
 
-                Section {
-                    Button(action: onCreateProject) {
-                        CommenterActionRow(
-                            title: "Create Project",
-                            subtitle: "Name a class, choose the year level, and start with all curriculum areas selected.",
-                            systemImage: "plus.circle",
-                            isEnabled: canStartProjectStorageAction
-                        )
+                stationerySection(
+                    title: "Storage",
+                    detail: "Verified local project files on this device.",
+                    tone: storageTone
+                ) {
+                    NotebookCard(showsPaperclip: true) {
+                        storageStatusContent
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canStartProjectStorageAction)
-                    .accessibilityIdentifier("create-project-button")
-
-                    Button(action: onImportBackup) {
-                        CommenterActionRow(
-                            title: "Import Project Backup",
-                            subtitle: "Restore a verified Commenter JSON backup into local project storage.",
-                            systemImage: "square.and.arrow.down",
-                            isEnabled: canStartProjectStorageAction
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canStartProjectStorageAction)
-
-                    if !canStartProjectStorageAction {
-                        Text(projectActionUnavailableMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                } header: {
-                    CommenterSectionHeader("Project actions")
                 }
 
-                Section {
-                    if projects.isEmpty {
-                        CommenterEmptyState(
-                            systemImage: "folder.badge.plus",
-                            title: "No saved projects",
-                            message: "Create your first local project or import a verified backup to start building a roster and report drafts.",
-                            primaryActionTitle: "Create your first project",
-                            isActionDisabled: !canStartProjectStorageAction,
-                            primaryAction: onCreateProject
-                        )
-                    } else {
-                        ForEach(projects) { project in
-                            Button {
-                                onOpenProject(project.id)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "folder")
-                                        .font(.title3)
-                                        .foregroundStyle(CommenterColors.accent)
-                                        .accessibilityHidden(true)
-                                    ProjectSummaryCard(
-                                        name: project.name,
-                                        term: project.term,
-                                        revision: project.revision
-                                    )
-                                    Spacer(minLength: 8)
-                                    Image(systemName: "chevron.right")
-                                        .font(.footnote.weight(.semibold))
-                                        .foregroundStyle(.tertiary)
-                                        .accessibilityHidden(true)
-                                }
+                stationerySection(title: "Project actions") {
+                    NotebookCard {
+                        VStack(spacing: 0) {
+                            Button(action: onCreateProject) {
+                                StationeryActionRow(
+                                    title: "Create Project",
+                                    subtitle: "Name a class, choose the year level, and start with all curriculum areas selected.",
+                                    systemImage: "plus.circle",
+                                    tone: .action,
+                                    isEnabled: canStartProjectStorageAction
+                                )
                             }
                             .buttonStyle(.plain)
                             .disabled(!canStartProjectStorageAction)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    onDeleteProject(project)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                .disabled(!canStartProjectStorageAction)
+                            .accessibilityIdentifier("create-project-button")
+
+                            Divider()
+                                .padding(.vertical, 12)
+
+                            Button(action: onImportBackup) {
+                                StationeryActionRow(
+                                    title: "Import Project Backup",
+                                    subtitle: "Restore a verified Report Writer JSON backup into local project storage.",
+                                    systemImage: "square.and.arrow.down",
+                                    tone: .action,
+                                    isEnabled: canStartProjectStorageAction
+                                )
                             }
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    onDeleteProject(project)
-                                } label: {
-                                    Label("Delete Project", systemImage: "trash")
-                                }
-                                .disabled(!canStartProjectStorageAction)
+                            .buttonStyle(.plain)
+                            .disabled(!canStartProjectStorageAction)
+
+                            if !canStartProjectStorageAction {
+                                Divider()
+                                    .padding(.vertical, 12)
+                                Text(projectActionUnavailableMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                     }
-                } header: {
-                    CommenterSectionHeader("Saved projects", detail: savedProjectsHeaderDetail)
+                }
+
+                stationerySection(title: "Saved projects", detail: savedProjectsHeaderDetail) {
+                    if projects.isEmpty {
+                        emptyProjectsCard
+                    } else {
+                        savedProjectsCards
+                    }
                 }
             }
-            .commenterGroupedListStyle()
-            .scrollIndicators(.visible)
-            .background(CommenterColors.groupedBackground)
             .navigationTitle("Projects")
-            .commenterLargeNavigationTitle()
-            .accessibilityIdentifier("projects-list")
+            .commenterInlineNavigationTitle()
         }
         .accessibilityIdentifier("projects-page")
     }
@@ -133,6 +101,26 @@ struct ProjectsRootView: View {
     private var savedProjectsHeaderDetail: String? {
         guard !projects.isEmpty else { return "Create a project to populate this list." }
         return projects.count == 1 ? "1 verified local project" : "\(projects.count) verified local projects"
+    }
+
+    private var hasVisibleOperationStatus: Bool {
+        switch operationStatus {
+        case .idle:
+            return false
+        case .busy, .saved, .failed, .prepared, .shared, .cancelled, .dirty:
+            return true
+        }
+    }
+
+    private var storageTone: StationeryTone {
+        switch status {
+        case .loaded:
+            return .local
+        case .failed:
+            return .failure
+        case .notLoaded, .loading, .creating, .loadingProject, .saving, .deleting, .preparingFile, .importing, .generating:
+            return .warning
+        }
     }
 
     private var projectActionUnavailableMessage: String {
@@ -152,36 +140,139 @@ struct ProjectsRootView: View {
     private var storageStatusContent: some View {
         switch status {
         case .notLoaded, .loading:
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 ProgressView()
-                Text("Checking local project storage")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Checking local project storage")
+                        .font(.headline)
+                    Text("Project actions will unlock after the local store finishes loading.")
+                        .font(.subheadline)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .accessibilityElement(children: .combine)
         case .creating, .loadingProject, .saving, .deleting, .preparingFile, .importing, .generating:
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 ProgressView()
-                Text(message)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(currentStorageOperationTitle)
+                        .font(.headline)
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .accessibilityElement(children: .combine)
         case .loaded:
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "externaldrive.fill.badge.checkmark")
-                    .font(.title3)
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(CommenterColors.success)
-                    .accessibilityHidden(true)
+                StatusIconBubble(systemImage: "externaldrive.fill.badge.checkmark", tone: .local)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Local storage ready")
                         .font(.headline)
                     Text(message)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
-                    StatusChip("Verified", systemImage: "checkmark.seal", tone: .success)
+                    StationeryStatusChip("Verified", systemImage: "checkmark.seal", tone: .success)
                 }
             }
         case let .failed(message):
             UnavailableFeatureNotice(title: "Project storage unavailable", message: message)
+        }
+    }
+
+    @ViewBuilder
+    private func stationerySection<Content: View>(
+        title: String,
+        detail: String? = nil,
+        tone: StationeryTone = .neutral,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TapeLabel(title, tone: tone)
+            if let detail, !detail.isEmpty {
+                HandwrittenAnnotation(detail)
+                    .padding(.leading, 4)
+            }
+            content()
+        }
+    }
+
+    private var emptyProjectsCard: some View {
+        StationeryEmptyState(
+            systemImage: "shippingbox",
+            title: "No projects yet",
+            message: "Get started by creating your first local project.",
+            primaryActionTitle: "Create your first project",
+            isActionDisabled: !canStartProjectStorageAction,
+            primaryAction: onCreateProject
+        )
+    }
+
+    private var savedProjectsCards: some View {
+        VStack(spacing: 12) {
+            ForEach(projects) { project in
+                Button {
+                    onOpenProject(project.id)
+                } label: {
+                    NotebookCard(showsPerforation: false) {
+                        HStack(spacing: 12) {
+                            StatusIconBubble(systemImage: "folder", tone: .local)
+                            ProjectSummaryCard(
+                                name: project.name,
+                                term: project.term,
+                                revision: project.revision
+                            )
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(!canStartProjectStorageAction)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        onDeleteProject(project)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .disabled(!canStartProjectStorageAction)
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        onDeleteProject(project)
+                    } label: {
+                        Label("Delete Project", systemImage: "trash")
+                    }
+                    .disabled(!canStartProjectStorageAction)
+                }
+            }
+        }
+    }
+
+    private var currentStorageOperationTitle: String {
+        switch status {
+        case .creating:
+            return "Creating project"
+        case .loadingProject:
+            return "Opening project"
+        case .saving:
+            return "Saving project"
+        case .deleting:
+            return "Deleting project"
+        case .preparingFile:
+            return "Preparing file"
+        case .importing:
+            return "Importing backup"
+        case .generating:
+            return "Generating reports"
+        case .notLoaded, .loading, .loaded, .failed:
+            return "Local operation in progress"
         }
     }
 }

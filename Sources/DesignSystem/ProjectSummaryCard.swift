@@ -12,20 +12,27 @@ public struct ProjectSummaryCard: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(name)
-                .font(.body.weight(.semibold))
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
-            HStack(spacing: 6) {
-                Text(term)
-                if let revision {
-                    Text("-")
-                    Text("Revision \(revision)")
+        NotebookCard(showsPaperclip: true) {
+            HStack(alignment: .top, spacing: 12) {
+                StatusIconBubble(systemImage: "folder", tone: .local)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(name)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.85)
+                    HStack(spacing: 6) {
+                        Text(term)
+                        if let revision {
+                            Text("-")
+                            Text("Revision \(revision)")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
                 }
+                Spacer(minLength: 0)
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
     }

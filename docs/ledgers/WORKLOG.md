@@ -2,6 +2,40 @@
 
 Append material work history here. Keep entries short, dated, and factual.
 
+## 2026-06-02 - Shared stationery review fix
+
+- Replaced Work list-only stationery drawing primitives with shared
+  `DesignSystem` stationery components and theme values.
+- Tightened the shared workflow timeline connector frame to the fixed-size
+  SwiftUI modifier shape used by hosted CI diagnostics.
+
+## 2026-06-02 - CI and screenshot workflow hardening
+
+- Updated iOS CI to cache SwiftPM artifacts and Xcode derived data, bound the
+  main CI job with a timeout, and uploaded xcodebuild logs/result bundles for
+  failure diagnostics.
+- Hardened screenshot attachment export to keep direct screenshot files, fall
+  back when the xcresult manifest shape changes, and upload the xcodebuild log
+  with screenshot artifacts.
+- Updated validation ledger wording to the current
+  `testCoreReportFlowScreenshots` 14-screenshot workflow.
+
+## 2026-06-01 - Preferred stationery redesign and Report Writer naming
+
+- Applied the preferred stationery handoff to native SwiftUI project, worklist,
+  support, status, empty-state, and reusable design-system surfaces.
+- Changed user-facing app/product naming, bundle display name, support
+  diagnostics, export fallbacks, temp export folder names, and DOCX metadata to
+  `Report Writer`.
+- Changed newly generated backup filenames to the user-facing
+  `.report-writer-backup.json` suffix while retaining legacy
+  `.commenter-backup.json` import compatibility.
+- Preserved existing local persistence, generation, import/export, diagnostics,
+  and availability gates; no reference screenshots or web views were added.
+- Recorded that Swift package, Swift tests, and Xcode build validation were
+  blocked on this Windows environment because Swift/Xcode tools were not
+  available on PATH.
+
 ## 2026-05-31 - OSS dependency policy guardrail
 
 - Added `docs/OSS_DEPENDENCY_POLICY.md` as the binding OSS/native-first package

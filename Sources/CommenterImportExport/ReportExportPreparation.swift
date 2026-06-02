@@ -220,7 +220,7 @@ public func reportExportFilename(project: Project, format: ImportExportFormat, s
     guard [.docx, .xlsx, .xls].contains(format) else {
         throw ReportExportPreparationError.unsupportedFormat(format)
     }
-    let base = safeFileName(project.metadata.name, fallback: "Commenter")
+    let base = safeFileName(project.metadata.name, fallback: "ReportWriter")
     let suffix: String
     if let studentId {
         guard let student = project.roster.first(where: { $0.id == studentId }) else {

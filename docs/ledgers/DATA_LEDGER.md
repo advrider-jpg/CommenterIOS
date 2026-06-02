@@ -94,8 +94,11 @@ keys recursively, serializes to compact JSON, and hashes with SHA-256. This is
 the source-truth contract from `C:\Commenterv3\client\src\lib\backup.ts` and
 `C:\Commenterv3\client\src\lib\persistence-fingerprint.ts`.
 
-Native backup file import/export workflows and durable commit semantics are not
-complete yet.
+Native backup file import/export workflows preserve the internal
+`commenter-project-backup` payload format for CommenterV3 compatibility. New
+Report Writer backup files use the user-facing
+`*.report-writer-backup.json` filename suffix; the legacy
+`*.commenter-backup.json` suffix remains accepted for import compatibility.
 
 ## Dataset Validation Contract
 

@@ -129,12 +129,12 @@ extension ProjectStoreClient: DependencyKey {
         },
         prepareBackup: { project in
             let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("CommenterIOSExports", isDirectory: true)
+                .appendingPathComponent("ReportWriterExports", isDirectory: true)
             return try prepareProjectBackupFile(project: project, directory: directory).url
         },
         prepareReportExport: { project, format in
             let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("CommenterIOSExports", isDirectory: true)
+                .appendingPathComponent("ReportWriterExports", isDirectory: true)
             switch format {
             case .docx:
                 return try prepareReportDocumentFile(project: project, format: format, directory: directory).url

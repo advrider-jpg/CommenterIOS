@@ -385,16 +385,16 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   app-target `xcodebuild` build with package plugin and macro validation
   skipped for noninteractive CI.
 - Added a separate `iOS Screenshots` GitHub Actions workflow for real simulator
-  screenshot evidence. The intended hosted command is `xcodebuild test -project
+  screenshot evidence. The current hosted command is `xcodebuild test -project
   CommenterIOS.xcodeproj -scheme CommenterIOS -destination <available iPhone
-  simulator> -only-testing:CommenterIOSScreenshotTests/CommenterIOSScreenshotTests/testCoreAppPages
+  simulator> -only-testing:CommenterIOSScreenshotTests/CommenterIOSScreenshotTests/testCoreReportFlowScreenshots
   -resultBundlePath build/CommenterIOSScreenshots.xcresult
   -skipPackagePluginValidation -skipMacroValidation ARCHS=arm64
   CODE_SIGNING_ALLOWED=NO` with `COMMENTER_SCREENSHOT_DIR` set to
-  `build/screenshots`. The workflow verifies at least ten PNG files and uploads
-  them with the `.xcresult` bundle. This live Windows checkout cannot execute
-  the new workflow locally because `swift`, `xcodebuild`, and `xcrun` are not
-  installed.
+  `build/screenshots`. The workflow verifies 14 required PNG files and uploads
+  them with the `.xcresult` bundle and xcodebuild log. This live Windows
+  checkout cannot execute the workflow locally because `swift`, `xcodebuild`,
+  and `xcrun` are not installed.
 - Manual workflow run `26725511774` proved package resolution, simulator
   selection, app build, launch, project creation, and the first four screenshot
   captures reached the hosted simulator, then failed because the test looked for
@@ -402,18 +402,28 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   anchors worklist captures on real visible controls inside each area instead
   of section headers.
 - Manual workflow runs `26725702774` and `26725932729` proved the hosted
-  screenshot UI test passes through all ten core captures and uploads the
-  `.xcresult`, but both failed the PNG verification step because the raw
-  `build/screenshots` directory was empty. The screenshot workflow now exports
-  kept XCTest attachments from `build/CommenterIOSScreenshots.xcresult` into
-  stable PNG files before running the existing count check and artifact upload.
+  screenshot UI test passed through the earlier ten-capture flow and uploaded
+  the `.xcresult`, but both failed the PNG verification step because the raw
+  `build/screenshots` directory was empty. The screenshot workflow now keeps
+  direct `COMMENTER_SCREENSHOT_DIR` output, exports kept XCTest attachments
+  from `build/CommenterIOSScreenshots.xcresult` when present, falls back to a
+  recursive PNG scan if the xcresult manifest shape changes, and verifies the
+  14 current required screenshot names before artifact upload.
 - Manual workflow run `26726339250` on `main` commit
-  `d9d09f63b49a3b62ca3ba79599917cc086feab7f` passed the full screenshot
+  `d9d09f63b49a3b62ca3ba79599917cc086feab7f` passed the older screenshot
   workflow: package resolve, hosted iPhone simulator selection, screenshot UI
-  test, `.xcresult` attachment export, ten-PNG verification, and artifact
-  upload. The `commenter-ios-core-screenshots` artifact ID was `7320654221`;
+  test, `.xcresult` attachment export, older ten-screenshot verification, and
+  artifact upload. The `commenter-ios-core-screenshots` artifact ID was
+  `7320654221`;
   downloading it locally produced exactly ten stable PNG files named
-  `01-projects.png` through `10-support-with-project.png`.
+  `01-projects.png` through `10-support-with-project.png`. That evidence is now
+  stale relative to the current 14-screenshot
+  `testCoreReportFlowScreenshots` workflow.
+
+- The current PR workflow configuration adds SwiftPM caches for `.build` and
+  `.swiftpm`, Xcode derived-data caches under `build/DerivedData`, a
+  `timeout-minutes` limit for the main iOS CI job, xcodebuild result bundles,
+  xcodebuild log capture, and failure artifact uploads for CI diagnosis.
 
 ## Future Required Gates
 
