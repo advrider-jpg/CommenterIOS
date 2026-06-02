@@ -91,9 +91,9 @@ public func loadProjectBackupFile(
 }
 
 public func backupFilename(project: Project, createdAt: Date = Date()) -> String {
-    let projectName = safeFilenameComponent(project.metadata.name).nilIfEmpty ?? "commenter-project"
+    let projectName = safeFilenameComponent(project.metadata.name).nilIfEmpty ?? "report-writer-project"
     let timestamp = backupTimestamp(createdAt)
-    return "\(projectName)-\(timestamp).commenter-backup.json"
+    return "\(projectName)-\(timestamp).report-writer-backup.json"
 }
 
 private func ensureWritableDirectory(_ directory: URL, fileManager: FileManager) throws {

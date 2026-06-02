@@ -10,7 +10,7 @@ enum ImportMode {
     var allowedContentTypes: [UTType] {
         switch self {
         case .backup:
-            return [.json, .commenterBackup]
+            return [.json, .reportWriterBackup, .commenterBackup]
         case .roster, .results:
             return [.commaSeparatedText, .xlsxWorkbook, .xlsWorkbook]
         }
@@ -53,7 +53,7 @@ struct PreparedExportDocument: FileDocument {
             throw Error.missingPreparedFile("selected file")
         }
         self.contentType = configuration.contentType
-        self.defaultFilename = "CommenterExport"
+        self.defaultFilename = "ReportWriterExport"
     }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
@@ -67,6 +67,7 @@ struct PreparedExportDocument: FileDocument {
 extension UTType {
     static let xlsxWorkbook = UTType(filenameExtension: "xlsx") ?? .data
     static let xlsWorkbook = UTType(filenameExtension: "xls") ?? .data
+    static let reportWriterBackup = UTType(filenameExtension: "report-writer-backup.json") ?? .json
     static let commenterBackup = UTType(filenameExtension: "commenter-backup.json") ?? .json
 }
 

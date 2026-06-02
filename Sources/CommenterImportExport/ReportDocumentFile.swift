@@ -288,7 +288,7 @@ private let footerXML = documentXMLDeclaration
 
 private func corePropertiesXML(title: String) -> String {
     documentXMLDeclaration
-        + #"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>\#(documentEscape(title))</dc:title><dc:creator>Commenter</dc:creator><dc:description>Student reports</dc:description></cp:coreProperties>"#
+        + #"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>\#(documentEscape(title))</dc:title><dc:creator>Report Writer</dc:creator><dc:description>Student reports</dc:description></cp:coreProperties>"#
 }
 
 private func documentEscape(_ value: String) -> String {
@@ -320,7 +320,7 @@ private let documentRelationshipsXML = documentXMLDeclaration + #"""
 """#
 
 private let documentAppPropertiesXML = documentXMLDeclaration + #"""
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Commenter</Application></Properties>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Report Writer</Application></Properties>
 """#
 
 private let documentStylesXML = documentXMLDeclaration + #"""

@@ -10,17 +10,19 @@ public struct UnavailableFeatureNotice: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        NotebookCard(showsPaperclip: true) {
+            HStack(alignment: .top, spacing: 12) {
+                StatusIconBubble(systemImage: "exclamationmark.triangle", tone: .warning)
+                VStack(alignment: .leading, spacing: 8) {
+                    TapeLabel(title, tone: .warning)
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
     }
 }

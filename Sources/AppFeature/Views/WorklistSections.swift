@@ -17,66 +17,80 @@ struct ProjectMetadataSection: View {
 
     var body: some View {
         Section {
-            TextField("Project name", text: Binding(get: { project.metadata.name }, set: onNameChanged))
-                .commenterWordsTextInput()
-                .disabled(isDisabled)
-                .accessibilityHint("Use a descriptive class and year name.")
-                .accessibilityIdentifier("project-name-field")
-            HStack(spacing: 10) {
-                Image(systemName: "pencil.line")
-                    .foregroundStyle(CommenterColors.accent)
-                    .accessibilityHidden(true)
-                TextField("Term", text: Binding(get: { project.metadata.term }, set: onTermChanged))
-                    .disabled(isDisabled)
-                    .accessibilityIdentifier("project-term-field")
-            }
-            Picker("Project year level", selection: Binding(get: { project.metadata.yearLevel }, set: onYearLevelChanged)) {
-                Text("Year 5").tag(ProjectYearLevel.year5)
-                Text("Year 6").tag(ProjectYearLevel.year6)
-                Text("Mixed").tag(ProjectYearLevel.mixed)
-            }
-            .disabled(isDisabled)
-            Toggle(isOn: Binding(get: { project.metadata.useFirstNameOnly }, set: onUseFirstNameOnlyChanged)) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Use first names in reports")
-                    Text("Applies to generated draft text and prepared DOCX/XLSX/XLS report headings.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            WorklistNotebookCard(clipped: true) {
+                WorklistFormRow(systemImage: "book") {
+                    TextField("Project name", text: Binding(get: { project.metadata.name }, set: onNameChanged))
+                        .commenterWordsTextInput()
+                        .disabled(isDisabled)
+                        .accessibilityHint("Use a descriptive class and year name.")
+                        .accessibilityIdentifier("project-name-field")
                 }
+                WorklistRuledDivider()
+                WorklistFormRow(systemImage: "pencil") {
+                    TextField("Term", text: Binding(get: { project.metadata.term }, set: onTermChanged))
+                        .disabled(isDisabled)
+                        .accessibilityIdentifier("project-term-field")
+                }
+                WorklistRuledDivider()
+                WorklistFormRow {
+                    Picker("Project year level", selection: Binding(get: { project.metadata.yearLevel }, set: onYearLevelChanged)) {
+                        Text("Year 5").tag(ProjectYearLevel.year5)
+                        Text("Year 6").tag(ProjectYearLevel.year6)
+                        Text("Mixed").tag(ProjectYearLevel.mixed)
+                    }
+                    .disabled(isDisabled)
+                }
+                WorklistRuledDivider()
+                Toggle(isOn: Binding(get: { project.metadata.useFirstNameOnly }, set: onUseFirstNameOnlyChanged)) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Use first names in reports")
+                            .foregroundStyle(WorklistStationery.ink)
+                        Text("Applies to generated draft text and prepared DOCX/XLSX/XLS report headings.")
+                            .font(.footnote)
+                            .foregroundStyle(WorklistStationery.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(WorklistStationery.localGreen)
+                .disabled(isDisabled)
+                .padding(.vertical, 10)
+                WorklistRuledDivider()
+                Button(action: onSave) {
+                    WorklistActionRow(
+                        title: "Save Project",
+                        subtitle: lastSavedText,
+                        systemImage: "square.and.arrow.down",
+                        tone: .local,
+                        isEnabled: !isDisabled
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled)
+                .accessibilityIdentifier("save-project-button")
             }
-            .disabled(isDisabled)
-            Button(action: onSave) {
-                CommenterActionRow(
-                    title: "Save Project",
-                    subtitle: lastSavedText,
-                    systemImage: "square.and.arrow.down",
-                    isEnabled: !isDisabled,
-                    showsChevron: false
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(isDisabled)
-            .accessibilityIdentifier("save-project-button")
+            .worklistSectionRow()
         } header: {
-            CommenterSectionHeader("Project", step: 1, detail: "Name, class context, save status")
+            WorklistTapeHeader("Project", step: 1, detail: "Name, class context, save status", tone: .local)
         }
 
         Section {
-            Button(role: .destructive, action: onDeleteProject) {
-                CommenterActionRow(
-                    title: "Delete Project",
-                    subtitle: deleteSubtitle,
-                    systemImage: "trash",
-                    isEnabled: !isDisabled && deleteDisabledReason == nil,
-                    isDestructive: true,
-                    showsChevron: false
-                )
+            WorklistNotebookCard(perforated: false) {
+                Button(role: .destructive, action: onDeleteProject) {
+                    WorklistActionRow(
+                        title: "Delete Project",
+                        subtitle: deleteSubtitle,
+                        systemImage: "trash",
+                        tone: .failure,
+                        isEnabled: !isDisabled && deleteDisabledReason == nil,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled || deleteDisabledReason != nil)
             }
-            .buttonStyle(.plain)
-            .disabled(isDisabled || deleteDisabledReason != nil)
+            .worklistSectionRow()
         } header: {
-            CommenterSectionHeader("Danger zone")
+            WorklistTapeHeader("Danger zone", tone: .failure)
         } footer: {
             Text("A confirmation dialog appears before deletion. A local recovery snapshot is created first when the verified project file can be reached.")
                 .font(.footnote)
@@ -102,34 +116,40 @@ struct ImportPreviewSection: View {
 
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(preview.title)
-                    .font(.headline)
-                Text(preview.detail)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                StatusChip("\(preview.acceptedRows) accepted", systemImage: "checkmark.seal", tone: preview.acceptedRows > 0 ? .success : .warning)
+            WorklistNotebookCard(clipped: true) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(preview.title)
+                        .font(WorklistStationery.titleFont)
+                        .foregroundStyle(WorklistStationery.ink)
+                    Text(preview.detail)
+                        .foregroundStyle(WorklistStationery.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                    WorklistStatusChip("\(preview.acceptedRows) accepted", systemImage: "checkmark.seal", tone: preview.acceptedRows > 0 ? .success : .warning)
+                }
+                if isSaving {
+                    WorklistRuledDivider()
+                    ProgressView("Saving confirmed import and verifying local storage")
+                        .tint(WorklistStationery.localGreen)
+                } else {
+                    WorklistRuledDivider()
+                    WorklistNote("Project data will not change until this import is confirmed and the local save verifies.")
+                }
+                WorklistRuledDivider()
+                Button(action: onConfirm) {
+                    WorklistActionRow(title: "Confirm Import", systemImage: "checkmark.circle", tone: .local, isEnabled: !isSaving, showsChevron: false)
+                }
+                .buttonStyle(.plain)
+                .disabled(isSaving)
+                WorklistRuledDivider()
+                Button(role: .cancel, action: onCancel) {
+                    WorklistActionRow(title: "Cancel Import", systemImage: "xmark.circle", tone: .warning, isEnabled: !isSaving, showsChevron: false)
+                }
+                .buttonStyle(.plain)
+                .disabled(isSaving)
             }
-            if isSaving {
-                ProgressView("Saving confirmed import and verifying local storage")
-            } else {
-                Text("Project data will not change until this import is confirmed and the local save verifies.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Button(action: onConfirm) {
-                CommenterActionRow(title: "Confirm Import", systemImage: "checkmark.circle", isEnabled: !isSaving, showsChevron: false)
-            }
-            .buttonStyle(.plain)
-            .disabled(isSaving)
-            Button(role: .cancel, action: onCancel) {
-                CommenterActionRow(title: "Cancel Import", systemImage: "xmark.circle", isEnabled: !isSaving, showsChevron: false)
-            }
-            .buttonStyle(.plain)
-            .disabled(isSaving)
+            .worklistSectionRow()
         } header: {
-            CommenterSectionHeader("Import preview", detail: "All-or-nothing local save")
+            WorklistTapeHeader("Import preview", detail: "All-or-nothing local save", tone: .warning)
         }
     }
 }
@@ -147,69 +167,82 @@ struct RosterSection: View {
 
     var body: some View {
         Section {
-            tabularImportStatus(importState, emptyLabel: "Roster not imported")
-            Button(action: onImportRoster) {
-                CommenterActionRow(
-                    title: "Import Roster CSV, XLSX, or XLS",
-                    subtitle: "Preview and confirm student names before the verified local project changes.",
-                    systemImage: "square.and.arrow.down",
-                    isEnabled: !isDisabled
-                )
+            WorklistNotebookCard(clipped: true) {
+                tabularImportStatus(importState, emptyLabel: "Roster not imported")
+                WorklistRuledDivider()
+                Button(action: onImportRoster) {
+                    WorklistActionRow(
+                        title: "Import Roster CSV, XLSX, or XLS",
+                        subtitle: "Preview and confirm student names before the verified local project changes.",
+                        systemImage: "square.and.arrow.down",
+                        tone: .action,
+                        isEnabled: !isDisabled
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled)
+                WorklistRuledDivider()
+                Button(action: onAddStudent) {
+                    WorklistActionRow(
+                        title: "Add Student",
+                        subtitle: "Add a student manually when a roster file is not available.",
+                        systemImage: "person.badge.plus",
+                        tone: .local,
+                        isEnabled: !isDisabled
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled)
+                .accessibilityIdentifier("add-student-button")
             }
-            .buttonStyle(.plain)
-            .disabled(isDisabled)
-            Button(action: onAddStudent) {
-                CommenterActionRow(
-                    title: "Add Student",
-                    subtitle: "Add a student manually when a roster file is not available.",
-                    systemImage: "person.badge.plus",
-                    isEnabled: !isDisabled
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(isDisabled)
-            .accessibilityIdentifier("add-student-button")
-
+            .worklistSectionRow()
             if project.roster.isEmpty {
-                CommenterEmptyState(
+                WorklistEmptyCard(
                     systemImage: "person.2.badge.plus",
                     title: "No students yet",
                     message: "Add students manually or import a roster file before entering results or generating draft comments."
                 )
+                .worklistSectionRow()
             } else {
-                ForEach(project.roster) { student in
-                    NavigationLink {
-                        StudentEditorView(
-                            student: student,
-                            isDisabled: isDisabled,
-                            onFirstNameChanged: { onFirstNameChanged(student.id, $0) },
-                            onLastNameChanged: { onLastNameChanged(student.id, $0) },
-                            onYearChanged: { onYearChanged(student.id, $0) },
-                            onDelete: { onDeleteStudent(student.id) }
-                        )
-                    } label: {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(fullStudentName(student))
-                                .font(.body.weight(.semibold))
-                            Text(student.yearLevel.rawValue)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(isDisabled)
-                    .accessibilityIdentifier("student-row-\(student.id)")
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            onDeleteStudent(student.id)
+                WorklistNotebookCard {
+                    ForEach(project.roster) { student in
+                        NavigationLink {
+                            StudentEditorView(
+                                student: student,
+                                isDisabled: isDisabled,
+                                onFirstNameChanged: { onFirstNameChanged(student.id, $0) },
+                                onLastNameChanged: { onLastNameChanged(student.id, $0) },
+                                onYearChanged: { onYearChanged(student.id, $0) },
+                                onDelete: { onDeleteStudent(student.id) }
+                            )
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            WorklistActionRow(
+                                title: fullStudentName(student),
+                                subtitle: student.yearLevel.rawValue,
+                                systemImage: "person.text.rectangle",
+                                tone: .local,
+                                isEnabled: !isDisabled
+                            )
                         }
                         .disabled(isDisabled)
+                        .accessibilityIdentifier("student-row-\(student.id)")
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                onDeleteStudent(student.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .disabled(isDisabled)
+                        }
+                        if student.id != project.roster.last?.id {
+                            WorklistRuledDivider()
+                        }
                     }
                 }
+                .worklistSectionRow()
             }
         } header: {
-            CommenterSectionHeader("Roster", step: 2, detail: "Students required before results and drafts")
+            WorklistTapeHeader("Roster", step: 2, detail: "Students required before results and drafts", tone: .local)
         }
     }
 }
@@ -225,30 +258,45 @@ private struct StudentEditorView: View {
     var body: some View {
         Form {
             Section {
-                TextField("First name", text: Binding(get: { student.firstName }, set: onFirstNameChanged))
-                    .commenterWordsTextInput()
+                WorklistNotebookCard(clipped: true) {
+                    WorklistFormRow(label: "First name") {
+                        TextField("First name", text: Binding(get: { student.firstName }, set: onFirstNameChanged))
+                            .commenterWordsTextInput()
+                            .disabled(isDisabled)
+                            .accessibilityIdentifier("student-first-name-\(student.id)")
+                    }
+                    WorklistRuledDivider()
+                    WorklistFormRow(label: "Surname") {
+                        TextField("Last name", text: Binding(get: { student.lastName }, set: onLastNameChanged))
+                            .commenterWordsTextInput()
+                            .disabled(isDisabled)
+                            .accessibilityIdentifier("student-last-name-\(student.id)")
+                    }
+                    WorklistRuledDivider()
+                    Picker("Year", selection: Binding(get: { student.yearLevel }, set: onYearChanged)) {
+                        Text("Year 5").tag(StudentYearLevel.year5)
+                        Text("Year 6").tag(StudentYearLevel.year6)
+                    }
+                    .pickerStyle(.segmented)
                     .disabled(isDisabled)
-                    .accessibilityIdentifier("student-first-name-\(student.id)")
-                TextField("Last name", text: Binding(get: { student.lastName }, set: onLastNameChanged))
-                    .commenterWordsTextInput()
-                    .disabled(isDisabled)
-                    .accessibilityIdentifier("student-last-name-\(student.id)")
-                Picker("Year", selection: Binding(get: { student.yearLevel }, set: onYearChanged)) {
-                    Text("Year 5").tag(StudentYearLevel.year5)
-                    Text("Year 6").tag(StudentYearLevel.year6)
+                    .padding(.top, 10)
                 }
-                .pickerStyle(.segmented)
-                .disabled(isDisabled)
+                .worklistSectionRow()
             } header: {
-                CommenterSectionHeader("Student details")
+                WorklistTapeHeader("Student details", tone: .neutral)
             }
             Section {
-                Button(role: .destructive, action: onDelete) {
-                    Label("Delete Student", systemImage: "trash")
+                WorklistNotebookCard(perforated: false) {
+                    Button(role: .destructive, action: onDelete) {
+                        WorklistActionRow(title: "Delete Student", systemImage: "trash", tone: .failure, isEnabled: !isDisabled, showsChevron: false)
+                    }
+                    .disabled(isDisabled)
                 }
-                .disabled(isDisabled)
+                .worklistSectionRow()
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(WorklistStationery.paperBackground)
         .navigationTitle(fullStudentName(student))
         .commenterInlineNavigationTitle()
     }
@@ -263,47 +311,53 @@ struct SubjectsSection: View {
 
     var body: some View {
         Section {
-            HStack(spacing: 12) {
-                Button(action: onSelectAll) {
-                    Label("Select all", systemImage: "checkmark.circle")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(isDisabled || selectedSubjectCount == availableTeacherSubjects().count)
-                .accessibilityIdentifier("subject-select-all-button")
+            WorklistNotebookCard(clipped: true) {
+                HStack(spacing: 10) {
+                    Button(action: onSelectAll) {
+                        Label("Select all", systemImage: "checkmark.circle")
+                            .font(.footnote.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(WorklistStationery.localGreen)
+                    .disabled(isDisabled || selectedSubjectCount == availableTeacherSubjects().count)
+                    .accessibilityIdentifier("subject-select-all-button")
 
-                Button(role: .destructive, action: onDeselectAll) {
-                    Label("Deselect all", systemImage: "xmark.circle")
-                        .frame(maxWidth: .infinity)
+                    Button(role: .destructive, action: onDeselectAll) {
+                        Label("Deselect all", systemImage: "xmark.circle")
+                            .font(.footnote.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(WorklistStationery.attentionOrange)
+                    .disabled(isDisabled || selectedSubjectCount == 0)
+                    .accessibilityIdentifier("subject-deselect-all-button")
                 }
-                .buttonStyle(.bordered)
-                .disabled(isDisabled || selectedSubjectCount == 0)
-                .accessibilityIdentifier("subject-deselect-all-button")
-            }
-            .controlSize(.regular)
-            Text("Select the curriculum areas to include in this reporting cycle. At least one subject is required before results can be imported or drafts generated.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(australianCurriculumSubjectOrder) { descriptor in
-                let isSelected = project.metadata.selectedSubjects[descriptor.key] != nil
-                SubjectSelectionButton(
-                    title: descriptor.displayName,
-                    subtitle: descriptor.subtitle,
-                    isSelected: isSelected,
-                    isDisabled: isDisabled,
-                    accessibilityIdentifier: "subject-toggle-\(accessibilityKey(descriptor.key))",
-                    action: { onSubjectToggled(descriptor.key) }
-                )
-                if subjectRequiresConcreteFocus(descriptor.key), project.metadata.selectedSubjects[descriptor.key] != nil {
-                    Text("Specific focus required: \(getConcreteFocusOptions(descriptor.key).joined(separator: ", ")).")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                .controlSize(.regular)
+                WorklistRuledDivider()
+                WorklistNote("Select the curriculum areas to include in this reporting cycle. At least one subject is required before results can be imported or drafts generated.")
+                WorklistRuledDivider()
+                ForEach(australianCurriculumSubjectOrder) { descriptor in
+                    let isSelected = project.metadata.selectedSubjects[descriptor.key] != nil
+                    SubjectSelectionButton(
+                        title: descriptor.displayName,
+                        subtitle: descriptor.subtitle,
+                        isSelected: isSelected,
+                        isDisabled: isDisabled,
+                        accessibilityIdentifier: "subject-toggle-\(accessibilityKey(descriptor.key))",
+                        action: { onSubjectToggled(descriptor.key) }
+                    )
+                    if subjectRequiresConcreteFocus(descriptor.key), project.metadata.selectedSubjects[descriptor.key] != nil {
+                        WorklistNote("Specific focus required: \(getConcreteFocusOptions(descriptor.key).joined(separator: ", ")).")
+                    }
+                    if descriptor.key != australianCurriculumSubjectOrder.last?.key {
+                        WorklistRuledDivider()
+                    }
                 }
             }
+            .worklistSectionRow()
         } header: {
-            CommenterSectionHeader("Subjects", step: 3, detail: "Australian Curriculum order")
+            WorklistTapeHeader("Subjects", step: 3, detail: "Australian Curriculum order", tone: .local)
         }
     }
 
@@ -323,12 +377,20 @@ private struct SubjectSelectionButton: View {
     var body: some View {
         Button(action: action) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(isSelected ? CommenterColors.accent : Color.secondary)
+                ZStack {
+                    Circle()
+                        .stroke(isSelected ? WorklistStationery.localGreen : WorklistStationery.secondaryInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: isSelected ? [] : [5, 4]))
+                        .frame(width: 22, height: 22)
+                    if isSelected {
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(WorklistStationery.localGreen)
+                    }
+                }
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(.primary)
                     Text(subtitle)
                         .font(.footnote)
@@ -338,7 +400,7 @@ private struct SubjectSelectionButton: View {
                 Spacer(minLength: 0)
             }
             .contentShape(Rectangle())
-            .padding(.vertical, 2)
+            .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
@@ -359,44 +421,48 @@ struct ResultsSection: View {
 
     var body: some View {
         Section {
-            tabularImportStatus(importState, emptyLabel: "Results not imported")
-            Button(action: onImportResults) {
-                CommenterActionRow(
-                    title: "Import Results CSV, XLSX, or XLS",
-                    subtitle: resultsImportSubtitle,
-                    systemImage: "square.and.arrow.down",
-                    isEnabled: canImportResults
-                )
+            WorklistNotebookCard(clipped: true) {
+                tabularImportStatus(importState, emptyLabel: "Results not imported")
+                WorklistRuledDivider()
+                Button(action: onImportResults) {
+                    WorklistActionRow(
+                        title: "Import Results CSV, XLSX, or XLS",
+                        subtitle: resultsImportSubtitle,
+                        systemImage: "square.and.arrow.down",
+                        tone: .action,
+                        isEnabled: canImportResults
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canImportResults)
+                if let disabledMessage = resultsImportDisabledMessage {
+                    WorklistRuledDivider()
+                    WorklistNote(disabledMessage, tone: .warning)
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(!canImportResults)
-            if let disabledMessage = resultsImportDisabledMessage {
-                Text(disabledMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .worklistSectionRow()
 
             if project.roster.isEmpty || selectedSubjects.isEmpty {
-                CommenterEmptyState(
+                WorklistEmptyCard(
                     systemImage: "chart.bar.doc.horizontal",
                     title: "Results waiting for prerequisites",
                     message: resultsImportDisabledMessage ?? "Add students and select subjects before entering results."
                 )
+                .worklistSectionRow()
             } else if project.results.isEmpty {
-                CommenterEmptyState(
+                WorklistEmptyCard(
                     systemImage: "tray.and.arrow.down",
                     title: "No results recorded",
                     message: "Import a results file or enter achievement levels manually for each selected student and subject."
                 )
+                .worklistSectionRow()
             }
 
             ForEach(project.roster) { student in
                 ForEach(selectedSubjects, id: \.self) { subject in
                     let result = project.results.first { $0.studentId == student.id && $0.subject == subject }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("\(fullStudentName(student)) - \(displaySubjectName(subject))")
-                            .font(.headline)
+                    WorklistNotebookCard {
+                        WorklistTapeInlineTitle("\(fullStudentName(student)) - \(displaySubjectName(subject))")
                         AchievementLevelSelector(
                             selection: result?.achievementLevel,
                             onSelectionChanged: { onAchievementChanged(student.id, subject, $0) },
@@ -404,6 +470,7 @@ struct ResultsSection: View {
                             accessibilityIdentifier: "achievement-picker-\(student.id)-\(accessibilityKey(subject))"
                         )
                         if subjectRequiresConcreteFocus(subject) {
+                            WorklistRuledDivider()
                             Picker("Specific subject", selection: Binding(get: { result?.focusStrand ?? "" }, set: { onFocusChanged(student.id, subject, $0) })) {
                                 Text("Choose").tag("")
                                 ForEach(getConcreteFocusOptions(subject), id: \.self) { focus in
@@ -414,23 +481,26 @@ struct ResultsSection: View {
                             .disabled(isDisabled)
                             .accessibilityIdentifier("focus-picker-\(student.id)-\(accessibilityKey(subject))")
                         } else {
+                            WorklistRuledDivider()
                             TextField("Focus", text: Binding(get: { result?.focusStrand ?? "" }, set: { onFocusChanged(student.id, subject, $0) }))
+                                .commenterWordsTextInput()
                                 .disabled(isDisabled)
                                 .accessibilityIdentifier("focus-field-\(student.id)-\(accessibilityKey(subject))")
                         }
                         if let entry = readiness?.entries.first(where: { $0.studentId == student.id && $0.subject == subject }) {
+                            WorklistRuledDivider()
                             Label(entry.message, systemImage: isReadyForExport(entry.status) ? "checkmark.circle" : "exclamationmark.triangle")
                                 .font(.footnote)
-                                .foregroundStyle(isReadyForExport(entry.status) ? CommenterColors.success : CommenterColors.warning)
+                                .foregroundStyle(isReadyForExport(entry.status) ? WorklistStationery.localGreen : WorklistStationery.attentionOrange)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .worklistSectionRow()
                     .accessibilityIdentifier("result-card-\(student.id)-\(accessibilityKey(subject))")
                 }
             }
         } header: {
-            CommenterSectionHeader("Results", step: 4, detail: "Distinct empty, failed, zero-row, and success states")
+            WorklistTapeHeader("Results", step: 4, detail: "Distinct empty, failed, zero-row, and success states", tone: .warning)
         }
     }
 
@@ -462,9 +532,16 @@ private struct AchievementLevelSelector: View {
     let accessibilityIdentifier: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Achievement")
-                .font(.subheadline.weight(.semibold))
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(WorklistStationery.ink)
+                .overlay(alignment: .bottomLeading) {
+                    Capsule()
+                        .fill(WorklistStationery.localGreen.opacity(0.35))
+                        .frame(height: 2)
+                        .offset(y: 4)
+                }
             LazyVGrid(columns: optionColumns, alignment: .leading, spacing: 8) {
                 AchievementLevelButton(
                     title: "Missing",
@@ -506,27 +583,32 @@ private struct AchievementLevelButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
+                Circle()
+                    .stroke(isSelected ? WorklistStationery.localGreen : WorklistStationery.secondaryInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: isSelected ? [] : [5, 4]))
+                    .overlay {
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(WorklistStationery.localGreen)
+                        }
+                    }
+                    .frame(width: 22, height: 22)
+                    .accessibilityHidden(true)
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.8)
                 Spacer(minLength: 4)
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(CommenterColors.accent)
-                        .accessibilityHidden(true)
-                }
             }
-            .frame(maxWidth: .infinity, minHeight: 34)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(isSelected ? CommenterColors.accentSoft : CommenterColors.surface)
+            .background(isSelected ? WorklistStationery.localGreenSoft : WorklistStationery.paperSurfaceDeep.opacity(0.45))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? CommenterColors.accent : Color.secondary.opacity(0.28), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? WorklistStationery.localGreen : WorklistStationery.paperLine, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
@@ -555,59 +637,72 @@ struct ReportsSection: View {
 
     var body: some View {
         Section {
-            Button(action: onGenerate) {
-                CommenterActionRow(
-                    title: reportGenerationButtonTitle(project: project, readiness: readiness),
-                    subtitle: generationSubtitle,
-                    systemImage: "text.bubble",
-                    isEnabled: canGenerate,
-                    showsChevron: false
-                )
+            WorklistNotebookCard(clipped: true) {
+                Button(action: onGenerate) {
+                    WorklistActionRow(
+                        title: reportGenerationButtonTitle(project: project, readiness: readiness),
+                        subtitle: generationSubtitle,
+                        systemImage: "text.bubble",
+                        tone: .action,
+                        isEnabled: canGenerate,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canGenerate)
+                .accessibilityIdentifier("generate-reports-button")
+                if isGenerating {
+                    WorklistRuledDivider()
+                    ProgressView("Generating deterministic draft comments")
+                        .tint(WorklistStationery.localGreen)
+                }
+                if let disabledReason = generationDisabledReason {
+                    WorklistRuledDivider()
+                    WorklistNote(disabledReason, tone: .warning)
+                }
+                if readiness?.entries.contains(where: { $0.status == .staleReport || $0.status == .lockedStale }) == true {
+                    WorklistRuledDivider()
+                    WorklistStatusChip("Stale drafts need review", systemImage: "arrow.triangle.2.circlepath", tone: .warning)
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(!canGenerate)
-            .accessibilityIdentifier("generate-reports-button")
-            if isGenerating {
-                ProgressView("Generating deterministic draft comments")
-            }
-            if let disabledReason = generationDisabledReason {
-                Text(disabledReason)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if readiness?.entries.contains(where: { $0.status == .staleReport || $0.status == .lockedStale }) == true {
-                StatusChip("Stale drafts need review", systemImage: "arrow.triangle.2.circlepath", tone: .warning)
-            }
+            .worklistSectionRow()
             if project.reports.isEmpty {
-                CommenterEmptyState(
+                WorklistEmptyCard(
                     systemImage: "text.bubble",
                     title: "No draft comments yet",
                     message: "Draft comments are generated deterministically from the bundled local dataset after roster, subjects, and results are ready."
                 )
+                .worklistSectionRow()
             }
-            ForEach(project.reports, id: \.reportListIdentifier) { report in
-                NavigationLink {
-                    ReportEditorView(
-                        report: report,
-                        project: project,
-                        isDisabled: isDisabled,
-                        onManualEditChanged: { onManualEditChanged(report.studentId, report.subject, $0) },
-                        onLockChanged: { onLockChanged(report.studentId, report.subject, $0) }
-                    )
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(reportTitle(report, project: project))
-                            .font(.body.weight(.semibold))
-                        Text(report.isLocked ? "Locked against regeneration" : "Editable draft")
-                            .font(.footnote)
-                            .foregroundStyle(report.isLocked ? CommenterColors.warning : .secondary)
+            if project.reports.isEmpty == false {
+                WorklistNotebookCard {
+                    ForEach(project.reports, id: \.reportListIdentifier) { report in
+                        NavigationLink {
+                            ReportEditorView(
+                                report: report,
+                                project: project,
+                                isDisabled: isDisabled,
+                                onManualEditChanged: { onManualEditChanged(report.studentId, report.subject, $0) },
+                                onLockChanged: { onLockChanged(report.studentId, report.subject, $0) }
+                            )
+                        } label: {
+                            WorklistActionRow(
+                                title: reportTitle(report, project: project),
+                                subtitle: report.isLocked ? "Locked against regeneration" : "Editable draft",
+                                systemImage: report.isLocked ? "lock" : "doc.text",
+                                tone: report.isLocked ? .warning : .local
+                            )
+                        }
+                        .accessibilityIdentifier("report-row-\(report.studentId)-\(accessibilityKey(report.subject))")
+                        if report.reportListIdentifier != project.reports.last?.reportListIdentifier {
+                            WorklistRuledDivider()
+                        }
                     }
                 }
-                .accessibilityIdentifier("report-row-\(report.studentId)-\(accessibilityKey(report.subject))")
+                .worklistSectionRow()
             }
         } header: {
-            CommenterSectionHeader("Draft reports", step: 5, detail: "Deterministic local draft generation")
+            WorklistTapeHeader("Draft reports", step: 5, detail: "Deterministic local draft generation", tone: .action)
         }
     }
 
@@ -635,22 +730,31 @@ private struct ReportEditorView: View {
     var body: some View {
         Form {
             Section {
-                TextEditor(text: Binding(
-                    get: { report.manualEdit ?? report.text },
-                    set: onManualEditChanged
-                ))
-                .frame(minHeight: 220)
-                .disabled(isDisabled)
-                .accessibilityIdentifier("report-editor-\(report.studentId)-\(accessibilityKey(report.subject))")
-                Toggle("Lock against regeneration", isOn: Binding(get: { report.isLocked }, set: onLockChanged))
+                WorklistNotebookCard(clipped: true) {
+                    TextEditor(text: Binding(
+                        get: { report.manualEdit ?? report.text },
+                        set: onManualEditChanged
+                    ))
+                    .frame(minHeight: 220)
+                    .scrollContentBackground(.hidden)
+                    .background(WorklistStationery.paperSurface)
                     .disabled(isDisabled)
+                    .accessibilityIdentifier("report-editor-\(report.studentId)-\(accessibilityKey(report.subject))")
+                    WorklistRuledDivider()
+                    Toggle("Lock against regeneration", isOn: Binding(get: { report.isLocked }, set: onLockChanged))
+                        .tint(WorklistStationery.localGreen)
+                        .disabled(isDisabled)
+                }
+                .worklistSectionRow()
             } header: {
-                CommenterSectionHeader("Draft text")
+                WorklistTapeHeader("Draft text", tone: .action)
             } footer: {
                 Text("Locked drafts are preserved during regeneration. Unlocked stale drafts can be regenerated from current results and selected subjects.")
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(WorklistStationery.paperBackground)
         .navigationTitle(reportTitle(report, project: project))
         .commenterInlineNavigationTitle()
     }
@@ -665,32 +769,35 @@ struct ReportExportsSection: View {
 
     var body: some View {
         Section {
-            ForEach([ImportExportFormat.docx, .xlsx, .xls], id: \.self) { format in
-                Button { onPrepareExport(format) } label: {
-                    CommenterActionRow(
-                        title: format.prepareTitle,
-                        subtitle: exportSubtitle(for: format),
-                        systemImage: format.exportSystemImage,
-                        isEnabled: !isDisabled && canPrepareReports
-                    )
+            WorklistNotebookCard(clipped: true) {
+                ForEach([ImportExportFormat.docx, .xlsx, .xls], id: \.self) { format in
+                    Button { onPrepareExport(format) } label: {
+                        WorklistActionRow(
+                            title: format.prepareTitle,
+                            subtitle: exportSubtitle(for: format),
+                            systemImage: format.exportSystemImage,
+                            tone: .action,
+                            isEnabled: !isDisabled && canPrepareReports
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDisabled || !canPrepareReports)
+                    .accessibilityIdentifier(format == .docx ? "prepare-docx-reports-button" : "prepare-\(format.rawValue)-reports-button")
+                    if format != .xls {
+                        WorklistRuledDivider()
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(isDisabled || !canPrepareReports)
-                .accessibilityIdentifier(format == .docx ? "prepare-docx-reports-button" : "prepare-\(format.rawValue)-reports-button")
+                if isDisabled {
+                    WorklistRuledDivider()
+                    WorklistNote(disabledReason ?? "Report export preparation is paused until the current project state is available.", tone: .warning)
+                } else if !canPrepareReports {
+                    WorklistRuledDivider()
+                    WorklistNote(exportBlockedMessage, tone: .warning)
+                }
             }
-            if isDisabled {
-                Text(disabledReason ?? "Report export preparation is paused until the current project state is available.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if !canPrepareReports {
-                Text(exportBlockedMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .worklistSectionRow()
         } header: {
-            CommenterSectionHeader("Reports", step: 6, detail: "Prepare delivery files after every draft is ready")
+            WorklistTapeHeader("Reports", step: 6, detail: "Prepare delivery files after every draft is ready", tone: .action)
         }
     }
 
@@ -723,25 +830,26 @@ struct BackupSection: View {
 
     var body: some View {
         Section {
-            Button(action: onPrepareBackup) {
-                CommenterActionRow(
-                    title: "Prepare Backup JSON",
-                    subtitle: backupSubtitle,
-                    systemImage: "externaldrive.badge.checkmark",
-                    isEnabled: !isDisabled,
-                    showsChevron: false
-                )
+            WorklistNotebookCard {
+                Button(action: onPrepareBackup) {
+                    WorklistActionRow(
+                        title: "Prepare Backup JSON",
+                        subtitle: backupSubtitle,
+                        systemImage: "externaldrive.badge.checkmark",
+                        tone: .local,
+                        isEnabled: !isDisabled
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled)
+                if isDisabled {
+                    WorklistRuledDivider()
+                    WorklistNote(disabledReason ?? "Backup preparation is paused until the current project state is available.", tone: .warning)
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(isDisabled)
-            if isDisabled {
-                Text(disabledReason ?? "Backup preparation is paused until the current project state is available.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .worklistSectionRow()
         } header: {
-            CommenterSectionHeader("Backup", step: 7, detail: "User-owned recovery copy")
+            WorklistTapeHeader("Backup", step: 7, detail: "User-owned recovery copy", tone: .local)
         }
     }
 
@@ -762,47 +870,59 @@ struct PreparedFileSection: View {
     var body: some View {
         if preparedFile != nil || hasHiddenStalePreparedFile {
             Section {
-                if hasHiddenStalePreparedFile {
-                    StatusChip("Prepared file hidden until current edits are saved", systemImage: "exclamationmark.triangle", tone: .warning)
-                    Text("Save the project and prepare a new file so exports and shares reflect verified local state.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                WorklistNotebookCard(clipped: true) {
+                    if hasHiddenStalePreparedFile {
+                        WorklistStatusChip("Prepared file hidden until current edits are saved", systemImage: "exclamationmark.triangle", tone: .warning)
+                        WorklistRuledDivider()
+                        WorklistNote("Save the project and prepare a new file so exports and shares reflect verified local state.", tone: .warning)
+                    }
+                    if let preparedFile {
+                        if hasHiddenStalePreparedFile {
+                            WorklistRuledDivider()
+                        }
+                        Label("Verified prepared file is ready", systemImage: "checkmark.seal")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(WorklistStationery.localGreen)
+                            .accessibilityIdentifier("prepared-file-ready")
+                        WorklistRuledDivider()
+                        LabeledContent("Prepared file", value: preparedFile.url.lastPathComponent)
+                        Text(preparedFile.label)
+                            .font(.footnote)
+                            .foregroundStyle(WorklistStationery.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let preparedAt = preparedFile.preparedAtMilliseconds {
+                            WorklistRuledDivider()
+                            LabeledContent("Prepared", value: CommenterFormatters.timestamp(preparedAt))
+                        }
+                    }
                 }
-                if let preparedFile {
-                    Label("Verified prepared file is ready", systemImage: "checkmark.seal")
-                        .foregroundStyle(CommenterColors.success)
-                        .accessibilityIdentifier("prepared-file-ready")
-                    LabeledContent("Prepared file", value: preparedFile.url.lastPathComponent)
-                    Text(preparedFile.label)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let preparedAt = preparedFile.preparedAtMilliseconds {
-                        LabeledContent("Prepared", value: CommenterFormatters.timestamp(preparedAt))
+                .worklistSectionRow()
+                if preparedFile != nil {
+                    WorklistNotebookCard(perforated: false) {
+                        Button(action: onSavePreparedFile) {
+                            WorklistActionRow(title: "Save Prepared File Copy", systemImage: "square.and.arrow.down", tone: .local, isEnabled: !isDisabled)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDisabled)
+                        WorklistRuledDivider()
+                        Button(action: onSharePreparedFile) {
+                            WorklistActionRow(title: "Share Prepared File", systemImage: "square.and.arrow.up", tone: .action, isEnabled: !isDisabled)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDisabled)
+                        WorklistRuledDivider()
+                        WorklistNote("This file has been prepared and verified locally. Saving reports success only after the file exporter returns; sharing records completed, cancelled, or failed native share outcomes.")
+                        WorklistRuledDivider()
+                        Button(action: onDismissPreparedFile) {
+                            WorklistActionRow(title: "Dismiss Prepared File", systemImage: "xmark", tone: .neutral, isEnabled: !isDisabled, showsChevron: false)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDisabled)
                     }
-                    Button(action: onSavePreparedFile) {
-                        CommenterActionRow(title: "Save Prepared File Copy", systemImage: "square.and.arrow.down", isEnabled: !isDisabled)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isDisabled)
-                    Button(action: onSharePreparedFile) {
-                        CommenterActionRow(title: "Share Prepared File", systemImage: "square.and.arrow.up", isEnabled: !isDisabled)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isDisabled)
-                    Text("This file has been prepared and verified locally. Saving reports success only after the file exporter returns; sharing records completed, cancelled, or failed native share outcomes.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button(action: onDismissPreparedFile) {
-                        CommenterActionRow(title: "Dismiss Prepared File", systemImage: "xmark", isEnabled: !isDisabled, showsChevron: false)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isDisabled)
+                    .worklistSectionRow()
                 }
             } header: {
-                CommenterSectionHeader("Prepared file", detail: "Verified file ready for native save or share")
+                WorklistTapeHeader("Prepared file", detail: "Verified file ready for native save or share", tone: .prepared)
             }
         }
     }
@@ -812,25 +932,30 @@ struct PreparedFileSection: View {
 private func tabularImportStatus(_ state: AppFeature.TabularImportState, emptyLabel: String) -> some View {
     switch state {
     case .neverImported:
-        StatusChip(emptyLabel, systemImage: "tray", tone: .neutral)
+        WorklistStatusChip(emptyLabel, systemImage: "tray", tone: .neutral)
     case let .loaded(count, source):
-        StatusChip("Loaded \(count) rows from \(source)", systemImage: "checkmark.seal", tone: .success)
+        WorklistStatusChip("Loaded \(count) rows from \(source)", systemImage: "checkmark.seal", tone: .success)
     case let .validating(source):
         HStack {
             ProgressView()
             Text("Validating \(source)")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(WorklistStationery.secondaryInk)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(WorklistStationery.paperSurfaceDeep))
         .accessibilityElement(children: .combine)
     case let .previewReady(count, source):
-        StatusChip("Preview ready: \(count) rows from \(source)", systemImage: "doc.text.magnifyingglass", tone: .prepared)
+        WorklistStatusChip("Preview ready: \(count) rows from \(source)", systemImage: "doc.text.magnifyingglass", tone: .prepared)
     case let .zeroValidRecords(message):
-        StatusChip(message, systemImage: "0.circle", tone: .warning)
+        WorklistStatusChip(message, systemImage: "0.circle", tone: .warning)
     case let .failed(message):
-        StatusChip(message, systemImage: "exclamationmark.triangle", tone: .failure)
+        WorklistStatusChip(message, systemImage: "exclamationmark.triangle", tone: .failure)
     case let .success(count, source):
-        StatusChip("Imported \(count) rows from \(source)", systemImage: "checkmark.seal", tone: .success)
+        WorklistStatusChip("Imported \(count) rows from \(source)", systemImage: "checkmark.seal", tone: .success)
     case let .stale(message):
-        StatusChip(message, systemImage: "arrow.triangle.2.circlepath", tone: .warning)
+        WorklistStatusChip(message, systemImage: "arrow.triangle.2.circlepath", tone: .warning)
     }
 }
 
@@ -905,4 +1030,445 @@ private func accessibilityKey(_ value: String) -> String {
     value
         .lowercased()
         .filter { $0.isLetter || $0.isNumber }
+}
+
+private enum WorklistStationery {
+    static let paperBackground = Color(red: 0.965, green: 0.937, blue: 0.875)
+    static let paperSurface = Color(red: 1.0, green: 0.976, blue: 0.925)
+    static let paperSurfaceDeep = Color(red: 0.957, green: 0.91, blue: 0.827)
+    static let ink = Color(red: 0.09, green: 0.078, blue: 0.067)
+    static let secondaryInk = Color(red: 0.373, green: 0.341, blue: 0.302)
+    static let mutedInk = Color(red: 0.459, green: 0.427, blue: 0.38)
+    static let tape = Color(red: 0.918, green: 0.843, blue: 0.678)
+    static let localGreen = Color(red: 0.231, green: 0.529, blue: 0.314)
+    static let localGreenSoft = Color(red: 0.894, green: 0.945, blue: 0.867)
+    static let actionBlue = Color(red: 0.145, green: 0.427, blue: 0.784)
+    static let actionBlueSoft = Color(red: 0.902, green: 0.933, blue: 0.973)
+    static let attentionOrange = Color(red: 0.847, green: 0.475, blue: 0.173)
+    static let attentionOrangeSoft = Color(red: 0.98, green: 0.906, blue: 0.824)
+    static let destructiveRed = Color(red: 0.725, green: 0.294, blue: 0.227)
+    static let destructiveRedSoft = Color(red: 0.965, green: 0.867, blue: 0.839)
+    static let gold = Color(red: 0.843, green: 0.639, blue: 0.129)
+    static let paperLine = Color(red: 0.463, green: 0.392, blue: 0.282).opacity(0.22)
+
+    static let titleFont = Font.system(.title3, design: .serif).weight(.semibold)
+    static let rowTitleFont = Font.system(.body, design: .default).weight(.semibold)
+    static let handwrittenFont = Font.callout.italic()
+}
+
+private enum WorklistStationeryTone: Equatable {
+    case neutral
+    case local
+    case success
+    case warning
+    case failure
+    case prepared
+    case action
+
+    var color: Color {
+        switch self {
+        case .neutral:
+            return WorklistStationery.secondaryInk
+        case .local, .success:
+            return WorklistStationery.localGreen
+        case .warning:
+            return WorklistStationery.attentionOrange
+        case .failure:
+            return WorklistStationery.destructiveRed
+        case .prepared, .action:
+            return WorklistStationery.actionBlue
+        }
+    }
+
+    var softColor: Color {
+        switch self {
+        case .neutral:
+            return WorklistStationery.paperSurfaceDeep
+        case .local, .success:
+            return WorklistStationery.localGreenSoft
+        case .warning:
+            return WorklistStationery.attentionOrangeSoft
+        case .failure:
+            return WorklistStationery.destructiveRedSoft
+        case .prepared, .action:
+            return WorklistStationery.actionBlueSoft
+        }
+    }
+
+    var tapeColor: Color {
+        switch self {
+        case .neutral:
+            return WorklistStationery.tape
+        default:
+            return softColor
+        }
+    }
+}
+
+private struct WorklistTapeHeader: View {
+    let title: String
+    let step: Int?
+    let detail: String?
+    let tone: WorklistStationeryTone
+
+    init(_ title: String, step: Int? = nil, detail: String? = nil, tone: WorklistStationeryTone = .neutral) {
+        self.title = title
+        self.step = step
+        self.detail = detail
+        self.tone = tone
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            if let step {
+                Text("\(step)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 27, height: 27)
+                    .background(Circle().fill(tone.color))
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(WorklistStationery.ink)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 5)
+                    .background(tone.tapeColor, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .rotationEffect(.degrees(-1.3))
+                    .shadow(color: .black.opacity(0.07), radius: 4, y: 2)
+                if let detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(WorklistStationery.handwrittenFont)
+                        .foregroundStyle(WorklistStationery.mutedInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .overlay(alignment: .bottomLeading) {
+                            Capsule()
+                                .fill(tone.color.opacity(0.25))
+                                .frame(height: 1.5)
+                                .offset(y: 4)
+                        }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .textCase(nil)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+private struct WorklistNotebookCard<Content: View>: View {
+    let perforated: Bool
+    let clipped: Bool
+    let content: Content
+
+    init(perforated: Bool = true, clipped: Bool = false, @ViewBuilder content: () -> Content) {
+        self.perforated = perforated
+        self.clipped = clipped
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(WorklistStationery.paperSurfaceDeep)
+                .offset(x: 6, y: 7)
+                .rotationEffect(.degrees(0.6))
+                .accessibilityHidden(true)
+            HStack(spacing: 0) {
+                if perforated {
+                    WorklistPerforatedEdge()
+                        .frame(width: 18)
+                        .accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    content
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+            }
+            .background(WorklistRuledPaperBackground())
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(WorklistStationery.paperLine, lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+            if clipped {
+                WorklistPaperclip()
+                    .offset(x: 6, y: -16)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+private struct WorklistPerforatedEdge: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let count = max(4, Int(proxy.size.height / 28))
+            VStack(spacing: 12) {
+                ForEach(0..<count, id: \.self) { _ in
+                    Circle()
+                        .fill(WorklistStationery.paperBackground)
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().stroke(WorklistStationery.paperLine, lineWidth: 1))
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+            .padding(.top, 10)
+        }
+    }
+}
+
+private struct WorklistPaperclip: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .stroke(WorklistStationery.gold, lineWidth: 3)
+            .frame(width: 19, height: 44)
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(WorklistStationery.gold.opacity(0.55), lineWidth: 2)
+                    .padding(5)
+            }
+            .rotationEffect(.degrees(12))
+            .shadow(color: .black.opacity(0.18), radius: 3, y: 2)
+    }
+}
+
+private struct WorklistRuledPaperBackground: View {
+    var body: some View {
+        WorklistStationery.paperSurface
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Color(red: 0.80, green: 0.32, blue: 0.22).opacity(0.20))
+                    .frame(width: 1)
+                    .padding(.leading, 22)
+            }
+            .overlay {
+                GeometryReader { proxy in
+                    Path { path in
+                        for y in stride(from: CGFloat(24), through: proxy.size.height, by: 34) {
+                            path.move(to: CGPoint(x: 0, y: y))
+                            path.addLine(to: CGPoint(x: proxy.size.width, y: y))
+                        }
+                    }
+                    .stroke(WorklistStationery.paperLine.opacity(0.55), lineWidth: 0.7)
+                }
+            }
+    }
+}
+
+private struct WorklistRuledDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(WorklistStationery.paperLine)
+            .frame(height: 1)
+            .padding(.vertical, 10)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct WorklistFormRow<Content: View>: View {
+    let systemImage: String?
+    let label: String?
+    let content: Content
+
+    init(systemImage: String? = nil, label: String? = nil, @ViewBuilder content: () -> Content) {
+        self.systemImage = systemImage
+        self.label = label
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(WorklistStationery.localGreen)
+                    .frame(width: 26)
+                    .accessibilityHidden(true)
+            }
+            if let label {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(WorklistStationery.mutedInk)
+                    .frame(width: 86, alignment: .leading)
+            }
+            content
+                .font(.body)
+                .foregroundStyle(WorklistStationery.ink)
+        }
+        .frame(minHeight: 44)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct WorklistActionRow: View {
+    let title: String
+    let subtitle: String?
+    let systemImage: String
+    let tone: WorklistStationeryTone
+    let isEnabled: Bool
+    let showsChevron: Bool
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        systemImage: String,
+        tone: WorklistStationeryTone = .action,
+        isEnabled: Bool = true,
+        showsChevron: Bool = true
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.tone = tone
+        self.isEnabled = isEnabled
+        self.showsChevron = showsChevron
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.headline.weight(.semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(tone.color)
+                .frame(width: 42, height: 42)
+                .background(Circle().fill(tone.softColor))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(WorklistStationery.rowTitleFont)
+                    .foregroundStyle(isEnabled ? WorklistStationery.ink : WorklistStationery.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(WorklistStationery.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(WorklistStationery.secondaryInk.opacity(0.65))
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(minHeight: 44)
+        .opacity(isEnabled ? 1 : 0.48)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+private struct WorklistStatusChip: View {
+    let text: String
+    let systemImage: String
+    let tone: WorklistStationeryTone
+
+    init(_ text: String, systemImage: String, tone: WorklistStationeryTone = .neutral) {
+        self.text = text
+        self.systemImage = systemImage
+        self.tone = tone
+    }
+
+    var body: some View {
+        Label {
+            Text(text)
+                .lineLimit(3)
+                .minimumScaleFactor(0.82)
+        } icon: {
+            Image(systemName: systemImage)
+                .accessibilityHidden(true)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(tone.color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(tone.softColor))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct WorklistNote: View {
+    let text: String
+    let tone: WorklistStationeryTone
+
+    init(_ text: String, tone: WorklistStationeryTone = .neutral) {
+        self.text = text
+        self.tone = tone
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(tone == .warning ? WorklistStationery.attentionOrange : WorklistStationery.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct WorklistEmptyCard: View {
+    let systemImage: String
+    let title: String
+    let message: String
+
+    var body: some View {
+        WorklistNotebookCard {
+            VStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 40, weight: .regular))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(WorklistStationery.localGreen)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(WorklistStationery.titleFont)
+                    .foregroundStyle(WorklistStationery.ink)
+                    .multilineTextAlignment(.center)
+                Text(message)
+                    .font(WorklistStationery.handwrittenFont)
+                    .foregroundStyle(WorklistStationery.secondaryInk)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct WorklistTapeInlineTitle: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(WorklistStationery.ink)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(WorklistStationery.tape, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .rotationEffect(.degrees(-1))
+            .padding(.bottom, 12)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+private extension View {
+    func worklistSectionRow() -> some View {
+        self
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
 }

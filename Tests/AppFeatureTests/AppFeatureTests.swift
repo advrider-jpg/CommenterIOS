@@ -567,7 +567,7 @@ final class AppFeatureTests: XCTestCase {
             AppFeature()
         } withDependencies: {
             $0.clipboardClient = ClipboardClient(copy: { text in
-                XCTAssertTrue(text.contains("CommenterIOS Support Diagnostics"))
+                XCTAssertTrue(text.contains("Report Writer Support Diagnostics"))
                 XCTAssertTrue(text.contains("Hash verification: verified match"))
                 XCTAssertTrue(text.contains("Prepared files:"))
                 XCTAssertTrue(text.contains("Privacy:"))
@@ -602,7 +602,7 @@ final class AppFeatureTests: XCTestCase {
         state.datasetStatus = .loaded(datasetSnapshot(hash: "hash", normalized: "hash", loadedAt: 1_000))
         let text = supportDiagnosticsText(
             state: state,
-            buildInfo: AppBuildInfo(displayName: "Commenter", version: "1.0", build: "42"),
+            buildInfo: AppBuildInfo(displayName: "Report Writer", version: "1.0", build: "42"),
             locale: Locale(identifier: "en_US"),
             timeZone: TimeZone(secondsFromGMT: 0)!
         )
@@ -1238,7 +1238,7 @@ private func testProjectStoreClient(
     importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in importPreview(format: .csv, kind: .roster, count: 0, project: project) },
     importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in importPreview(format: .csv, kind: .results, count: 0, project: project) },
     importBackup: @escaping @Sendable (_ url: URL) async throws -> Project = { _ in project(id: "imported") },
-    prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL = { _ in URL(fileURLWithPath: "/tmp/commenter-backup.json") },
+    prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL = { _ in URL(fileURLWithPath: "/tmp/report-writer-backup.json") },
     prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL = { _, format in URL(fileURLWithPath: "/tmp/commenter-report.\(format.rawValue)") }
 ) -> ProjectStoreClient {
     ProjectStoreClient(

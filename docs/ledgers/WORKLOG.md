@@ -2,6 +2,22 @@
 
 Append material work history here. Keep entries short, dated, and factual.
 
+## 2026-06-01 - Preferred stationery redesign and Report Writer naming
+
+- Applied the preferred stationery handoff to native SwiftUI project, worklist,
+  support, status, empty-state, and reusable design-system surfaces.
+- Changed user-facing app/product naming, bundle display name, support
+  diagnostics, export fallbacks, temp export folder names, and DOCX metadata to
+  `Report Writer`.
+- Changed newly generated backup filenames to the user-facing
+  `.report-writer-backup.json` suffix while retaining legacy
+  `.commenter-backup.json` import compatibility.
+- Preserved existing local persistence, generation, import/export, diagnostics,
+  and availability gates; no reference screenshots or web views were added.
+- Recorded that Swift package, Swift tests, and Xcode build validation were
+  blocked on this Windows environment because Swift/Xcode tools were not
+  available on PATH.
+
 ## 2026-05-31 - OSS dependency policy guardrail
 
 - Added `docs/OSS_DEPENDENCY_POLICY.md` as the binding OSS/native-first package

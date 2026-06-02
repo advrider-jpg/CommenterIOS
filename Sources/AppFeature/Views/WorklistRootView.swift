@@ -50,6 +50,14 @@ struct WorklistRootView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    StationeryPageHeader(
+                        project?.metadata.name ?? "Work list",
+                        subtitle: project == nil ? "Your workflow hub" : "Local state, progress, and recovery prompts"
+                    )
+                }
+                .worklistStationeryChromeRow()
+
                 workflowStatusSection
 
                 if let pendingImport {
@@ -59,6 +67,7 @@ struct WorklistRootView: View {
                         onConfirm: onConfirmImport,
                         onCancel: onCancelImportPreview
                     )
+                    .worklistStationerySectionRows()
                 }
 
                 if let project {
@@ -73,6 +82,7 @@ struct WorklistRootView: View {
                         isDisabled: isEditingLocked,
                         deleteDisabledReason: projectDeleteDisabledReason
                     )
+                    .worklistStationerySectionRows()
                     RosterSection(
                         project: project,
                         importState: rosterImportState,
@@ -84,6 +94,7 @@ struct WorklistRootView: View {
                         onImportRoster: onImportRoster,
                         isDisabled: isEditingLocked
                     )
+                    .worklistStationerySectionRows()
                     SubjectsSection(
                         project: project,
                         onSubjectToggled: onSubjectToggled,
@@ -91,6 +102,7 @@ struct WorklistRootView: View {
                         onDeselectAll: onDeselectAllSubjects,
                         isDisabled: isEditingLocked
                     )
+                    .worklistStationerySectionRows()
                     ResultsSection(
                         project: project,
                         readiness: readiness,
@@ -100,6 +112,7 @@ struct WorklistRootView: View {
                         onImportResults: onImportResults,
                         isDisabled: isEditingLocked
                     )
+                    .worklistStationerySectionRows()
                     ReportsSection(
                         project: project,
                         readiness: readiness,
@@ -110,6 +123,7 @@ struct WorklistRootView: View {
                         onLockChanged: onLockChanged,
                         isDisabled: isEditingLocked
                     )
+                    .worklistStationerySectionRows()
                     ReportExportsSection(
                         readiness: readiness,
                         records: lastPreparedFiles,
@@ -117,12 +131,14 @@ struct WorklistRootView: View {
                         isDisabled: isEditingLocked || hasUnsavedChanges,
                         disabledReason: exportDisabledReason
                     )
+                    .worklistStationerySectionRows()
                     BackupSection(
                         record: lastPreparedFiles[.backupJSON],
                         onPrepareBackup: onPrepareBackup,
                         isDisabled: isEditingLocked || hasUnsavedChanges,
                         disabledReason: backupDisabledReason
                     )
+                    .worklistStationerySectionRows()
                     PreparedFileSection(
                         preparedFile: hasUnsavedChanges ? nil : preparedFile,
                         hasHiddenStalePreparedFile: hasUnsavedChanges && preparedFile != nil,
@@ -131,21 +147,29 @@ struct WorklistRootView: View {
                         onDismissPreparedFile: onDismissPreparedFile,
                         isDisabled: isEditingLocked
                     )
+                    .worklistStationerySectionRows()
                 } else if pendingImport == nil {
                     Section {
-                        CommenterEmptyState(
+                        StationeryEmptyState(
                             systemImage: "folder.badge.questionmark",
-                            title: "No project open",
+                            title: "No project open yet",
                             message: "Create or open a local project from Projects to manage roster, subjects, results, drafts, reports, and backups.",
                             primaryActionTitle: "Go to Projects",
                             primaryAction: onGoToProjects
                         )
                     }
+                    .worklistStationeryChromeRow()
                 }
             }
             .commenterGroupedListStyle()
             .scrollIndicators(.visible)
-            .background(CommenterColors.groupedBackground)
+            .scrollContentBackground(.hidden)
+            .background(worklistStationeryBackground)
+            .safeAreaInset(edge: .bottom) {
+                DeskEdgeDecoration()
+                    .frame(height: 76)
+                    .accessibilityHidden(true)
+            }
             .navigationTitle(project?.metadata.name ?? "Work list")
             .commenterLargeNavigationTitle()
             .accessibilityIdentifier("worklist-list")
@@ -155,49 +179,60 @@ struct WorklistRootView: View {
 
     private var workflowStatusSection: some View {
         Section {
-            OperationStatusView(status: operationStatus, onDismiss: onDismissStatus)
-            if let readiness, readiness.expected > 0 {
-                LabeledContent("Export ready", value: "\(readiness.ready) of \(readiness.expected)")
-                    .accessibilityLabel("Export ready \(readiness.ready) of \(readiness.expected)")
-            } else if project != nil {
-                StatusChip("Add students to get started", systemImage: "person.badge.plus", tone: .neutral)
-            }
-            if case .saving = status {
-                ProgressView("Saving and verifying project")
-            }
-            if case .deleting = status {
-                ProgressView("Creating recovery snapshot and deleting project")
-            }
-            if case .generating = status {
-                ProgressView("Generating deterministic draft comments")
-            }
-            if case .importing = status {
-                ProgressView("Validating import")
-            }
-            if case .preparingFile = status {
-                ProgressView("Preparing and verifying file")
-            }
-            if isWorkflowBusy {
-                Text("Editing and file actions are paused until the current operation finishes.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if pendingImport != nil, !isWorkflowBusy {
-                Text("A validated import is waiting for confirmation. Confirm or cancel it before editing this project.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if hasUnsavedChanges {
-                Text("Save the project before preparing backups or exports so the file reflects verified local state.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            NotebookCard(showsPaperclip: project != nil) {
+                VStack(alignment: .leading, spacing: 12) {
+                    OperationStatusView(status: operationStatus, onDismiss: onDismissStatus)
+                    if let readiness, readiness.expected > 0 {
+                        LabeledContent("Export ready", value: "\(readiness.ready) of \(readiness.expected)")
+                            .accessibilityLabel("Export ready \(readiness.ready) of \(readiness.expected)")
+                    } else if project != nil {
+                        StatusChip("Add students to get started", systemImage: "person.badge.plus", tone: .neutral)
+                    }
+                    if case .saving = status {
+                        ProgressView("Saving and verifying project")
+                    }
+                    if case .deleting = status {
+                        ProgressView("Creating recovery snapshot and deleting project")
+                    }
+                    if case .generating = status {
+                        ProgressView("Generating deterministic draft comments")
+                    }
+                    if case .importing = status {
+                        ProgressView("Validating import")
+                    }
+                    if case .preparingFile = status {
+                        ProgressView("Preparing and verifying file")
+                    }
+                    if isWorkflowBusy {
+                        Text("Editing and file actions are paused until the current operation finishes.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if pendingImport != nil, !isWorkflowBusy {
+                        Text("A validated import is waiting for confirmation. Confirm or cancel it before editing this project.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if hasUnsavedChanges {
+                        Text("Save the project before preparing backups or exports so the file reflects verified local state.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         } header: {
             CommenterSectionHeader("Workflow", detail: "Local state, progress, and recovery prompts")
         }
+        .worklistStationeryChromeRow()
+    }
+
+    private var worklistStationeryBackground: some View {
+        CommenterStationeryTheme.Colors.paperBackground
+            .ignoresSafeArea()
+            .overlay(StationeryPaperTexture().ignoresSafeArea())
     }
 
     private var isEditingLocked: Bool {
@@ -260,5 +295,20 @@ struct WorklistRootView: View {
             return "Save or reopen the project before deleting it so the recovery snapshot reflects verified local storage."
         }
         return nil
+    }
+}
+
+private extension View {
+    func worklistStationeryChromeRow() -> some View {
+        self
+            .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 10, trailing: 20))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
+    func worklistStationerySectionRows() -> some View {
+        self
+            .listRowBackground(CommenterStationeryTheme.Colors.paperSurface)
+            .listRowSeparatorTint(CommenterStationeryTheme.Colors.paperLine)
     }
 }

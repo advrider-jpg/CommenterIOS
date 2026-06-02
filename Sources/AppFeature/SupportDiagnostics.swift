@@ -18,7 +18,7 @@ public struct AppBuildInfo: Equatable, Sendable {
         AppBuildInfo(
             displayName: bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
                 ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String
-                ?? "Commenter",
+                ?? "Report Writer",
             version: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
             build: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
         )
@@ -57,7 +57,7 @@ public func supportDiagnosticsText(
     timeZone: TimeZone = .current
 ) -> String {
     var lines: [String] = []
-    lines.append("CommenterIOS Support Diagnostics")
+    lines.append("Report Writer Support Diagnostics")
     lines.append("App: \(buildInfo.displayName)")
     lines.append("App version: \(buildInfo.version)")
     lines.append("Build: \(buildInfo.build)")

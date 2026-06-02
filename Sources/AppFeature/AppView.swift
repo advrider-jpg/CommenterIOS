@@ -129,7 +129,7 @@ public struct AppView: View {
                 isPresented: $isExportingFile,
                 document: exportDocument,
                 contentType: exportDocument?.contentType ?? .data,
-                defaultFilename: exportDocument?.defaultFilename ?? "CommenterExport"
+                defaultFilename: exportDocument?.defaultFilename ?? "ReportWriterExport"
             ) { result in
                 handleExportResult(result, viewStore: viewStore)
             }
@@ -282,25 +282,57 @@ private struct ProjectCreationSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Class name", text: Binding(get: { draft.name }, set: onNameChanged))
-                        .commenterWordsTextInput()
-                        .focused($isNameFocused)
-                        .accessibilityHint("Use a descriptive name, such as 5B Semester 1 2026.")
-                        .accessibilityIdentifier("project-creation-name-field")
-                    TextField("Term", text: Binding(get: { draft.term }, set: onTermChanged))
-                        .accessibilityIdentifier("project-creation-term-field")
-                    Picker("Year level", selection: Binding(get: { draft.yearLevel }, set: onYearLevelChanged)) {
-                        Text("Year 5").tag(ProjectYearLevel.year5)
-                        Text("Year 6").tag(ProjectYearLevel.year6)
-                        Text("Mixed").tag(ProjectYearLevel.mixed)
+            StationeryScreen(showsDeskFooter: false) {
+                StationeryPageHeader("Create project", subtitle: "Start a verified local class file")
+
+                VStack(alignment: .leading, spacing: 10) {
+                    TapeLabel("Project details", tone: .action)
+                    HandwrittenAnnotation("Name the class before the local project file is created.")
+                        .padding(.leading, 4)
+
+                    NotebookCard(showsPaperclip: true) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            StationeryFormRow("Class name") {
+                                TextField("Class name", text: Binding(get: { draft.name }, set: onNameChanged))
+                                    .commenterWordsTextInput()
+                                    .focused($isNameFocused)
+                                    .accessibilityHint("Use a descriptive name, such as 5B Semester 1 2026.")
+                                    .accessibilityIdentifier("project-creation-name-field")
+                            }
+
+                            StationeryFormRow("Term") {
+                                TextField("Term", text: Binding(get: { draft.term }, set: onTermChanged))
+                                    .accessibilityIdentifier("project-creation-term-field")
+                            }
+
+                            StationeryFormRow("Year level") {
+                                Picker("Year level", selection: Binding(get: { draft.yearLevel }, set: onYearLevelChanged)) {
+                                    Text("Year 5").tag(ProjectYearLevel.year5)
+                                    Text("Year 6").tag(ProjectYearLevel.year6)
+                                    Text("Mixed").tag(ProjectYearLevel.mixed)
+                                }
+                                .pickerStyle(.segmented)
+                            }
+
+                            StationeryFormRow("Use first names in reports", detail: "Controls generated wording for students.") {
+                                Toggle(
+                                    "Use first names in reports",
+                                    isOn: Binding(get: { draft.useFirstNameOnly }, set: onUseFirstNameOnlyChanged)
+                                )
+                                .labelsHidden()
+                                .tint(CommenterStationeryTheme.Colors.localGreen)
+                            }
+
+                            Text("Projects are stored locally on this device. You can edit these details later from the Work list tab.")
+                                .font(.footnote)
+                                .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            if isSaving {
+                                StationeryStatusChip("Creating and verifying", systemImage: "arrow.triangle.2.circlepath", tone: .local)
+                            }
+                        }
                     }
-                    Toggle("Use first names in reports", isOn: Binding(get: { draft.useFirstNameOnly }, set: onUseFirstNameOnlyChanged))
-                } header: {
-                    CommenterSectionHeader("Project details", detail: "Name the class before the local project file is created.")
-                } footer: {
-                    Text("Projects are stored locally on this device. You can edit these details later from the Work list tab.")
                 }
             }
             .navigationTitle("Create project")

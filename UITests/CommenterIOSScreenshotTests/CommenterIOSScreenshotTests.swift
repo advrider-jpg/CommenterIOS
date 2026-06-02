@@ -346,6 +346,9 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         if list.exists {
             return list
         }
+        if app.scrollViews.firstMatch.exists {
+            return app.scrollViews.firstMatch
+        }
         if app.collectionViews.firstMatch.exists {
             return app.collectionViews.firstMatch
         }
@@ -359,6 +362,9 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         let list = element("support-list")
         if list.exists {
             return list
+        }
+        if app.scrollViews.firstMatch.exists {
+            return app.scrollViews.firstMatch
         }
         if app.collectionViews.firstMatch.exists {
             return app.collectionViews.firstMatch

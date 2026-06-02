@@ -10,7 +10,7 @@ final class BackupFileWorkflowTests: XCTestCase {
 
         let prepared = try prepareProjectBackupFile(project: fixtureProject(), directory: root, createdAt: createdAt)
 
-        XCTAssertEqual(prepared.url.lastPathComponent, "Project-Term-1-1970-01-01T00-00-00Z.commenter-backup.json")
+        XCTAssertEqual(prepared.url.lastPathComponent, "Project-Term-1-1970-01-01T00-00-00Z.report-writer-backup.json")
         XCTAssertGreaterThan(prepared.byteCount, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: prepared.url.path))
         XCTAssertEqual(prepared.project.metadata.id, "p1")
@@ -36,7 +36,7 @@ final class BackupFileWorkflowTests: XCTestCase {
     func testLoadProjectBackupFileRejectsEmptyAndTamperedFiles() throws {
         let root = temporaryRoot()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let empty = root.appendingPathComponent("empty.commenter-backup.json")
+        let empty = root.appendingPathComponent("empty.report-writer-backup.json")
         try Data().write(to: empty)
 
         XCTAssertThrowsError(try loadProjectBackupFile(from: empty)) { error in
@@ -99,10 +99,10 @@ final class BackupFileWorkflowTests: XCTestCase {
 
     func testBackupFilenameSanitizesProjectNames() {
         let name = backupFilename(project: fixtureProject(name: " *** "), createdAt: Date(timeIntervalSince1970: 0))
-        XCTAssertEqual(name, "commenter-project-1970-01-01T00-00-00Z.commenter-backup.json")
+        XCTAssertEqual(name, "report-writer-project-1970-01-01T00-00-00Z.report-writer-backup.json")
 
         let unsafe = backupFilename(project: fixtureProject(name: "Room: 5 / Term?"), createdAt: Date(timeIntervalSince1970: 0))
-        XCTAssertEqual(unsafe, "Room-5-Term-1970-01-01T00-00-00Z.commenter-backup.json")
+        XCTAssertEqual(unsafe, "Room-5-Term-1970-01-01T00-00-00Z.report-writer-backup.json")
     }
 
     private func fixtureProject(id: String = "p1", name: String = "Project Term 1") -> Project {

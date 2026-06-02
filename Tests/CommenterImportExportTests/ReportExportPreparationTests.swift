@@ -123,7 +123,7 @@ final class ReportExportPreparationTests: XCTestCase {
 
         project.metadata.name = "***"
         project.roster[0].firstName = ""
-        XCTAssertEqual(try reportExportFilename(project: project, format: .xlsx, studentId: "s1"), "Commenter_Student_Report_Review.xlsx")
+        XCTAssertEqual(try reportExportFilename(project: project, format: .xlsx, studentId: "s1"), "ReportWriter_Student_Report_Review.xlsx")
     }
 
     func testSpreadsheetSafeTextAndParagraphs() {
