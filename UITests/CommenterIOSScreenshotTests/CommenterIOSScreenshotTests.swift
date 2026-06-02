@@ -111,6 +111,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             buttons(identifier: "generate-reports-button", label: "Generate and Save Reports"),
             name: "Generate and Save Reports"
         )
+        waitForEnabledElement(generateReports, named: "Generate and Save Reports")
         generateReports.tap()
         waitForOperationToSettle(action: "report generation")
         ensureWorklistOpen()
@@ -550,18 +551,25 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         }
     }
 
-    private func waitForOperationToSettle(action: String, timeout: TimeInterval = 30) {
+    private func waitForOperationToSettle(action: String, timeout: TimeInterval = 45) {
         let busy = element("operation-status-busy")
         let failed = element("operation-status-failed")
+        let observationGrace = Date().addingTimeInterval(5)
         let deadline = Date().addingTimeInterval(timeout)
+        var observedBusy = false
         while Date() < deadline {
             if failed.exists {
                 captureFailureContext("\(action)-failed")
                 XCTFail("\(action) failed: \(failed.label)")
                 return
             }
-            if !busy.exists { return }
-            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.5))
+            if busy.exists {
+                observedBusy = true
+            } else if observedBusy || Date() >= observationGrace {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.5))
+                return
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.25))
         }
         captureFailureContext("\(action)-timeout")
         XCTFail("\(action) timed out (still busy): \(busy.label)")

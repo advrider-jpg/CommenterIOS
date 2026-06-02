@@ -692,6 +692,7 @@ struct ReportsSection: View {
                                 systemImage: report.isLocked ? "lock" : "doc.text",
                                 tone: report.isLocked ? .warning : .local
                             )
+                            .accessibilityIdentifier("report-row-\(report.studentId)-\(accessibilityKey(report.subject))")
                         }
                         .accessibilityIdentifier("report-row-\(report.studentId)-\(accessibilityKey(report.subject))")
                         if report.reportListIdentifier != project.reports.last?.reportListIdentifier {
