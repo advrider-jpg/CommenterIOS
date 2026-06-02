@@ -125,8 +125,8 @@ struct SupportRootView: View {
                         if !readiness.blocked.isEmpty {
                             DisclosureGroup("Blocked readiness details") {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    ForEach(readiness.blocked.indices, id: \.self) { index in
-                                        SupportBodyText(readiness.blocked[index].message)
+                                    ForEach(Array(readiness.blocked.enumerated()), id: \.offset) { pair in
+                                        SupportBodyText(pair.element.message)
                                     }
                                 }
                                 .padding(.top, 8)

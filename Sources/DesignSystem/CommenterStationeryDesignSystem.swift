@@ -675,8 +675,9 @@ public struct WorkflowTimeline: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(items.indices, id: \.self) { index in
-                let item = items[index]
+            ForEach(Array(items.enumerated()), id: \.element.id) { pair in
+                let index = pair.offset
+                let item = pair.element
                 HStack(alignment: .top, spacing: 12) {
                     VStack(spacing: 0) {
                         StatusIconBubble(systemImage: item.systemImage, tone: item.tone)
