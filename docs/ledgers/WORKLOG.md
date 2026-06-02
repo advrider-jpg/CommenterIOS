@@ -2,6 +2,13 @@
 
 Append material work history here. Keep entries short, dated, and factual.
 
+## 2026-06-02 - Shared stationery review fix
+
+- Replaced Work list-only stationery drawing primitives with shared
+  `DesignSystem` stationery components and theme values.
+- Tightened the shared workflow timeline connector frame to the fixed-size
+  SwiftUI modifier shape used by hosted CI diagnostics.
+
 ## 2026-06-02 - CI and screenshot workflow hardening
 
 - Updated iOS CI to cache SwiftPM artifacts and Xcode derived data, bound the

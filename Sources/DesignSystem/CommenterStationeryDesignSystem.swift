@@ -683,8 +683,7 @@ public struct WorkflowTimeline: View {
                         if !isLast {
                             Rectangle()
                                 .fill(CommenterStationeryTheme.Colors.paperLine)
-                                .frame(width: 2)
-                                .frame(minHeight: 24)
+                                .frame(width: 2, height: 24)
                                 .accessibilityHidden(true)
                         }
                     }

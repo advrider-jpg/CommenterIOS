@@ -44,14 +44,14 @@ struct ProjectMetadataSection: View {
                 Toggle(isOn: Binding(get: { project.metadata.useFirstNameOnly }, set: onUseFirstNameOnlyChanged)) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Use first names in reports")
-                            .foregroundStyle(WorklistStationery.ink)
+                            .foregroundStyle(CommenterStationeryTheme.Colors.ink)
                         Text("Applies to generated draft text and prepared DOCX/XLSX/XLS report headings.")
                             .font(.footnote)
-                            .foregroundStyle(WorklistStationery.secondaryInk)
+                            .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .tint(WorklistStationery.localGreen)
+                .tint(CommenterStationeryTheme.Colors.localGreen)
                 .disabled(isDisabled)
                 .padding(.vertical, 10)
                 WorklistRuledDivider()
@@ -119,17 +119,17 @@ struct ImportPreviewSection: View {
             WorklistNotebookCard(clipped: true) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(preview.title)
-                        .font(WorklistStationery.titleFont)
-                        .foregroundStyle(WorklistStationery.ink)
+                        .font(CommenterStationeryTheme.Typography.compactPageTitle)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.ink)
                     Text(preview.detail)
-                        .foregroundStyle(WorklistStationery.secondaryInk)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
                         .fixedSize(horizontal: false, vertical: true)
                     WorklistStatusChip("\(preview.acceptedRows) accepted", systemImage: "checkmark.seal", tone: preview.acceptedRows > 0 ? .success : .warning)
                 }
                 if isSaving {
                     WorklistRuledDivider()
                     ProgressView("Saving confirmed import and verifying local storage")
-                        .tint(WorklistStationery.localGreen)
+                        .tint(CommenterStationeryTheme.Colors.localGreen)
                 } else {
                     WorklistRuledDivider()
                     WorklistNote("Project data will not change until this import is confirmed and the local save verifies.")
@@ -296,7 +296,7 @@ private struct StudentEditorView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(WorklistStationery.paperBackground)
+        .background(CommenterStationeryTheme.Colors.paperBackground)
         .navigationTitle(fullStudentName(student))
         .commenterInlineNavigationTitle()
     }
@@ -319,7 +319,7 @@ struct SubjectsSection: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.bordered)
-                    .tint(WorklistStationery.localGreen)
+                    .tint(CommenterStationeryTheme.Colors.localGreen)
                     .disabled(isDisabled || selectedSubjectCount == availableTeacherSubjects().count)
                     .accessibilityIdentifier("subject-select-all-button")
 
@@ -329,7 +329,7 @@ struct SubjectsSection: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.bordered)
-                    .tint(WorklistStationery.attentionOrange)
+                    .tint(CommenterStationeryTheme.Colors.attentionOrange)
                     .disabled(isDisabled || selectedSubjectCount == 0)
                     .accessibilityIdentifier("subject-deselect-all-button")
                 }
@@ -379,12 +379,12 @@ private struct SubjectSelectionButton: View {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     Circle()
-                        .stroke(isSelected ? WorklistStationery.localGreen : WorklistStationery.secondaryInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: isSelected ? [] : [5, 4]))
+                        .stroke(isSelected ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.secondaryInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: isSelected ? [] : [5, 4]))
                         .frame(width: 22, height: 22)
                     if isSelected {
                         Image(systemName: "checkmark")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(WorklistStationery.localGreen)
+                            .foregroundStyle(CommenterStationeryTheme.Colors.localGreen)
                     }
                 }
                     .accessibilityHidden(true)
@@ -491,7 +491,7 @@ struct ResultsSection: View {
                             WorklistRuledDivider()
                             Label(entry.message, systemImage: isReadyForExport(entry.status) ? "checkmark.circle" : "exclamationmark.triangle")
                                 .font(.footnote)
-                                .foregroundStyle(isReadyForExport(entry.status) ? WorklistStationery.localGreen : WorklistStationery.attentionOrange)
+                                .foregroundStyle(isReadyForExport(entry.status) ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.attentionOrange)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -535,10 +535,10 @@ private struct AchievementLevelSelector: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Achievement")
                 .font(.headline.weight(.semibold))
-                .foregroundStyle(WorklistStationery.ink)
+                .foregroundStyle(CommenterStationeryTheme.Colors.ink)
                 .overlay(alignment: .bottomLeading) {
                     Capsule()
-                        .fill(WorklistStationery.localGreen.opacity(0.35))
+                        .fill(CommenterStationeryTheme.Colors.localGreen.opacity(0.35))
                         .frame(height: 2)
                         .offset(y: 4)
                 }
@@ -584,12 +584,12 @@ private struct AchievementLevelButton: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Circle()
-                    .stroke(isSelected ? WorklistStationery.localGreen : WorklistStationery.secondaryInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: isSelected ? [] : [5, 4]))
+                    .stroke(isSelected ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.secondaryInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: isSelected ? [] : [5, 4]))
                     .overlay {
                         if isSelected {
                             Image(systemName: "checkmark")
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(WorklistStationery.localGreen)
+                                .foregroundStyle(CommenterStationeryTheme.Colors.localGreen)
                         }
                     }
                     .frame(width: 22, height: 22)
@@ -603,10 +603,10 @@ private struct AchievementLevelButton: View {
             .frame(maxWidth: .infinity, minHeight: 44)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(isSelected ? WorklistStationery.localGreenSoft : WorklistStationery.paperSurfaceDeep.opacity(0.45))
+            .background(isSelected ? CommenterStationeryTheme.Colors.localGreenSoft : CommenterStationeryTheme.Colors.paperSurfaceDeep.opacity(0.45))
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isSelected ? WorklistStationery.localGreen : WorklistStationery.paperLine, lineWidth: 1)
+                    .stroke(isSelected ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.paperLine, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
@@ -654,7 +654,7 @@ struct ReportsSection: View {
                 if isGenerating {
                     WorklistRuledDivider()
                     ProgressView("Generating deterministic draft comments")
-                        .tint(WorklistStationery.localGreen)
+                        .tint(CommenterStationeryTheme.Colors.localGreen)
                 }
                 if let disabledReason = generationDisabledReason {
                     WorklistRuledDivider()
@@ -737,12 +737,12 @@ private struct ReportEditorView: View {
                     ))
                     .frame(minHeight: 220)
                     .scrollContentBackground(.hidden)
-                    .background(WorklistStationery.paperSurface)
+                    .background(CommenterStationeryTheme.Colors.paperSurface)
                     .disabled(isDisabled)
                     .accessibilityIdentifier("report-editor-\(report.studentId)-\(accessibilityKey(report.subject))")
                     WorklistRuledDivider()
                     Toggle("Lock against regeneration", isOn: Binding(get: { report.isLocked }, set: onLockChanged))
-                        .tint(WorklistStationery.localGreen)
+                        .tint(CommenterStationeryTheme.Colors.localGreen)
                         .disabled(isDisabled)
                 }
                 .worklistSectionRow()
@@ -754,7 +754,7 @@ private struct ReportEditorView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(WorklistStationery.paperBackground)
+        .background(CommenterStationeryTheme.Colors.paperBackground)
         .navigationTitle(reportTitle(report, project: project))
         .commenterInlineNavigationTitle()
     }
@@ -882,13 +882,13 @@ struct PreparedFileSection: View {
                         }
                         Label("Verified prepared file is ready", systemImage: "checkmark.seal")
                             .font(.headline.weight(.semibold))
-                            .foregroundStyle(WorklistStationery.localGreen)
+                            .foregroundStyle(CommenterStationeryTheme.Colors.localGreen)
                             .accessibilityIdentifier("prepared-file-ready")
                         WorklistRuledDivider()
                         LabeledContent("Prepared file", value: preparedFile.url.lastPathComponent)
                         Text(preparedFile.label)
                             .font(.footnote)
-                            .foregroundStyle(WorklistStationery.secondaryInk)
+                            .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
                         if let preparedAt = preparedFile.preparedAtMilliseconds {
                             WorklistRuledDivider()
@@ -940,11 +940,11 @@ private func tabularImportStatus(_ state: AppFeature.TabularImportState, emptyLa
             ProgressView()
             Text("Validating \(source)")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(WorklistStationery.secondaryInk)
+                .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Capsule().fill(WorklistStationery.paperSurfaceDeep))
+        .background(Capsule().fill(CommenterStationeryTheme.Colors.paperSurfaceDeep))
         .accessibilityElement(children: .combine)
     case let .previewReady(count, source):
         WorklistStatusChip("Preview ready: \(count) rows from \(source)", systemImage: "doc.text.magnifyingglass", tone: .prepared)
@@ -1032,31 +1032,7 @@ private func accessibilityKey(_ value: String) -> String {
         .filter { $0.isLetter || $0.isNumber }
 }
 
-private enum WorklistStationery {
-    static let paperBackground = Color(red: 0.965, green: 0.937, blue: 0.875)
-    static let paperSurface = Color(red: 1.0, green: 0.976, blue: 0.925)
-    static let paperSurfaceDeep = Color(red: 0.957, green: 0.91, blue: 0.827)
-    static let ink = Color(red: 0.09, green: 0.078, blue: 0.067)
-    static let secondaryInk = Color(red: 0.373, green: 0.341, blue: 0.302)
-    static let mutedInk = Color(red: 0.459, green: 0.427, blue: 0.38)
-    static let tape = Color(red: 0.918, green: 0.843, blue: 0.678)
-    static let localGreen = Color(red: 0.231, green: 0.529, blue: 0.314)
-    static let localGreenSoft = Color(red: 0.894, green: 0.945, blue: 0.867)
-    static let actionBlue = Color(red: 0.145, green: 0.427, blue: 0.784)
-    static let actionBlueSoft = Color(red: 0.902, green: 0.933, blue: 0.973)
-    static let attentionOrange = Color(red: 0.847, green: 0.475, blue: 0.173)
-    static let attentionOrangeSoft = Color(red: 0.98, green: 0.906, blue: 0.824)
-    static let destructiveRed = Color(red: 0.725, green: 0.294, blue: 0.227)
-    static let destructiveRedSoft = Color(red: 0.965, green: 0.867, blue: 0.839)
-    static let gold = Color(red: 0.843, green: 0.639, blue: 0.129)
-    static let paperLine = Color(red: 0.463, green: 0.392, blue: 0.282).opacity(0.22)
-
-    static let titleFont = Font.system(.title3, design: .serif).weight(.semibold)
-    static let rowTitleFont = Font.system(.body, design: .default).weight(.semibold)
-    static let handwrittenFont = Font.callout.italic()
-}
-
-private enum WorklistStationeryTone: Equatable {
+private enum WorklistTone: Equatable {
     case neutral
     case local
     case success
@@ -1065,43 +1041,31 @@ private enum WorklistStationeryTone: Equatable {
     case prepared
     case action
 
-    var color: Color {
+    var stationeryTone: StationeryTone {
         switch self {
         case .neutral:
-            return WorklistStationery.secondaryInk
-        case .local, .success:
-            return WorklistStationery.localGreen
+            return .neutral
+        case .local:
+            return .local
+        case .success:
+            return .success
         case .warning:
-            return WorklistStationery.attentionOrange
+            return .warning
         case .failure:
-            return WorklistStationery.destructiveRed
-        case .prepared, .action:
-            return WorklistStationery.actionBlue
+            return .failure
+        case .prepared:
+            return .prepared
+        case .action:
+            return .action
         }
+    }
+
+    var color: Color {
+        stationeryTone.color
     }
 
     var softColor: Color {
-        switch self {
-        case .neutral:
-            return WorklistStationery.paperSurfaceDeep
-        case .local, .success:
-            return WorklistStationery.localGreenSoft
-        case .warning:
-            return WorklistStationery.attentionOrangeSoft
-        case .failure:
-            return WorklistStationery.destructiveRedSoft
-        case .prepared, .action:
-            return WorklistStationery.actionBlueSoft
-        }
-    }
-
-    var tapeColor: Color {
-        switch self {
-        case .neutral:
-            return WorklistStationery.tape
-        default:
-            return softColor
-        }
+        stationeryTone.softColor
     }
 }
 
@@ -1109,9 +1073,9 @@ private struct WorklistTapeHeader: View {
     let title: String
     let step: Int?
     let detail: String?
-    let tone: WorklistStationeryTone
+    let tone: WorklistTone
 
-    init(_ title: String, step: Int? = nil, detail: String? = nil, tone: WorklistStationeryTone = .neutral) {
+    init(_ title: String, step: Int? = nil, detail: String? = nil, tone: WorklistTone = .neutral) {
         self.title = title
         self.step = step
         self.detail = detail
@@ -1129,25 +1093,9 @@ private struct WorklistTapeHeader: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(WorklistStationery.ink)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 5)
-                    .background(tone.tapeColor, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    .rotationEffect(.degrees(-1.3))
-                    .shadow(color: .black.opacity(0.07), radius: 4, y: 2)
+                TapeLabel(title, tone: tone.stationeryTone)
                 if let detail, !detail.isEmpty {
-                    Text(detail)
-                        .font(WorklistStationery.handwrittenFont)
-                        .foregroundStyle(WorklistStationery.mutedInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .overlay(alignment: .bottomLeading) {
-                            Capsule()
-                                .fill(tone.color.opacity(0.25))
-                                .frame(height: 1.5)
-                                .offset(y: 4)
-                        }
+                    HandwrittenAnnotation(detail)
                 }
             }
             Spacer(minLength: 0)
@@ -1170,101 +1118,20 @@ private struct WorklistNotebookCard<Content: View>: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(WorklistStationery.paperSurfaceDeep)
-                .offset(x: 6, y: 7)
-                .rotationEffect(.degrees(0.6))
-                .accessibilityHidden(true)
-            HStack(spacing: 0) {
-                if perforated {
-                    WorklistPerforatedEdge()
-                        .frame(width: 18)
-                        .accessibilityHidden(true)
-                }
-                VStack(alignment: .leading, spacing: 0) {
-                    content
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-            }
-            .background(WorklistRuledPaperBackground())
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(WorklistStationery.paperLine, lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-            if clipped {
-                WorklistPaperclip()
-                    .offset(x: 6, y: -16)
-                    .accessibilityHidden(true)
-            }
+        NotebookCard(
+            showsPerforation: perforated,
+            showsPaperclip: clipped,
+            showsStack: true
+        ) {
+            content
         }
-    }
-}
-
-private struct WorklistPerforatedEdge: View {
-    var body: some View {
-        GeometryReader { proxy in
-            let count = max(4, Int(proxy.size.height / 28))
-            VStack(spacing: 12) {
-                ForEach(0..<count, id: \.self) { _ in
-                    Circle()
-                        .fill(WorklistStationery.paperBackground)
-                        .frame(width: 9, height: 9)
-                        .overlay(Circle().stroke(WorklistStationery.paperLine, lineWidth: 1))
-                }
-            }
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
-            .padding(.top, 10)
-        }
-    }
-}
-
-private struct WorklistPaperclip: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .stroke(WorklistStationery.gold, lineWidth: 3)
-            .frame(width: 19, height: 44)
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(WorklistStationery.gold.opacity(0.55), lineWidth: 2)
-                    .padding(5)
-            }
-            .rotationEffect(.degrees(12))
-            .shadow(color: .black.opacity(0.18), radius: 3, y: 2)
-    }
-}
-
-private struct WorklistRuledPaperBackground: View {
-    var body: some View {
-        WorklistStationery.paperSurface
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(Color(red: 0.80, green: 0.32, blue: 0.22).opacity(0.20))
-                    .frame(width: 1)
-                    .padding(.leading, 22)
-            }
-            .overlay {
-                GeometryReader { proxy in
-                    Path { path in
-                        for y in stride(from: CGFloat(24), through: proxy.size.height, by: 34) {
-                            path.move(to: CGPoint(x: 0, y: y))
-                            path.addLine(to: CGPoint(x: proxy.size.width, y: y))
-                        }
-                    }
-                    .stroke(WorklistStationery.paperLine.opacity(0.55), lineWidth: 0.7)
-                }
-            }
     }
 }
 
 private struct WorklistRuledDivider: View {
     var body: some View {
-        Rectangle()
-            .fill(WorklistStationery.paperLine)
-            .frame(height: 1)
+        Divider()
+            .overlay(CommenterStationeryTheme.Colors.paperLine)
             .padding(.vertical, 10)
             .accessibilityHidden(true)
     }
@@ -1284,22 +1151,19 @@ private struct WorklistFormRow<Content: View>: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(WorklistStationery.localGreen)
-                    .frame(width: 26)
-                    .accessibilityHidden(true)
+                StatusIconBubble(systemImage: systemImage, tone: .local)
+                    .scaleEffect(0.72)
+                    .frame(width: 30, height: 30)
             }
             if let label {
                 Text(label)
                     .font(.caption)
-                    .foregroundStyle(WorklistStationery.mutedInk)
+                    .foregroundStyle(CommenterStationeryTheme.Colors.mutedInk)
                     .frame(width: 86, alignment: .leading)
             }
             content
                 .font(.body)
-                .foregroundStyle(WorklistStationery.ink)
+                .foregroundStyle(CommenterStationeryTheme.Colors.ink)
         }
         .frame(minHeight: 44)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1310,7 +1174,7 @@ private struct WorklistActionRow: View {
     let title: String
     let subtitle: String?
     let systemImage: String
-    let tone: WorklistStationeryTone
+    let tone: WorklistTone
     let isEnabled: Bool
     let showsChevron: Bool
 
@@ -1318,7 +1182,7 @@ private struct WorklistActionRow: View {
         title: String,
         subtitle: String? = nil,
         systemImage: String,
-        tone: WorklistStationeryTone = .action,
+        tone: WorklistTone = .action,
         isEnabled: Bool = true,
         showsChevron: Bool = true
     ) {
@@ -1331,38 +1195,14 @@ private struct WorklistActionRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.headline.weight(.semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(tone.color)
-                .frame(width: 42, height: 42)
-                .background(Circle().fill(tone.softColor))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(WorklistStationery.rowTitleFont)
-                    .foregroundStyle(isEnabled ? WorklistStationery.ink : WorklistStationery.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(WorklistStationery.secondaryInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 8)
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(WorklistStationery.secondaryInk.opacity(0.65))
-                    .accessibilityHidden(true)
-            }
-        }
-        .frame(minHeight: 44)
-        .opacity(isEnabled ? 1 : 0.48)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        StationeryActionRow(
+            title: title,
+            subtitle: subtitle,
+            systemImage: systemImage,
+            tone: tone.stationeryTone,
+            isEnabled: isEnabled,
+            showsChevron: showsChevron
+        )
         .accessibilityAddTraits(.isButton)
     }
 }
@@ -1370,37 +1210,24 @@ private struct WorklistActionRow: View {
 private struct WorklistStatusChip: View {
     let text: String
     let systemImage: String
-    let tone: WorklistStationeryTone
+    let tone: WorklistTone
 
-    init(_ text: String, systemImage: String, tone: WorklistStationeryTone = .neutral) {
+    init(_ text: String, systemImage: String, tone: WorklistTone = .neutral) {
         self.text = text
         self.systemImage = systemImage
         self.tone = tone
     }
 
     var body: some View {
-        Label {
-            Text(text)
-                .lineLimit(3)
-                .minimumScaleFactor(0.82)
-        } icon: {
-            Image(systemName: systemImage)
-                .accessibilityHidden(true)
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(tone.color)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(tone.softColor))
-        .accessibilityElement(children: .combine)
+        StationeryStatusChip(text, systemImage: systemImage, tone: tone.stationeryTone)
     }
 }
 
 private struct WorklistNote: View {
     let text: String
-    let tone: WorklistStationeryTone
+    let tone: WorklistTone
 
-    init(_ text: String, tone: WorklistStationeryTone = .neutral) {
+    init(_ text: String, tone: WorklistTone = .neutral) {
         self.text = text
         self.tone = tone
     }
@@ -1408,7 +1235,7 @@ private struct WorklistNote: View {
     var body: some View {
         Text(text)
             .font(.footnote)
-            .foregroundStyle(tone == .warning ? WorklistStationery.attentionOrange : WorklistStationery.secondaryInk)
+            .foregroundStyle(tone == .warning ? CommenterStationeryTheme.Colors.attentionOrange : CommenterStationeryTheme.Colors.secondaryInk)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1420,27 +1247,7 @@ private struct WorklistEmptyCard: View {
     let message: String
 
     var body: some View {
-        WorklistNotebookCard {
-            VStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 40, weight: .regular))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(WorklistStationery.localGreen)
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(WorklistStationery.titleFont)
-                    .foregroundStyle(WorklistStationery.ink)
-                    .multilineTextAlignment(.center)
-                Text(message)
-                    .font(WorklistStationery.handwrittenFont)
-                    .foregroundStyle(WorklistStationery.secondaryInk)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-        }
-        .accessibilityElement(children: .combine)
+        StationeryEmptyState(systemImage: systemImage, title: title, message: message)
     }
 }
 
@@ -1452,13 +1259,7 @@ private struct WorklistTapeInlineTitle: View {
     }
 
     var body: some View {
-        Text(title)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(WorklistStationery.ink)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(WorklistStationery.tape, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
-            .rotationEffect(.degrees(-1))
+        TapeLabel(title)
             .padding(.bottom, 12)
             .accessibilityAddTraits(.isHeader)
     }
