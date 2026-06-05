@@ -2,10 +2,6 @@ name: iOS Screenshots
 
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
 
 jobs:
   screenshots:
@@ -25,25 +21,6 @@ jobs:
           xcrun --version || true
           xcrun simctl list runtimes || true
           xcrun simctl list devices available || true
-
-      - name: Cache SwiftPM artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            .build
-            .swiftpm
-          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.resolved', 'Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-swiftpm-
-
-      - name: Cache Xcode derived data
-        uses: actions/cache@v4
-        with:
-          path: build/DerivedData
-          key: ${{ runner.os }}-xcode-screenshots-${{ hashFiles('Package.resolved', 'Package.swift', 'CommenterIOS.xcodeproj/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-xcode-screenshots-
-            ${{ runner.os }}-xcode-
 
       - name: Resolve packages
         run: swift package resolve

@@ -704,6 +704,13 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   prompt builder, and guarded Foundation Models call still need macOS/Xcode SDK
   compile and simulator UI validation before release claims.
 
+- CI validation was hardened on 2026-06-05 so `.github/workflows/ios-ci.yml`
+  runs Swift package tests, the iOS app-target build, and then the screenshot
+  UI test only after both prerequisites pass. The standalone
+  `.github/workflows/ios-screenshots.yml` trigger is manual-only. Compiled
+  `.build` and `build/DerivedData` caches were removed from CI workflows to
+  avoid stale Swift module reuse across source changes.
+
 ## Future Required Gates
 
 Future required gates beyond current Swift package checks:

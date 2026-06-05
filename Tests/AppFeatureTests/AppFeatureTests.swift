@@ -1020,6 +1020,7 @@ final class AppFeatureTests: XCTestCase {
     func testAIReportApprovalRequiresValidationThenPersistsAsDirtyLocalState() async {
         var original = readyProject()
         let text = "Ava reads with confidence and explains ideas using evidence."
+        original.reports[0].text = text
         original.reports[0].generationMode = .aiPolishedDeterministic
         original.reports[0].aiTrace = AIReportTrace(
             traceId: "trace-1",

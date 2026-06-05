@@ -438,24 +438,9 @@ public enum ToneAxis: Int, Codable, CaseIterable, Equatable, Sendable {
             return
         }
         if let value = try? container.decode(String.self) {
-            let normalized = value
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-                .replacingOccurrences(of: "-", with: "")
-                .replacingOccurrences(of: "_", with: "")
-            switch normalized {
-            case "low":
-                self = .low
-            case "slightlylow":
-                self = .slightlyLow
-            case "balanced":
-                self = .balanced
-            case "slightlyhigh":
-                self = .slightlyHigh
-            case "high":
-                self = .high
-            default:
-                break
+            if let axis = Self.legacyStringValue(value) {
+                self = axis
+                return
             }
         }
         throw DecodingError.typeMismatch(
@@ -467,6 +452,30 @@ public enum ToneAxis: Int, Codable, CaseIterable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(rawValue)
+    }
+
+    private static func legacyStringValue(_ value: String) -> ToneAxis? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let rawValue = Int(trimmed), let axis = ToneAxis(rawValue: rawValue) {
+            return axis
+        }
+        let normalized = value
+            .lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+        switch normalized {
+        case "low":
+            return .low
+        case "slightlylow":
+            return .slightlyLow
+        case "balanced":
+            return .balanced
+        case "slightlyhigh":
+            return .slightlyHigh
+        case "high":
+            return .high
+        default:
+            return nil
+        }
     }
 }
 

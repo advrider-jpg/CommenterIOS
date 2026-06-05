@@ -721,3 +721,14 @@ Append material work history here. Keep entries short, dated, and factual.
   accept both legacy raw checksums and normalized persistence checksums.
 - Split SwiftPM test diagnostics from the iOS app-target build in CI so Swift
   test failures still upload logs and no longer hide app target compilation.
+
+## 2026-06-05 - CI fail-fast and screenshot repair pass
+
+- Removed compiled SwiftPM and DerivedData caches from CI workflows so source
+  changes cannot reuse stale module artifacts.
+- Moved the required screenshot job into iOS CI behind Swift package and app
+  build prerequisites; the standalone screenshot workflow is now manual-only.
+- Fixed the AI approval test fixture to approve the same report text it
+  fingerprints, and added broader legacy tone-axis decoding coverage.
+- Made the screenshot UI test tap the roster navigation row deterministically
+  and wait for the student editor before editing first and last name fields.

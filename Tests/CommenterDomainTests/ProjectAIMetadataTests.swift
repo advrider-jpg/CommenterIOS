@@ -170,6 +170,61 @@ final class ProjectAIMetadataTests: XCTestCase {
         XCTAssertEqual(decoded.requiredMentions, [])
     }
 
+    func testDecodesLegacyToneAxisStringsAndDefaultsMissingToneFields() throws {
+        let json = Data("""
+        {
+          "warmth": "slightly high",
+          "specificity": "slightly-high",
+          "concision": "slightly_high",
+          "formality": "balanced",
+          "encouragement": "slightly low",
+          "nextStepDirectness": "slightly-low",
+          "evidenceAnchoring": "low",
+          "schoolVoice": "standard"
+        }
+        """.utf8)
+
+        let decoded = try JSONDecoder().decode(AIToneProfile.self, from: json)
+
+        XCTAssertEqual(decoded.warmth, .slightlyHigh)
+        XCTAssertEqual(decoded.specificity, .slightlyHigh)
+        XCTAssertEqual(decoded.concision, .slightlyHigh)
+        XCTAssertEqual(decoded.formality, .balanced)
+        XCTAssertEqual(decoded.encouragement, .slightlyLow)
+        XCTAssertEqual(decoded.nextStepDirectness, .slightlyLow)
+        XCTAssertEqual(decoded.evidenceAnchoring, .low)
+    }
+
+    func testDecodesMissingAIToneProfileAxesAsBalanced() throws {
+        let json = Data("""
+        {
+          "warmth": "high"
+        }
+        """.utf8)
+
+        let decoded = try JSONDecoder().decode(AIToneProfile.self, from: json)
+
+        XCTAssertEqual(decoded.warmth, .high)
+        XCTAssertEqual(decoded.specificity, .balanced)
+        XCTAssertEqual(decoded.concision, .balanced)
+        XCTAssertEqual(decoded.formality, .balanced)
+        XCTAssertEqual(decoded.encouragement, .balanced)
+        XCTAssertEqual(decoded.nextStepDirectness, .balanced)
+        XCTAssertEqual(decoded.evidenceAnchoring, .balanced)
+        XCTAssertEqual(decoded.schoolVoice, .standard)
+    }
+
+    func testUnknownToneAxisStringStillFailsClearly() {
+        let json = Data(#""extra spicy""#.utf8)
+
+        XCTAssertThrowsError(try JSONDecoder().decode(ToneAxis.self, from: json)) { error in
+            guard case let DecodingError.typeMismatch(_, context) = error else {
+                return XCTFail("Expected a ToneAxis type mismatch, got \(error).")
+            }
+            XCTAssertEqual(context.debugDescription, "Expected ToneAxis raw value or legacy string.")
+        }
+    }
+
     func testProjectAISettingsCanBeBuiltFromReportOptions() {
         let options = AIReportOptions(
             toneProfile: AIToneProfile(warmth: .high, specificity: .slightlyHigh),

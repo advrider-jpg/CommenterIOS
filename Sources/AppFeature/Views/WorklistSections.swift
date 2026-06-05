@@ -319,6 +319,7 @@ private struct StudentEditorView: View {
         .background(CommenterStationeryTheme.Colors.paperBackground)
         .navigationTitle(fullStudentName(student))
         .commenterInlineNavigationTitle()
+        .accessibilityIdentifier("student-editor-\(student.id)")
     }
 
     @ViewBuilder private var studentIdentityFields: some View {
