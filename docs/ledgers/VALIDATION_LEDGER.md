@@ -419,6 +419,50 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   `01-projects.png` through `10-support-with-project.png`. That evidence is now
   stale relative to the current 14-screenshot
   `testCoreReportFlowScreenshots` workflow.
+- Re-ran live Windows validation after the CommenterV3 parity port for
+  production comment data, recipe rendering, pronoun/language repair, and
+  expanded worklist inputs. `git diff --check` passed. `git ls-files --eol`
+  showed tracked text files with LF working-tree endings. The bundled
+  production dataset matched the current live
+  `C:\Commenterv3\client\public\data\comment-engine.json` after LF
+  normalization with normalized SHA-256
+  `c6d7f90c06f16c9d4b810bb076fb6647de1c5831a1ed99e118f470a19f7f48f3` and
+  counts `56564/5/4340/2`. XcodeBuildMCP discovered
+  `C:\CommenterIOS\CommenterIOS.xcodeproj`, but scheme listing and simulator
+  listing were blocked by missing Apple tools: `spawn xcodebuild ENOENT` and
+  `spawn xcrun ENOENT`. Direct `swift test` failed because `swift` is not
+  recognized on this Windows PATH.
+
+- Re-ran live Windows validation after the follow-on CommenterV3 carryover for
+  report-context sentence generation, disabled-layout flattening, final
+  sentence-case normalization, recipe `ComponentMode`/`RequiredTypes` support,
+  and generator-backed input feedback. `git diff --check` passed.
+  `git diff --cached --check` passed with no staged changes. `git ls-files
+  --eol | Select-String -Pattern 'w/crlf|w/mixed'` returned no matches. The
+  fake-state scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The bundled production dataset still exactly matched
+  the current live
+  `C:\Commenterv3\client\public\data\comment-engine.json` after LF
+  normalization with SHA-256
+  `c6d7f90c06f16c9d4b810bb076fb6647de1c5831a1ed99e118f470a19f7f48f3` and
+  counts `56564/5/4340/2`. XcodeBuildMCP discovered
+  `C:\CommenterIOS\CommenterIOS.xcodeproj`, but scheme and simulator listing
+  remain blocked by missing Apple tools: `spawn xcodebuild ENOENT` and
+  `spawn xcrun ENOENT`. Direct `swift test` remains blocked because `swift` is
+  not recognized on this Windows PATH.
+
+- Final Windows validation run on the full V3 parity carryover branch covering
+  advisory language warnings, layout normalization, spell-check modifiers,
+  reducer routing for new editing actions, roster validation UI, inline report
+  feedback, encrypted backup, backup collision detection, and invalid-project
+  diagnostics. `git diff --check` passed. `git ls-files --eol` returned no
+  CRLF or mixed line endings. Untracked Swift files (`RecipeRenderer.swift`,
+  `ReportInputFeedback.swift`) contained no CR bytes. Dataset equality check
+  passed: SHA-256
+  `c6d7f90c06f16c9d4b810bb076fb6647de1c5831a1ed99e118f470a19f7f48f3`
+  matches live `C:\Commenterv3\client\public\data\comment-engine.json`.
+  Swift/Xcode validation remains blocked on this Windows machine.
 
 - The current PR workflow configuration adds SwiftPM caches for `.build` and
   `.swiftpm`, Xcode derived-data caches under `build/DerivedData`, a

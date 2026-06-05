@@ -114,9 +114,12 @@ public enum ProductionCommentDataset {
                 rejected[.recipeBank, default: RejectionCount()].missingRequiredFields += 1
                 return nil
             }
+            let requiredTypes = stringArray(record, field: "RequiredTypes")?.compactMap(Component.ComponentType.init(rawValue:))
             return Recipe(
                 recipeID: requiredString(record, field: "Recipe_ID") ?? "",
-                pattern: requiredString(record, field: "Pattern") ?? ""
+                pattern: requiredString(record, field: "Pattern") ?? "",
+                componentMode: requiredString(record, field: "ComponentMode"),
+                requiredTypes: requiredTypes?.isEmpty == true ? nil : requiredTypes
             )
         }
 
@@ -267,6 +270,21 @@ public enum ProductionCommentDataset {
 
     private static func hasRequiredStrings(_ record: [String: Any], fields: [String]) -> Bool {
         fields.allSatisfy { requiredString(record, field: $0) != nil }
+    }
+
+    private static func stringArray(_ record: [String: Any], field: String) -> [String]? {
+        guard let value = record[field], !(value is NSNull) else { return nil }
+        if let array = value as? [Any] {
+            return array.compactMap { entry in
+                let rendered = String(describing: entry).trimmingCharacters(in: .whitespacesAndNewlines)
+                return rendered.isEmpty ? nil : rendered
+            }
+        }
+        if let string = value as? String {
+            let rendered = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return rendered.isEmpty ? nil : [rendered]
+        }
+        return nil
     }
 
     private static func numericValue(_ value: Any?) -> Double? {

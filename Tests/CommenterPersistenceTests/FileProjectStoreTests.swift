@@ -143,11 +143,32 @@ final class FileProjectStoreTests: XCTestCase {
         }
     }
 
-    private func fixtureProject() -> Project {
+    func testListProjectsPreservesValidProjectsAndReportsInvalidRecords() async throws {
+        let root = temporaryRoot()
+        let clock = TestClock(start: 1)
+        let store = FileProjectStore(rootURL: root, now: { clock.next() })
+        _ = try store.saveProject(fixtureProject(id: "valid", name: "Valid Project"))
+        _ = try store.saveProject(fixtureProject(id: "tampered", name: "Tampered Project"))
+        let tamperedURL = projectFileURL(root: root, projectId: "tampered")
+        var raw = try String(contentsOf: tamperedURL)
+        raw = raw.replacingOccurrences(of: "\"Tampered Project\"", with: "\"Changed Outside Store\"")
+        try raw.write(to: tamperedURL, atomically: true, encoding: .utf8)
+
+        let listedProjects = try await store.listProjects()
+        XCTAssertEqual(listedProjects.map(\.metadata.id), ["valid"])
+
+        let diagnostics = try await store.listProjectsWithDiagnostics()
+        XCTAssertEqual(diagnostics.projects.map(\.metadata.id), ["valid"])
+        XCTAssertEqual(diagnostics.invalidProjects, [
+            InvalidProjectRecord(id: "tampered", reason: "Stored project fingerprint verification failed.")
+        ])
+    }
+
+    private func fixtureProject(id: String = "p1", name: String = "Project") -> Project {
         Project(
             metadata: ProjectMetadata(
-                id: "p1",
-                name: "Project",
+                id: id,
+                name: name,
                 term: "Term 1",
                 yearLevel: .year5,
                 createdAt: 1,

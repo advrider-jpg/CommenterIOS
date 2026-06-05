@@ -56,6 +56,17 @@ public extension View {
         self
         #endif
     }
+
+    @ViewBuilder
+    func commenterReportTextInput() -> some View {
+        #if os(iOS)
+        self
+            .textInputAutocapitalization(.sentences)
+            .autocorrectionDisabled(false)
+        #else
+        self
+        #endif
+    }
 }
 
 public struct CommenterSectionHeader: View {

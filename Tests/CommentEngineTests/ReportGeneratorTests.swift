@@ -38,7 +38,7 @@ final class ReportGeneratorTests: XCTestCase {
         let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
 
         XCTAssertEqual(report.text, "Ava explains ideas in English. Ava uses evidence. Ava should revise punctuation.")
-        XCTAssertEqual(report.variantIds, ["ASSEMBLED_2d1440b2"])
+        XCTAssertEqual(report.variantIds, ["RECIPE_r1_139eae27"])
     }
 
     func testAggregateSubjectRequiresConcreteFocus() throws {
@@ -103,6 +103,39 @@ final class ReportGeneratorTests: XCTestCase {
         XCTAssertTrue((report.trace ?? "").contains("Teacher evidence was used through a safe specific task phrase."))
     }
 
+    func testAddsReportContextSentenceWhenContextFieldsAreNotAlreadyConsumed() throws {
+        var sourceResult = result()
+        sourceResult.textType = "persuasive paragraph"
+        sourceResult.learningContext = "class novel discussion"
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(report.text, "Ava writes clearly in English. This was demonstrated through persuasive paragraph in class novel discussion.")
+        XCTAssertTrue((report.trace ?? "").contains("Teacher report context included."))
+    }
+
+    func testBlocksUnsafeReportContextFieldsBeforeGeneration() throws {
+        var sourceResult = result()
+        sourceResult.textType = "They wrote a persuasive paragraph"
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        XCTAssertThrowsError(try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Text type / genre starts like a sentence"))
+        }
+    }
+
+    func testReportContextPunctuationIsNormalizedLikeV3() throws {
+        var sourceResult = result()
+        sourceResult.textType = "persuasive paragraph."
+        sourceResult.learningContext = "class novel discussion."
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(report.text, "Ava writes clearly in English. This was demonstrated through persuasive paragraph in class novel discussion.")
+    }
+
     func testAppendsRepairedReportNotesAndBlocksUnsafeNotes() throws {
         var sourceResult = result()
         sourceResult.reportEmphasisNote = "needs planning carefully"
@@ -115,7 +148,7 @@ final class ReportGeneratorTests: XCTestCase {
             generatedAt: 1
         )
 
-        XCTAssertEqual(report.text, "Ava writes clearly in English. Ava has shown using feedback. Ava would benefit from planning carefully.")
+        XCTAssertEqual(report.text, "Ava writes clearly in English. Ava uses feedback. Ava would benefit from support with planning carefully.")
         XCTAssertTrue((report.trace ?? "").contains("Teacher/student note emphasis included."))
 
         sourceResult.reportEmphasisNote = "Keep [Student Name] placeholder."
@@ -137,7 +170,7 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(
             report.text,
-            "Ava writes clearly in English. In Inferencing, she demonstrates solid understanding. Ava is developing respectful discussion habits in English by waiting to be called on before speaking. Ava participates confidently in English and contributes thoughtful ideas during discussions."
+            "Ava writes clearly in English. In Inferencing, they demonstrate solid understanding. Ava is developing respectful discussion habits in English by waiting to be called on before speaking. Ava participates confidently in English and contributes thoughtful ideas during discussions."
         )
     }
 
@@ -178,7 +211,7 @@ final class ReportGeneratorTests: XCTestCase {
         )
     }
 
-    func testLayoutCanReturnSubjectOnlyWhenDisabled() throws {
+    func testDisabledLayoutFlattensSelectedSectionsLikeV3() throws {
         var sourceMetadata = metadata()
         sourceMetadata.reportLayout = ReportLayout(enabled: false)
         var sourceResult = result()
@@ -187,10 +220,10 @@ final class ReportGeneratorTests: XCTestCase {
 
         let report = try generator.generateReport(student: student(attitudeDescriptor: "curious"), subject: "English", result: sourceResult, generatedAt: 1)
 
-        XCTAssertEqual(report.text, "Ava writes clearly in English.")
+        XCTAssertEqual(report.text, "A curious learner, Ava engages positively with English content. Ava writes clearly in English. A helpful next step for Ava is to use evidence from text.")
     }
 
-    func testLayoutIncludeDefaultsKeepSubjectAndMissingSectionsIncluded() throws {
+    func testLayoutIncludeDefaultsKeepSubjectForcedLikeV3() throws {
         var sourceMetadata = metadata()
         sourceMetadata.reportLayout = ReportLayout(
             enabled: true,
@@ -205,7 +238,10 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(
             report.text,
-            "A helpful next step for Ava is to use evidence from text."
+            [
+                "A helpful next step for Ava is to use evidence from text.",
+                "Ava writes clearly in English."
+            ].joined(separator: "\n\n")
         )
     }
 
@@ -221,9 +257,26 @@ final class ReportGeneratorTests: XCTestCase {
         XCTAssertEqual(
             report.text,
             [
-                "Ava writes clearly in English. In Inferencing, she demonstrates solid understanding.",
+                "Ava writes clearly in English. In Inferencing, they demonstrate solid understanding.",
                 "Ava demonstrates a growth mindset.",
                 "A helpful next step for Ava is to use evidence from text."
+            ].joined(separator: "\n\n")
+        )
+    }
+
+    func testDecorationArraysFallbackWhenExistingDataHasMoreThanTwoValues() throws {
+        var sourceResult = result()
+        sourceResult.englishFocusTags = ["Inferencing", "Vocabulary", "Punctuation"]
+        sourceResult.nextStepGoals = ["use evidence from text", "edit for clarity", "vary sentence structure"]
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(
+            report.text,
+            [
+                "Ava writes clearly in English. Ava has shown strength in Inferencing, Vocabulary, and Punctuation.",
+                "Next steps for Ava include use evidence from text, edit for clarity, and vary sentence structure."
             ].joined(separator: "\n\n")
         )
     }
@@ -237,6 +290,21 @@ final class ReportGeneratorTests: XCTestCase {
             XCTAssertTrue(error.localizedDescription.contains("Evidence could not be used safely"))
             XCTAssertTrue(error.localizedDescription.contains("template placeholders"))
         }
+    }
+
+    func testTeacherTextRepairAdjustsPronounVerbAgreement() throws {
+        var sourceResult = result()
+        sourceResult.reportEmphasisNote = "They use feedback and explain clearly"
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+
+        let report = try generator.generateReport(
+            student: student(gender: .female),
+            subject: "English",
+            result: sourceResult,
+            generatedAt: 1
+        )
+
+        XCTAssertEqual(report.text, "Ava writes clearly in English. She uses feedback and explains clearly.")
     }
 
     func testTemplateHashMatchesV3UTF16SelectionForNonASCIIKeys() throws {

@@ -65,15 +65,26 @@ public struct RejectionCount: Codable, Equatable, Sendable {
 public struct Recipe: Codable, Equatable, Sendable {
     public var recipeID: String
     public var pattern: String
+    public var componentMode: String?
+    public var requiredTypes: [Component.ComponentType]?
 
     enum CodingKeys: String, CodingKey {
         case recipeID = "Recipe_ID"
         case pattern = "Pattern"
+        case componentMode = "ComponentMode"
+        case requiredTypes = "RequiredTypes"
     }
 
-    public init(recipeID: String, pattern: String) {
+    public init(
+        recipeID: String,
+        pattern: String,
+        componentMode: String? = nil,
+        requiredTypes: [Component.ComponentType]? = nil
+    ) {
         self.recipeID = recipeID
         self.pattern = pattern
+        self.componentMode = componentMode
+        self.requiredTypes = requiredTypes
     }
 }
 

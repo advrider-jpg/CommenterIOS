@@ -454,3 +454,70 @@ Append material work history here. Keep entries short, dated, and factual.
 - After hosted screenshot run `26781195133` showed `prepared-file-ready` was
   present but exposed by SwiftUI as multiple label child elements, changed the
   generic identifier lookup helper to use the first matching accessibility node.
+
+## 2026-06-05 - CommenterV3 parity carryover
+
+- Refreshed the bundled production comment dataset from the live CommenterV3
+  source file and updated the production dataset hash expectation.
+- Ported current CommenterV3 recipe-bank assembly behavior into the Swift
+  generator, including slot rendering, unresolved-placeholder blocking,
+  language linting, and deterministic recipe synthetic variant IDs.
+- Hardened teacher note repair and report readiness checks for pronoun/verb
+  agreement, repeated names/words, article agreement, and the V3-derived
+  language patterns that block misleading generated output.
+- Added real Work list editing for student gender, pronouns, private teacher
+  notes, attitude descriptors, result evidence, text type, learning context,
+  report notes, English focus tags, math proficiencies, math habits, next-step
+  goals, and report flags. These fields now mutate durable project state
+  through TCA actions instead of being import-only or invisible data.
+- Tightened project and import validation for phrase-only report-context
+  fields so sentence-like or pronoun-led fragments are rejected before they can
+  produce misleading comments.
+- Continued the live CommenterV3 parity audit against the current
+  `C:\Commenterv3` checkout and carried over final-generation hardening that
+  was still missing from iOS: report-context sentences for unused text
+  type/context fields, V3-style disabled-layout flattening, final sentence-case
+  normalization that preserves names/subjects, recipe `ComponentMode` and
+  `RequiredTypes` handling, and generation-time blocking for unsafe
+  report-context phrases.
+- Added Work list feedback for evidence, text type, learning context, and
+  report notes. The feedback is backed by the same repair/validation helpers
+  used by generation, so user-visible success/warning/error states describe
+  real generator behavior rather than decorative guidance.
+- Added V3-style advisory language warnings (long sentences, overly complex
+  phrasing) alongside blocking errors so diagnostics are more informative
+  without changing export-readiness gates.
+- Aligned language-lint issue ordering with V3: placeholder, repeated
+  display/first names, custom patterns, pronoun, retext-style deterministic
+  checks, articles, then advisory warnings.
+- Aligned Work list focus-library options for English tags, math proficiencies,
+  and math habits to the current V3 import/generator contract.
+- Added a malformed-layout de-duplication guard matching V3's
+  `normalizeReportLayout` behavior so repeated section entries are collapsed
+  to one before generation, not silently skipped.
+- Applied native sentence autocapitalization and autocorrection modifiers to
+  long-form teacher-note and report-draft editors, the SwiftUI equivalent of
+  V3's explicit spell-check opt-in for manual report edits.
+- Fixed the AppFeature reducer routing so the new student-level editing actions
+  (gender, pronouns, internal note, attitude, evidence, text type, context,
+  report note, flags, English tags, math proficiencies, math habits, next-step
+  goals) are dispatched from the top-level dispatcher to the project-editing
+  sub-reducer.
+- Added real Work list roster validation backed by existing project-validation
+  helpers; teachers see duplicate-identity and missing-name/year-level errors
+  before save and generation.
+- Added inline report-editor feedback from the actual readiness/lint helpers so
+  placeholder and language blockers surface at the draft edit point, not only
+  at export time.
+- Ported V3 encrypted backup support (AES-GCM + PBKDF2-SHA-256, CryptoKit/
+  Security, password validation, ciphertext checksum, associated-data binding)
+  into `BackupEnvelope.swift` with matching import/parse/serialize helpers.
+- Added backup collision detection for invalid project records so teachers
+  importing a backup whose ID matches a damaged local record are shown the
+  right choice rather than silently replacing or duplicating.
+- Wired invalid-project diagnostics throughout app state, lifecycle, support
+  screen, and copied diagnostics so a damaged or tampered local project file
+  is visible without blocking the project list.
+- Ran available Windows validation. SwiftPM and Xcode/simulator validation
+  remain blocked locally because `swift`, `xcodebuild`, and `xcrun` are not
+  installed on this machine.

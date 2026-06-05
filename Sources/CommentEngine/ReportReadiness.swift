@@ -81,16 +81,35 @@ public struct ReportLanguageIssue: Equatable, Sendable {
         case error
     }
 
+    public enum Source: String, Equatable, Sendable {
+        case placeholder
+        case customRule = "custom-rule"
+        case retext
+        case sourceCorpus = "source-corpus"
+        case teacherText = "teacher-text"
+    }
+
     public var code: String
     public var severity: Severity
     public var message: String
     public var excerpt: String?
+    public var suggestion: String?
+    public var source: Source?
 
-    public init(code: String, severity: Severity, message: String, excerpt: String? = nil) {
+    public init(
+        code: String,
+        severity: Severity,
+        message: String,
+        excerpt: String? = nil,
+        suggestion: String? = nil,
+        source: Source? = nil
+    ) {
         self.code = code
         self.severity = severity
         self.message = message
         self.excerpt = excerpt
+        self.suggestion = suggestion
+        self.source = source
     }
 }
 
@@ -276,29 +295,50 @@ public func lintReportLanguage(
     _ text: String,
     displayName: String,
     firstName: String,
-    expectedSubjectPronoun: String
+    expectedSubjectPronoun: String,
+    allowWarnings: Bool = true
 ) -> ReportLanguageLintResult {
     var issues: [ReportLanguageIssue] = findUnresolvedPlaceholders(text).map { placeholder in
         ReportLanguageIssue(
             code: "unresolved-placeholder",
             severity: .error,
             message: "The report contains template text that must be replaced.",
-            excerpt: placeholder
+            excerpt: placeholder,
+            suggestion: "Replace the template token with real report text.",
+            source: .placeholder
         )
     }
 
-    severeLanguagePatterns.forEach { pattern in
-        if let match = firstMatch(pattern: pattern.pattern, in: text) {
-            issues.append(ReportLanguageIssue(code: pattern.code, severity: .error, message: pattern.message, excerpt: match))
+    let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let trimmedFirstName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmedDisplayName.isEmpty, trimmedDisplayName.lowercased() != trimmedFirstName.lowercased() {
+        let escaped = NSRegularExpression.escapedPattern(for: trimmedDisplayName)
+        if let repeated = firstMatch(pattern: #"(?:^|\s)("# + escaped + #"\s+"# + escaped + #")(?=\s|[.,!?;:]|$)"#, in: text, options: [.caseInsensitive]) {
+            issues.append(ReportLanguageIssue(code: "repeated-display-name", severity: .error, message: "The student name appears twice in a row.", excerpt: repeated, suggestion: "Remove the duplicated name.", source: .customRule))
         }
     }
 
-    let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !trimmedDisplayName.isEmpty {
-        let escaped = NSRegularExpression.escapedPattern(for: trimmedDisplayName)
+    if !trimmedFirstName.isEmpty {
+        let escaped = NSRegularExpression.escapedPattern(for: trimmedFirstName)
         if let repeated = firstMatch(pattern: #"(?:^|\s)("# + escaped + #"\s+"# + escaped + #")(?=\s|[.,!?;:]|$)"#, in: text, options: [.caseInsensitive]) {
-            issues.append(ReportLanguageIssue(code: "repeated-display-name", severity: .error, message: "The student name appears twice in a row.", excerpt: repeated))
+            issues.append(ReportLanguageIssue(code: "repeated-first-name", severity: .error, message: "The student first name appears twice in a row.", excerpt: repeated, suggestion: "Remove the duplicated name.", source: .customRule))
         }
+    }
+
+    severeLanguagePatterns.forEach { pattern in
+        if let match = firstMatch(pattern: pattern.pattern, in: text, options: [.caseInsensitive]) {
+            issues.append(ReportLanguageIssue(code: pattern.code, severity: .error, message: pattern.message, excerpt: match, source: .customRule))
+        }
+    }
+
+    if let wrongPronoun = wrongPronounIssue(text: text, expectedSubjectPronoun: expectedSubjectPronoun) {
+        issues.append(wrongPronoun)
+    }
+
+    repeatedWordIssues(text).forEach { issues.append($0) }
+    articleIssues(text).forEach { issues.append($0) }
+    if allowWarnings {
+        longSentenceWarnings(text).forEach { issues.append($0) }
     }
 
     return ReportLanguageLintResult(issues: issues)
@@ -323,13 +363,94 @@ private struct SevereLanguagePattern {
 
 private let severeLanguagePatterns: [SevereLanguagePattern] = [
     SevereLanguagePattern(code: "for-example-pronoun", pattern: #"For example,\s+(She|He|They)\b"#, message: "A report example begins with a pronoun and needs rewording."),
-    SevereLanguagePattern(code: "repeated-name", pattern: #"\b([A-Z][a-z]+)\s+\1\b"#, message: "A student name appears twice in a row."),
     SevereLanguagePattern(code: "shown-name", pattern: #"has also shown\s+[A-Z][a-z]+\b"#, message: "A report note appears to have been wrapped around a full sentence."),
     SevereLanguagePattern(code: "shown-needs", pattern: #"has also shown\s+needs\b"#, message: "A growth note was inserted into the wrong sentence frame."),
     SevereLanguagePattern(code: "shown-has", pattern: #"has also shown\s+has\b"#, message: "A growth note was inserted into the wrong sentence frame."),
     SevereLanguagePattern(code: "shown-pronoun", pattern: #"has also shown\s+(she|he|they)\b"#, message: "A report note was inserted into the wrong sentence frame."),
-    SevereLanguagePattern(code: "demonstrated-pronoun", pattern: #"demonstrated this during\s+(She|He|They)\b"#, message: "Evidence was inserted into a sentence frame incorrectly.")
+    SevereLanguagePattern(code: "demonstrated-pronoun", pattern: #"demonstrated this during\s+(She|He|They)\b"#, message: "Evidence was inserted into a sentence frame incorrectly."),
+    SevereLanguagePattern(code: "shown-gerund", pattern: #"has(?: also)? shown\s+(using|applying|checking|explaining|organising|organizing|writing|reading|sharing|analysing|analyzing|comparing|creating|solving|listening|participating|describing|identifying|developing|reflecting|editing|reviewing|completing)\b"#, message: "A report note was inserted into a sentence frame that needs a noun phrase or complete sentence."),
+    SevereLanguagePattern(code: "benefit-from-bare-verb", pattern: #"\bwould benefit from\s+(apply|attempt|check|compare|complete|create|describe|develop|edit|explain|identify|listen|organise|organize|participate|read|reflect|review|share|solve|thank|use|write|analyse|analyze)\b"#, message: "A growth note uses a bare verb after \"would benefit from\"."),
+    SevereLanguagePattern(code: "adjective-adverb-analyse", pattern: #"\bThey\s+(insightful|detailed)\s+analyse\b"#, message: "A corpus phrase uses an adjective where an adverbial phrase is needed before \"analyse\"."),
+    SevereLanguagePattern(code: "adjective-adverb-compare", pattern: #"\bThey\s+(insightful|detailed)\s+compare\b"#, message: "A corpus phrase uses an adjective where an adverbial phrase is needed before \"compare\"."),
+    SevereLanguagePattern(code: "designed-investigations-modifier", pattern: #"\bthrough\s+(insightful|detailed)\s+designed investigations\b"#, message: "A modifier before \"designed investigations\" is grammatically unsafe."),
+    SevereLanguagePattern(code: "subject-verb-agreement", pattern: #"\b(?:He|She)\s+(apply|attempt|check|compare|complete|create|describe|develop|edit|explain|identify|listen|organise|organize|participate|read|reflect|review|share|solve|thank|use|write|analyse|analyze)\b|\bThey\s+(applies|attempts|checks|compares|completes|creates|describes|develops|edits|explains|identifies|listens|organises|organizes|participates|reads|reflects|reviews|shares|solves|thanks|uses|writes|analyses|analyzes)\b|\b(?:He|She)\s+\w+s\b[^.!?;:]*\band\s+(apply|attempt|check|compare|complete|create|describe|develop|edit|explain|identify|listen|organise|organize|participate|read|reflect|review|share|solve|thank|use|write|analyse|analyze)\b"#, message: "A pronoun and verb do not agree."),
+    SevereLanguagePattern(code: "double-space", pattern: #" {2,}|\t+"#, message: "The report contains repeated spacing."),
+    SevereLanguagePattern(code: "space-before-punctuation", pattern: #"\s+([,.;:!?])"#, message: "The report contains a space before punctuation."),
+    SevereLanguagePattern(code: "repeated-terminal-punctuation", pattern: #"[!?]{2,}|,{2,}|(?<!\b[A-Z])\.{2,}"#, message: "The report contains repeated punctuation."),
+    SevereLanguagePattern(code: "sentence-start-lowercase", pattern: #"(^|[.!?]\s+)[a-z](?=[a-z])"#, message: "A sentence appears to start with a lowercase letter.")
 ]
+
+private let articlePatterns: [SevereLanguagePattern] = [
+    SevereLanguagePattern(code: "article-agreement", pattern: #"\ba\s+(achievement|activity|accurate|area|assessment|effective|engaging|excellent|example|idea|improvement|insight|insightful|investigation|opportunity|outcome|understanding)\b"#, message: "The article \"a\" appears before a word that usually needs \"an\"."),
+    SevereLanguagePattern(code: "article-agreement", pattern: #"\ban\s+(one|unit|unique|university|useful|year|young)\b"#, message: "The article \"an\" appears before a word that usually needs \"a\".")
+]
+
+private func wrongPronounIssue(text: String, expectedSubjectPronoun: String) -> ReportLanguageIssue? {
+    let expected = expectedSubjectPronoun.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard ["he", "she", "they"].contains(expected) else { return nil }
+    guard let match = firstMatch(pattern: #"(?:^|[.!?]\s+)(He|She|They)\b"#, in: text),
+          let pronoun = firstMatch(pattern: #"\b(He|She|They)\b"#, in: match)
+    else { return nil }
+    guard pronoun.lowercased() != expected else { return nil }
+    return ReportLanguageIssue(
+        code: "wrong-pronoun",
+        severity: .error,
+        message: "The report uses \"\(pronoun)\" where the student's subject pronoun is \"\(expectedSubjectPronoun)\".",
+        excerpt: match,
+        suggestion: "Use \"\(expectedSubjectPronoun)\" for this student.",
+        source: .customRule
+    )
+}
+
+private func repeatedWordIssues(_ text: String) -> [ReportLanguageIssue] {
+    guard let regex = try? NSRegularExpression(pattern: #"\b([A-Za-z][A-Za-z'’-]*)\s+\1\b"#, options: [.caseInsensitive]) else { return [] }
+    var seen = Set<String>()
+    return regex.matches(in: text, range: NSRange(text.startIndex..<text.endIndex, in: text)).compactMap { match in
+        guard let range = Range(match.range, in: text) else { return nil }
+        let excerpt = String(text[range])
+        let normalized = excerpt.lowercased()
+        guard seen.insert(normalized).inserted else { return nil }
+        return ReportLanguageIssue(code: "repeated-word", severity: .error, message: "The same word appears twice in a row.", excerpt: excerpt, suggestion: "Remove the repeated word.", source: .customRule)
+    }
+}
+
+private func articleIssues(_ text: String) -> [ReportLanguageIssue] {
+    articlePatterns.compactMap { pattern in
+        firstMatch(pattern: pattern.pattern, in: text, options: [.caseInsensitive]).map {
+            ReportLanguageIssue(code: pattern.code, severity: .error, message: pattern.message, excerpt: $0, source: .customRule)
+        }
+    }
+}
+
+private func longSentenceWarnings(_ text: String) -> [ReportLanguageIssue] {
+    sentences(in: text)
+        .filter { sentence in words(in: sentence).count > 45 }
+        .prefix(1)
+        .map { sentence in
+            ReportLanguageIssue(
+                code: "long-sentence",
+                severity: .warning,
+                message: "This sentence is long enough that it may be hard for families to read.",
+                excerpt: String(sentence.prefix(160)),
+                suggestion: "Consider splitting it into two shorter sentences.",
+                source: .customRule
+            )
+        }
+}
+
+private func sentences(in text: String) -> [String] {
+    text
+        .components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+}
+
+private func words(in text: String) -> [String] {
+    text
+        .components(separatedBy: .whitespacesAndNewlines)
+        .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+        .filter { !$0.isEmpty }
+}
 
 private func firstMatch(
     pattern: String,

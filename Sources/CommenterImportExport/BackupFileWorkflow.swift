@@ -41,7 +41,7 @@ public func prepareProjectBackupFile(
         directory: directory,
         createdAt: createdAt,
         fileManager: fileManager,
-        verifyReadBack: parseProjectBackup(serialized:)
+        verifyReadBack: { try parseProjectBackup(serialized: $0) }
     )
 }
 
@@ -82,11 +82,12 @@ func prepareProjectBackupFile(
 
 public func loadProjectBackupFile(
     from url: URL,
+    password: String? = nil,
     fileManager: FileManager = .default
 ) throws -> PreparedBackupFile {
     let byteCount = try verifiedNonEmptySize(url: url, fileManager: fileManager)
     let serialized = try String(contentsOf: url, encoding: .utf8)
-    let project = try parseProjectBackup(serialized: serialized)
+    let project = try parseProjectBackup(serialized: serialized, password: password)
     return PreparedBackupFile(url: url, byteCount: byteCount, project: project)
 }
 

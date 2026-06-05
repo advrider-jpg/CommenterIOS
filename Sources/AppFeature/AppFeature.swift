@@ -13,6 +13,7 @@ public struct AppFeature: Sendable {
         public var datasetStatus: DatasetStatus = .notLoaded
         public var projectStorageStatus: ProjectStorageStatus = .notLoaded
         public var projects: [ProjectSummary] = []
+        public var invalidProjectRecords: [InvalidProjectRecord] = []
         public var selectedProject: Project?
         public var selectedProjectReadiness: ProjectReadiness?
         public var projectStorageMessage = "Checking local project storage."
@@ -175,7 +176,7 @@ public struct AppFeature: Sendable {
         case tabSelected(Tab)
         case datasetLoaded(DatasetSnapshot)
         case datasetFailed(String)
-        case projectStoreLoaded([ProjectSummary])
+        case projectStoreLoaded(ProjectListDiagnostics)
         case projectStoreFailed(String)
         case createProjectTapped
         case projectCreationNameChanged(String)
@@ -201,11 +202,24 @@ public struct AppFeature: Sendable {
         case studentFirstNameChanged(String, String)
         case studentLastNameChanged(String, String)
         case studentYearLevelChanged(String, StudentYearLevel)
+        case studentGenderChanged(String, Gender?)
+        case studentPronounsChanged(String, String)
+        case studentInternalNoteChanged(String, String)
+        case studentAttitudeDescriptorChanged(String, String)
         case subjectToggled(String)
         case subjectSelectAllTapped
         case subjectDeselectAllTapped
         case achievementLevelChanged(String, String, AchievementLevel?)
         case focusChanged(String, String, String)
+        case resultEvidenceChanged(String, String, String)
+        case resultTextTypeChanged(String, String, String)
+        case resultLearningContextChanged(String, String, String)
+        case resultReportEmphasisNoteChanged(String, String, String)
+        case resultFlagChanged(String, String, String, Bool)
+        case resultEnglishFocusTagsChanged(String, String, [String])
+        case resultMathProficienciesChanged(String, String, [String])
+        case resultMathMindsetTogglesChanged(String, String, [String])
+        case resultNextStepGoalsChanged(String, String, [String])
         case generateReportsTapped
         case reportsGeneratedAndSaved(Project, String)
         case reportsGenerationFailed(String)

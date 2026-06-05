@@ -1,6 +1,10 @@
 import Foundation
 
 private let maxReportContextFieldLength = 120
+private let leadingPronounPattern = #"^(he|she|they|i|we)\b"#
+private let subordinateClausePattern = #"^(because|when|while|although|if|as)\b"#
+private let finiteVerbPattern = #"\b(am|are|is|was|were|be|being|been|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|read|reads|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
+private let leadingFinitePattern = #"^(am|are|is|was|were|has|have|had|do|does|did|can|could|will|would|should|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
 
 public struct StoredProjectValidation: Equatable, Sendable {
     public var ok: Bool
@@ -95,6 +99,15 @@ private func validateReportContextField(_ value: String?, label: String) -> Stri
     if normalized.count > maxReportContextFieldLength {
         return "\(label) must be \(maxReportContextFieldLength) characters or fewer."
     }
+    if matches(leadingPronounPattern, normalized) {
+        return "\(label) must be a short phrase without leading pronouns."
+    }
+    if matches(subordinateClausePattern, normalized) {
+        return "\(label) must be a short phrase, not a subordinate clause."
+    }
+    if looksLikeSentenceStart(normalized) {
+        return "\(label) must be a short phrase, not a sentence."
+    }
     return nil
 }
 
@@ -115,4 +128,16 @@ private func normalizeReportContextField(_ value: String) -> String {
 
 private func containsTemplateToken(_ value: String) -> Bool {
     value.range(of: #"\[[^\]]+\]|\{[^}]+\}"#, options: .regularExpression) != nil
+}
+
+private func looksLikeSentenceStart(_ value: String) -> Bool {
+    if matches(leadingFinitePattern, value) { return true }
+    if value.range(of: #"^[A-Z][A-Za-z'’-]+\s+"#, options: .regularExpression) != nil, matches(finiteVerbPattern, value) {
+        return true
+    }
+    return false
+}
+
+private func matches(_ pattern: String, _ value: String) -> Bool {
+    value.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
 }

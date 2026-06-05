@@ -27,10 +27,41 @@ final class AppFeatureTests: XCTestCase {
         await store.receive(.datasetLoaded(snapshot)) {
             $0.datasetStatus = .loaded(snapshot)
         }
-        await store.receive(.projectStoreLoaded([summary])) {
+        await store.receive(.projectStoreLoaded(ProjectListDiagnostics(projects: [summary]))) {
             $0.projectStorageStatus = .loaded
             $0.projects = [summary]
             $0.projectStorageMessage = "1 saved project loaded from local storage."
+        }
+    }
+
+    func testTaskReportsInvalidLocalProjectRecordsWithoutBlockingValidProjects() async {
+        let snapshot = datasetSnapshot(loadedAt: 1_000)
+        let summary = ProjectSummary(id: "p1", name: "Room 5", term: "Term 1", updatedAt: 2, revision: 4)
+        let invalid = InvalidProjectRecord(id: "broken", reason: "Stored project fingerprint verification failed.")
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        } withDependencies: {
+            $0.datasetClient = DatasetClient { snapshot }
+            $0.projectStoreClient = testProjectStoreClient(
+                listProjectDiagnostics: {
+                    ProjectListDiagnostics(projects: [summary], invalidProjects: [invalid])
+                }
+            )
+        }
+
+        await store.send(.task) {
+            $0.datasetStatus = .loading
+            $0.projectStorageStatus = .loading
+            $0.projectStorageMessage = "Checking local project storage."
+        }
+        await store.receive(.datasetLoaded(snapshot)) {
+            $0.datasetStatus = .loaded(snapshot)
+        }
+        await store.receive(.projectStoreLoaded(ProjectListDiagnostics(projects: [summary], invalidProjects: [invalid]))) {
+            $0.projectStorageStatus = .loaded
+            $0.projects = [summary]
+            $0.invalidProjectRecords = [invalid]
+            $0.projectStorageMessage = "1 saved project loaded from local storage. 1 local project record could not be loaded and is listed in Support diagnostics."
         }
     }
 
@@ -163,6 +194,102 @@ final class AppFeatureTests: XCTestCase {
         }
         await store.send(.deleteStudentTapped("student-1")) {
             $0.selectedProject?.roster = []
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+    }
+
+    func testRosterCommentContextFieldsPersistAsDirtyModelState() async {
+        var initial = loadedState(project: project(subjects: ["English"], roster: [student()]))
+        let store = TestStore(initialState: initial) { AppFeature() }
+
+        await store.send(.studentGenderChanged("s1", .female)) {
+            $0.selectedProject?.roster[0].gender = .female
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.studentPronounsChanged("s1", "she/her")) {
+            $0.selectedProject?.roster[0].pronouns = "she/her"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.studentInternalNoteChanged("s1", "Keep seating note private")) {
+            $0.selectedProject?.roster[0].internalTeacherNote = "Keep seating note private"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.studentAttitudeDescriptorChanged("s1", "thoughtful")) {
+            $0.selectedProject?.roster[0].attitudeDescriptor = "thoughtful"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.studentPronounsChanged("s1", "  ")) {
+            $0.selectedProject?.roster[0].pronouns = nil
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+    }
+
+    func testResultCommentContextFieldsPersistAsDirtyModelState() async {
+        let original = project(
+            subjects: ["English"],
+            roster: [student()],
+            results: [AchievementResult(studentId: "s1", subject: "English", achievementLevel: .atStandard, focusStrand: "Reading")]
+        )
+        var initial = loadedState(project: original)
+        let store = TestStore(initialState: initial) { AppFeature() }
+
+        await store.send(.resultEvidenceChanged("s1", "English", "uses quotations accurately")) {
+            $0.selectedProject?.results[0].evidenceText = "uses quotations accurately"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.resultTextTypeChanged("s1", "English", "persuasive paragraph")) {
+            $0.selectedProject?.results[0].textType = "persuasive paragraph"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.resultLearningContextChanged("s1", "English", "class novel discussion")) {
+            $0.selectedProject?.results[0].learningContext = "class novel discussion"
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.resultReportEmphasisNoteChanged("s1", "English", "They use feedback and explain clearly")) {
+            $0.selectedProject?.results[0].reportEmphasisNote = "They use feedback and explain clearly"
+            $0.selectedProject?.results[0].commentsText = nil
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.resultEnglishFocusTagsChanged("s1", "English", ["Inferencing", "Vocabulary"])) {
+            $0.selectedProject?.results[0].englishFocusTags = ["Inferencing", "Vocabulary"]
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.resultNextStepGoalsChanged("s1", "English", ["use evidence from text"])) {
+            $0.selectedProject?.results[0].nextStepGoals = ["use evidence from text"]
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.resultFlagChanged("s1", "English", "PARTICIPATION_ENGAGEMENT", true)) {
+            $0.selectedProject?.results[0].flags = ["PARTICIPATION_ENGAGEMENT": true]
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+        await store.send(.resultFlagChanged("s1", "English", "PARTICIPATION_ENGAGEMENT", false)) {
+            $0.selectedProject?.results[0].flags = nil
             $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
             $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
@@ -600,6 +727,9 @@ final class AppFeatureTests: XCTestCase {
 
         var state = loadedState(project: readyProject())
         state.datasetStatus = .loaded(datasetSnapshot(hash: "hash", normalized: "hash", loadedAt: 1_000))
+        state.invalidProjectRecords = [
+            InvalidProjectRecord(id: "broken", reason: "Stored project fingerprint verification failed.")
+        ]
         let text = supportDiagnosticsText(
             state: state,
             buildInfo: AppBuildInfo(displayName: "Report Writer", version: "1.0", build: "42"),
@@ -610,6 +740,8 @@ final class AppFeatureTests: XCTestCase {
         XCTAssertTrue(text.contains("Build: 42"))
         XCTAssertTrue(text.contains("Components: 56,564"))
         XCTAssertTrue(text.contains("Hash verification: verified match"))
+        XCTAssertTrue(text.contains("Invalid local project records:"))
+        XCTAssertTrue(text.contains("broken: Stored project fingerprint verification failed."))
         XCTAssertTrue(text.contains("Backup guidance:"))
     }
 
@@ -1229,6 +1361,7 @@ private actor WorkflowProbe {
 
 private func testProjectStoreClient(
     listProjects: @escaping @Sendable () async throws -> [ProjectSummary] = { [] },
+    listProjectDiagnostics: (@Sendable () async throws -> ProjectListDiagnostics)? = nil,
     createProject: @escaping @Sendable (_ draft: AppFeature.ProjectCreationDraft) async throws -> ProjectSummary = { draft in
         ProjectSummary(id: "p1", name: draft.normalizedName.isEmpty ? "Room 5" : draft.normalizedName, term: draft.normalizedTerm, updatedAt: 1, revision: 1)
     },
@@ -1243,6 +1376,7 @@ private func testProjectStoreClient(
 ) -> ProjectStoreClient {
     ProjectStoreClient(
         listProjects: listProjects,
+        listProjectDiagnostics: listProjectDiagnostics,
         createProject: createProject,
         loadProject: loadProject,
         saveProject: saveProject,

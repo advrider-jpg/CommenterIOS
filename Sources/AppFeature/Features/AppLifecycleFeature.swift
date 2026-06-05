@@ -14,7 +14,7 @@ extension AppFeature {
                     await send(.datasetFailed(error.localizedDescription))
                 }
                 do {
-                    await send(.projectStoreLoaded(try await projectStoreClient.listProjects()))
+                    await send(.projectStoreLoaded(try await projectStoreClient.listProjectDiagnostics()))
                 } catch {
                     await send(.projectStoreFailed(error.localizedDescription))
                 }
@@ -39,14 +39,19 @@ extension AppFeature {
             state.datasetStatus = .failed(message)
             return .none
 
-        case let .projectStoreLoaded(projects):
+        case let .projectStoreLoaded(diagnostics):
             state.projectStorageStatus = .loaded
-            state.projects = sortedProjects(projects)
-            state.projectStorageMessage = projectStorageLoadedMessage(projectCount: projects.count)
+            state.projects = sortedProjects(diagnostics.projects)
+            state.invalidProjectRecords = diagnostics.invalidProjects
+            state.projectStorageMessage = projectStorageLoadedMessage(
+                projectCount: diagnostics.projects.count,
+                invalidProjectCount: diagnostics.invalidProjects.count
+            )
             return .none
 
         case let .projectStoreFailed(message):
             state.projectStorageStatus = .failed(message)
+            state.invalidProjectRecords = []
             state.projectStorageMessage = message
             return .none
 

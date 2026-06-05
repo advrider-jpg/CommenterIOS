@@ -51,6 +51,18 @@ final class ProjectValidationTests: XCTestCase {
         XCTAssertTrue(result.issues.contains("Learning context / activity must not contain template placeholders such as [context] or {Name}."))
     }
 
+    func testStoredValidationRejectsSentenceLikeResultContextFields() {
+        var project = fixtureProject()
+        project.results[0].textType = "They created a persuasive paragraph"
+        project.results[0].learningContext = "Ava solved multi-step problems"
+
+        let result = validateStoredProjectShape(project)
+
+        XCTAssertFalse(result.ok)
+        XCTAssertTrue(result.issues.contains("Text type / genre must be a short phrase without leading pronouns."))
+        XCTAssertTrue(result.issues.contains("Learning context / activity must be a short phrase, not a sentence."))
+    }
+
     func testStoredValidationTreatsEmptyContextMarkersAsEmpty() {
         var project = fixtureProject()
         project.results[0].textType = "n/a"

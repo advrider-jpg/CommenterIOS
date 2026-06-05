@@ -91,6 +91,25 @@ struct SupportRootView: View {
                     .padding(.vertical, 12)
                     .supportRuledDivider()
                 SupportDiagnosticRow("Projects on device", value: CommenterFormatters.integer(state.projects.count))
+                SupportDiagnosticRow(
+                    "Invalid local records",
+                    value: CommenterFormatters.integer(state.invalidProjectRecords.count),
+                    valueTone: state.invalidProjectRecords.isEmpty ? .local : .warning
+                )
+                if !state.invalidProjectRecords.isEmpty {
+                    DisclosureGroup("Invalid record details") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(state.invalidProjectRecords, id: \.id) { record in
+                                SupportBodyText("\(record.id): \(record.reason)")
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+                    .padding(.vertical, 12)
+                    .supportRuledDivider()
+                }
                 SupportDiagnosticRow("Current operation", value: operationStatusLabel, valueTone: operationStatusTone)
             }
         }

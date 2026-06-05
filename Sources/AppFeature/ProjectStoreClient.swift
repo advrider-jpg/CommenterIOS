@@ -20,8 +20,19 @@ public struct ProjectSummary: Equatable, Identifiable, Sendable {
     }
 }
 
+public struct ProjectListDiagnostics: Equatable, Sendable {
+    public var projects: [ProjectSummary]
+    public var invalidProjects: [InvalidProjectRecord]
+
+    public init(projects: [ProjectSummary], invalidProjects: [InvalidProjectRecord] = []) {
+        self.projects = projects
+        self.invalidProjects = invalidProjects
+    }
+}
+
 public struct ProjectStoreClient: Sendable {
     public var listProjects: @Sendable () async throws -> [ProjectSummary]
+    public var listProjectDiagnostics: @Sendable () async throws -> ProjectListDiagnostics
     public var createProject: @Sendable (_ draft: AppFeature.ProjectCreationDraft) async throws -> ProjectSummary
     public var loadProject: @Sendable (_ id: String) async throws -> Project
     public var saveProject: @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project
@@ -34,6 +45,7 @@ public struct ProjectStoreClient: Sendable {
 
     public init(
         listProjects: @escaping @Sendable () async throws -> [ProjectSummary],
+        listProjectDiagnostics: (@Sendable () async throws -> ProjectListDiagnostics)? = nil,
         createProject: @escaping @Sendable (_ draft: AppFeature.ProjectCreationDraft) async throws -> ProjectSummary,
         loadProject: @escaping @Sendable (_ id: String) async throws -> Project,
         saveProject: @escaping @Sendable (_ project: Project, _ expectedRevision: Int?, _ createRecoverySnapshot: Bool, _ recoveryReason: RecoveryReason) async throws -> Project,
@@ -45,6 +57,9 @@ public struct ProjectStoreClient: Sendable {
         prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
     ) {
         self.listProjects = listProjects
+        self.listProjectDiagnostics = listProjectDiagnostics ?? {
+            ProjectListDiagnostics(projects: try await listProjects())
+        }
         self.createProject = createProject
         self.loadProject = loadProject
         self.saveProject = saveProject
@@ -62,6 +77,14 @@ extension ProjectStoreClient: DependencyKey {
         listProjects: {
             let store = try FileProjectStore.applicationSupport()
             return try await store.listProjects().map(projectSummary).sorted { $0.updatedAt > $1.updatedAt }
+        },
+        listProjectDiagnostics: {
+            let store = try FileProjectStore.applicationSupport()
+            let diagnostics = try await store.listProjectsWithDiagnostics()
+            return ProjectListDiagnostics(
+                projects: diagnostics.projects.map(projectSummary).sorted { $0.updatedAt > $1.updatedAt },
+                invalidProjects: diagnostics.invalidProjects
+            )
         },
         createProject: { draft in
             let store = try FileProjectStore.applicationSupport()
@@ -150,6 +173,7 @@ extension ProjectStoreClient: DependencyKey {
         listProjects: {
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },
+        listProjectDiagnostics: nil,
         createProject: { _ in
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },

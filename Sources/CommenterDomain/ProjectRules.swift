@@ -35,15 +35,18 @@ public func normalizeReportLayout(_ layout: ReportLayout?) -> ReportLayout {
     let defaultLayout = defaultReportLayout()
     guard let layout else { return defaultLayout }
 
-    let normalizedOrder = layout.order.filter { ReportSection.defaultOrder.contains($0) }
-    let completedOrder = normalizedOrder + ReportSection.defaultOrder.filter { !normalizedOrder.contains($0) }
+    var seenSections = Set<ReportSection>()
+    let normalizedOrder = layout.order
+        .filter { ReportSection.defaultOrder.contains($0) }
+        .filter { seenSections.insert($0).inserted }
+    let completedOrder = normalizedOrder + ReportSection.defaultOrder.filter { !seenSections.contains($0) }
 
     return ReportLayout(
         enabled: layout.enabled,
         order: completedOrder,
         include: [
             .general: layout.include[.general] != false,
-            .subject: layout.include[.subject] != false,
+            .subject: true,
             .dispositions: layout.include[.dispositions] != false,
             .nextSteps: layout.include[.nextSteps] != false
         ]

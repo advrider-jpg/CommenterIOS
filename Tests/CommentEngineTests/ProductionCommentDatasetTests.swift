@@ -16,7 +16,7 @@ final class ProductionCommentDatasetTests: XCTestCase {
         XCTAssertEqual(engine.diagnostics.uniquenessRules["MinVariantDistance"], 5)
         XCTAssertGreaterThan(engine.diagnostics.placeholderCounts["[Student Name]"] ?? 0, 0)
         XCTAssertFalse(engine.diagnostics.datasetHash.isEmpty)
-        XCTAssertEqual(engine.diagnostics.normalizedSourceHash, "438950a8a72de0ce3b6b0e4271f95858d6519162c9f530a295e36722618b9572")
+        XCTAssertEqual(engine.diagnostics.normalizedSourceHash, "c6d7f90c06f16c9d4b810bb076fb6647de1c5831a1ed99e118f470a19f7f48f3")
     }
 
     func testDatasetDiagnosticsRejectMalformedRecordsWithoutPromotingThemToEligibleData() throws {
@@ -150,5 +150,44 @@ final class ProductionCommentDatasetTests: XCTestCase {
 
         XCTAssertEqual(resolved.missingContext, ["[context]", "[text type]"])
         XCTAssertEqual(resolved.unresolved, ["[text type]", "[context]"])
+    }
+
+    func testNormalizeSentenceCaseProtectsNamesSubjectsAndSentenceStarts() {
+        let text = "ava writes clearly. she uses feedback in English. Ava said Her idea improved."
+
+        let normalized = normalizeSentenceCase(text, displayName: "Ava", protectedTerms: ["English"])
+
+        XCTAssertEqual(normalized, "Ava writes clearly. She uses feedback in English. Ava said her idea improved.")
+    }
+
+    func testReportInputFeedbackMatchesGenerationSafetyRules() {
+        let metadata = ProjectMetadata(
+            id: "project-1",
+            name: "Room 1",
+            term: "Term 1",
+            yearLevel: .year5,
+            createdAt: 0,
+            updatedAt: 0,
+            useFirstNameOnly: true
+        )
+        let student = Student(id: "student-1", firstName: "Ada", lastName: "Lovelace", gender: .female, yearLevel: .year5)
+        let result = AchievementResult(studentId: student.id, subject: "English", achievementLevel: .atStandard)
+
+        XCTAssertEqual(
+            reportContextPhraseFeedback(value: "She wrote a paragraph", label: "Text type / genre", example: "persuasive paragraph")?.tone,
+            .error
+        )
+        XCTAssertEqual(
+            evidenceInputFeedback(value: "inferring character motivation", student: student, subject: "English", result: result, projectMetadata: metadata)?.tone,
+            .success
+        )
+        XCTAssertEqual(
+            evidenceInputFeedback(value: "used quotations", student: student, subject: "English", result: result, projectMetadata: metadata)?.tone,
+            .warning
+        )
+        XCTAssertEqual(
+            reportNoteInputFeedback(value: "They use feedback", student: student, subject: "English", result: result, projectMetadata: metadata)?.detail,
+            "Preview after wording check: \"She uses feedback.\"."
+        )
     }
 }

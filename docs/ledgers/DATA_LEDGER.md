@@ -17,8 +17,8 @@ Production runtime code must not use sample fixtures as fallback data.
 
 Current copied dataset evidence:
 
-- Source raw SHA-256: `60BAB50DA5E7735AF545D39C1DF73EFD96A533B2871B83571A042ABF52E404F7`
-- Bundled LF-normalized SHA-256: `438950A8A72DE0CE3B6B0E4271F95858D6519162C9F530A295E36722618B9572`
+- Source raw SHA-256: `65E37D45A707CE7D3B18A79CFA06C0507DC7AECEEBF790F0005406DFE4D6B0EF`
+- Bundled LF-normalized SHA-256: `C6D7F90C06F16C9D4B810BB076FB6647DE1C5831A1ED99E118F470A19F7F48F3`
 - Normalized source text equals bundled resource text after CRLF-to-LF
   normalization.
 - Components: 56,564
@@ -116,6 +116,12 @@ Validation now records:
 - eligible subject, band, and level lists
 - uniqueness-rule values
 - bracket placeholder counts
+
+The Swift dataset model and production loader now preserve the V3 recipe-bank
+metadata fields `ComponentMode` and `RequiredTypes` when present. Recipe
+rendering uses those fields to distinguish sentence-component recipes from
+phrase-component recipes and to reject declared component-slot mismatches before
+generation can emit misleading assembled text.
 
 The Swift scaffold also ports CommenterV3 subject mapping for supported subject
 aliases and aggregate subjects. `The Arts` and `Technologies` require a concrete

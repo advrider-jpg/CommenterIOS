@@ -162,6 +162,10 @@ struct RosterSection: View {
     let onFirstNameChanged: (String, String) -> Void
     let onLastNameChanged: (String, String) -> Void
     let onYearChanged: (String, StudentYearLevel) -> Void
+    let onGenderChanged: (String, Gender?) -> Void
+    let onPronounsChanged: (String, String) -> Void
+    let onInternalNoteChanged: (String, String) -> Void
+    let onAttitudeDescriptorChanged: (String, String) -> Void
     let onImportRoster: () -> Void
     let isDisabled: Bool
 
@@ -204,6 +208,16 @@ struct RosterSection: View {
                 )
                 .worklistSectionRow()
             } else {
+                if !rosterValidationMessages.isEmpty {
+                    WorklistNotebookCard(perforated: false) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(rosterValidationMessages, id: \.self) { message in
+                                WorklistNote(message, tone: .warning)
+                            }
+                        }
+                    }
+                    .worklistSectionRow()
+                }
                 WorklistNotebookCard {
                     ForEach(project.roster) { student in
                         NavigationLink {
@@ -213,6 +227,10 @@ struct RosterSection: View {
                                 onFirstNameChanged: { onFirstNameChanged(student.id, $0) },
                                 onLastNameChanged: { onLastNameChanged(student.id, $0) },
                                 onYearChanged: { onYearChanged(student.id, $0) },
+                                onGenderChanged: { onGenderChanged(student.id, $0) },
+                                onPronounsChanged: { onPronounsChanged(student.id, $0) },
+                                onInternalNoteChanged: { onInternalNoteChanged(student.id, $0) },
+                                onAttitudeDescriptorChanged: { onAttitudeDescriptorChanged(student.id, $0) },
                                 onDelete: { onDeleteStudent(student.id) }
                             )
                         } label: {
@@ -245,6 +263,22 @@ struct RosterSection: View {
             WorklistTapeHeader("Roster", step: 2, detail: "Students required before results and drafts", tone: .local)
         }
     }
+
+    private var rosterValidationMessages: [String] {
+        var messages: [String] = []
+        let incompleteCount = project.roster.filter {
+            $0.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                $0.lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }.count
+        if incompleteCount > 0 {
+            messages.append("\(incompleteCount) roster \(incompleteCount == 1 ? "entry needs" : "entries need") first and last names before results and drafts can be trusted.")
+        }
+        let duplicateCount = duplicateStudentDisplayKeys(roster: project.roster).count
+        if duplicateCount > 0 {
+            messages.append("\(duplicateCount) duplicate student \(duplicateCount == 1 ? "identity needs" : "identities need") resolving before the project can be saved cleanly.")
+        }
+        return messages
+    }
 }
 
 private struct StudentEditorView: View {
@@ -253,6 +287,10 @@ private struct StudentEditorView: View {
     let onFirstNameChanged: (String) -> Void
     let onLastNameChanged: (String) -> Void
     let onYearChanged: (StudentYearLevel) -> Void
+    let onGenderChanged: (Gender?) -> Void
+    let onPronounsChanged: (String) -> Void
+    let onInternalNoteChanged: (String) -> Void
+    let onAttitudeDescriptorChanged: (String) -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -280,6 +318,43 @@ private struct StudentEditorView: View {
                     .pickerStyle(.segmented)
                     .disabled(isDisabled)
                     .padding(.top, 10)
+                    WorklistRuledDivider()
+                    Picker("Gender", selection: Binding(get: { student.gender ?? .unspecified }, set: { onGenderChanged($0 == .unspecified ? nil : $0) })) {
+                        Text("Unspecified").tag(Gender.unspecified)
+                        Text("Female").tag(Gender.female)
+                        Text("Male").tag(Gender.male)
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(isDisabled)
+                    WorklistRuledDivider()
+                    WorklistFormRow(label: "Pronouns") {
+                        TextField("they/them, she/her, he/him", text: Binding(get: { student.pronouns ?? "" }, set: onPronounsChanged))
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .disabled(isDisabled)
+                            .accessibilityIdentifier("student-pronouns-\(student.id)")
+                    }
+                    WorklistRuledDivider()
+                    WorklistFormRow(label: "Learner style") {
+                        TextField("e.g. thoughtful, persistent", text: Binding(get: { student.attitudeDescriptor ?? "" }, set: onAttitudeDescriptorChanged))
+                            .commenterWordsTextInput()
+                            .disabled(isDisabled)
+                            .accessibilityIdentifier("student-attitude-\(student.id)")
+                    }
+                    WorklistRuledDivider()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Private teacher note")
+                            .font(.caption)
+                            .foregroundStyle(CommenterStationeryTheme.Colors.mutedInk)
+                        TextEditor(text: Binding(get: { student.internalTeacherNote ?? "" }, set: onInternalNoteChanged))
+                            .frame(minHeight: 96)
+                            .scrollContentBackground(.hidden)
+                            .background(CommenterStationeryTheme.Colors.paperSurface)
+                            .commenterReportTextInput()
+                            .disabled(isDisabled)
+                            .accessibilityIdentifier("student-internal-note-\(student.id)")
+                        WorklistNote("Private notes are stored in the local project for teacher reference. They are not inserted into generated report text.")
+                    }
                 }
                 .worklistSectionRow()
             } header: {
@@ -416,6 +491,15 @@ struct ResultsSection: View {
     let importState: AppFeature.TabularImportState
     let onAchievementChanged: (String, String, AchievementLevel?) -> Void
     let onFocusChanged: (String, String, String) -> Void
+    let onEvidenceChanged: (String, String, String) -> Void
+    let onTextTypeChanged: (String, String, String) -> Void
+    let onLearningContextChanged: (String, String, String) -> Void
+    let onReportEmphasisNoteChanged: (String, String, String) -> Void
+    let onFlagChanged: (String, String, String, Bool) -> Void
+    let onEnglishFocusTagsChanged: (String, String, [String]) -> Void
+    let onMathProficienciesChanged: (String, String, [String]) -> Void
+    let onMathMindsetTogglesChanged: (String, String, [String]) -> Void
+    let onNextStepGoalsChanged: (String, String, [String]) -> Void
     let onImportResults: () -> Void
     let isDisabled: Bool
 
@@ -487,6 +571,70 @@ struct ResultsSection: View {
                                 .disabled(isDisabled)
                                 .accessibilityIdentifier("focus-field-\(student.id)-\(accessibilityKey(subject))")
                         }
+                        WorklistRuledDivider()
+                        ResultContextFields(
+                            result: result,
+                            student: student,
+                            studentID: student.id,
+                            subject: subject,
+                            projectMetadata: project.metadata,
+                            isDisabled: isDisabled,
+                            onEvidenceChanged: { onEvidenceChanged(student.id, subject, $0) },
+                            onTextTypeChanged: { onTextTypeChanged(student.id, subject, $0) },
+                            onLearningContextChanged: { onLearningContextChanged(student.id, subject, $0) },
+                            onReportEmphasisNoteChanged: { onReportEmphasisNoteChanged(student.id, subject, $0) }
+                        )
+                        if subject.caseInsensitiveCompare("English") == .orderedSame {
+                            WorklistRuledDivider()
+                            LimitedOptionToggleGroup(
+                                title: "English focus",
+                                options: commenterEnglishFocusTags,
+                                selected: result?.englishFocusTags ?? [],
+                                limit: 2,
+                                isDisabled: isDisabled,
+                                accessibilityPrefix: "english-focus-\(student.id)-\(accessibilityKey(subject))",
+                                onSelectionChanged: { onEnglishFocusTagsChanged(student.id, subject, $0) }
+                            )
+                        }
+                        if subject.caseInsensitiveCompare("Mathematics") == .orderedSame {
+                            WorklistRuledDivider()
+                            LimitedOptionToggleGroup(
+                                title: "Math proficiencies",
+                                options: commenterMathProficiencies,
+                                selected: result?.mathProficiencies ?? [],
+                                limit: 2,
+                                isDisabled: isDisabled,
+                                accessibilityPrefix: "math-proficiency-\(student.id)-\(accessibilityKey(subject))",
+                                onSelectionChanged: { onMathProficienciesChanged(student.id, subject, $0) }
+                            )
+                            WorklistRuledDivider()
+                            LimitedOptionToggleGroup(
+                                title: "Math habits",
+                                options: commenterMathMindsetToggles,
+                                selected: result?.mathMindsetToggles ?? [],
+                                limit: nil,
+                                isDisabled: isDisabled,
+                                accessibilityPrefix: "math-habit-\(student.id)-\(accessibilityKey(subject))",
+                                onSelectionChanged: { onMathMindsetTogglesChanged(student.id, subject, $0) }
+                            )
+                        }
+                        WorklistRuledDivider()
+                        LimitedOptionToggleGroup(
+                            title: "Next steps",
+                            options: commenterNextStepGoals(for: subject),
+                            selected: result?.nextStepGoals ?? [],
+                            limit: 2,
+                            isDisabled: isDisabled,
+                            accessibilityPrefix: "next-step-\(student.id)-\(accessibilityKey(subject))",
+                            onSelectionChanged: { onNextStepGoalsChanged(student.id, subject, $0) }
+                        )
+                        WorklistRuledDivider()
+                        ReportFlagToggleGroup(
+                            flags: result?.flags ?? [:],
+                            isDisabled: isDisabled,
+                            accessibilityPrefix: "report-flag-\(student.id)-\(accessibilityKey(subject))",
+                            onFlagChanged: { onFlagChanged(student.id, subject, $0, $1) }
+                        )
                         if let entry = readiness?.entries.first(where: { $0.studentId == student.id && $0.subject == subject }) {
                             WorklistRuledDivider()
                             Label(entry.message, systemImage: isReadyForExport(entry.status) ? "checkmark.circle" : "exclamationmark.triangle")
@@ -625,6 +773,211 @@ private let achievementLevelOptions: [AchievementLevel] = [
     .aboveStandard
 ]
 
+private struct ResultContextFields: View {
+    let result: AchievementResult?
+    let student: Student
+    let studentID: String
+    let subject: String
+    let projectMetadata: ProjectMetadata
+    let isDisabled: Bool
+    let onEvidenceChanged: (String) -> Void
+    let onTextTypeChanged: (String) -> Void
+    let onLearningContextChanged: (String) -> Void
+    let onReportEmphasisNoteChanged: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            WorklistFormRow(label: "Evidence") {
+                TextField("Concrete evidence for this subject", text: Binding(get: { result?.evidenceText ?? "" }, set: onEvidenceChanged))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("result-evidence-\(studentID)-\(accessibilityKey(subject))")
+            }
+            if let feedback = evidenceInputFeedback(value: result?.evidenceText, student: student, subject: subject, result: feedbackResult, projectMetadata: projectMetadata) {
+                WorklistFieldFeedback(feedback)
+            }
+            WorklistRuledDivider()
+            WorklistFormRow(label: "Text type") {
+                TextField("Genre, task type, or work sample", text: Binding(get: { result?.textType ?? "" }, set: onTextTypeChanged))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("result-text-type-\(studentID)-\(accessibilityKey(subject))")
+            }
+            if let feedback = reportContextPhraseFeedback(value: result?.textType, label: "Text type / genre", example: "persuasive paragraph") {
+                WorklistFieldFeedback(feedback)
+            }
+            WorklistRuledDivider()
+            WorklistFormRow(label: "Context") {
+                TextField("Learning activity or assessment context", text: Binding(get: { result?.learningContext ?? "" }, set: onLearningContextChanged))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("result-learning-context-\(studentID)-\(accessibilityKey(subject))")
+            }
+            if let feedback = reportContextPhraseFeedback(value: result?.learningContext, label: "Learning context / activity", example: "class novel discussion") {
+                WorklistFieldFeedback(feedback)
+            }
+            WorklistRuledDivider()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Report note")
+                    .font(.caption)
+                    .foregroundStyle(CommenterStationeryTheme.Colors.mutedInk)
+                TextEditor(text: Binding(get: { result?.reportEmphasisNote ?? "" }, set: onReportEmphasisNoteChanged))
+                    .frame(minHeight: 90)
+                    .scrollContentBackground(.hidden)
+                    .background(CommenterStationeryTheme.Colors.paperSurface)
+                    .commenterReportTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("result-report-note-\(studentID)-\(accessibilityKey(subject))")
+                if let feedback = reportNoteInputFeedback(value: result?.reportEmphasisNote, student: student, subject: subject, result: feedbackResult, projectMetadata: projectMetadata) {
+                    WorklistFieldFeedback(feedback)
+                }
+                WorklistNote("Report notes may appear in parent-facing draft comments. Use private teacher notes for information that should not be included in generated or exported report text.")
+            }
+        }
+    }
+
+    private var feedbackResult: AchievementResult {
+        result ?? AchievementResult(studentId: studentID, subject: subject)
+    }
+}
+
+private struct LimitedOptionToggleGroup: View {
+    let title: String
+    let options: [String]
+    let selected: [String]
+    let limit: Int?
+    let isDisabled: Bool
+    let accessibilityPrefix: String
+    let onSelectionChanged: ([String]) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+                Spacer(minLength: 0)
+                if let limit {
+                    Text("\(normalizedSelection.count)/\(limit)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(selectionIsAtLimit ? CommenterStationeryTheme.Colors.attentionOrange : CommenterStationeryTheme.Colors.secondaryInk)
+                }
+            }
+            LazyVGrid(columns: optionColumns, alignment: .leading, spacing: 8) {
+                ForEach(options, id: \.self) { option in
+                    let isSelected = normalizedSelection.contains(option)
+                    OptionPillButton(
+                        title: option,
+                        isSelected: isSelected,
+                        isDisabled: isDisabled || (!isSelected && selectionIsAtLimit),
+                        accessibilityIdentifier: "\(accessibilityPrefix)-\(accessibilityKey(option))",
+                        action: { toggle(option) }
+                    )
+                }
+            }
+            if let limit {
+                WorklistNote("Up to \(limit) selections are used in generated comments.")
+            }
+        }
+    }
+
+    private var normalizedSelection: [String] {
+        selected.filter { options.contains($0) }
+    }
+
+    private var selectionIsAtLimit: Bool {
+        guard let limit else { return false }
+        return normalizedSelection.count >= limit
+    }
+
+    private var optionColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8)
+        ]
+    }
+
+    private func toggle(_ option: String) {
+        var next = normalizedSelection
+        if let index = next.firstIndex(of: option) {
+            next.remove(at: index)
+        } else if limit.map({ next.count < $0 }) ?? true {
+            next.append(option)
+        }
+        onSelectionChanged(next)
+    }
+}
+
+private struct ReportFlagToggleGroup: View {
+    let flags: [String: Bool]
+    let isDisabled: Bool
+    let accessibilityPrefix: String
+    let onFlagChanged: (String, Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Report flags")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+            LazyVGrid(columns: optionColumns, alignment: .leading, spacing: 8) {
+                ForEach(commenterReportFlagOptions, id: \.id) { flag in
+                    OptionPillButton(
+                        title: flag.label,
+                        isSelected: flags[flag.id] == true,
+                        isDisabled: isDisabled,
+                        accessibilityIdentifier: "\(accessibilityPrefix)-\(accessibilityKey(flag.id))",
+                        action: { onFlagChanged(flag.id, flags[flag.id] != true) }
+                    )
+                }
+            }
+        }
+    }
+
+    private var optionColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8)
+        ]
+    }
+}
+
+private struct OptionPillButton: View {
+    let title: String
+    let isSelected: Bool
+    let isDisabled: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.secondaryInk)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(isSelected ? CommenterStationeryTheme.Colors.localGreenSoft : CommenterStationeryTheme.Colors.paperSurfaceDeep.opacity(0.45))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.paperLine, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+    }
+}
+
 struct ReportsSection: View {
     let project: Project
     let readiness: ProjectReadiness?
@@ -738,8 +1091,12 @@ private struct ReportEditorView: View {
                     .frame(minHeight: 220)
                     .scrollContentBackground(.hidden)
                     .background(CommenterStationeryTheme.Colors.paperSurface)
+                    .commenterReportTextInput()
                     .disabled(isDisabled)
                     .accessibilityIdentifier("report-editor-\(report.studentId)-\(accessibilityKey(report.subject))")
+                    if let feedback = reportEditorFeedback {
+                        WorklistFieldFeedback(feedback)
+                    }
                     WorklistRuledDivider()
                     Toggle("Lock against regeneration", isOn: Binding(get: { report.isLocked }, set: onLockChanged))
                         .tint(CommenterStationeryTheme.Colors.localGreen)
@@ -757,6 +1114,45 @@ private struct ReportEditorView: View {
         .background(CommenterStationeryTheme.Colors.paperBackground)
         .navigationTitle(reportTitle(report, project: project))
         .commenterInlineNavigationTitle()
+    }
+
+    private var reportEditorFeedback: ReportInputFeedback? {
+        let text = report.manualEdit ?? report.text
+        let placeholders = findUnresolvedPlaceholders(text)
+        if let placeholder = placeholders.first {
+            return ReportInputFeedback(
+                tone: .error,
+                message: "This draft contains template text that must be replaced before export.",
+                detail: "First unresolved placeholder: \(placeholder)"
+            )
+        }
+        guard let student = project.roster.first(where: { $0.id == report.studentId }),
+              let result = project.results.first(where: { $0.studentId == report.studentId && $0.subject == report.subject })
+        else {
+            return nil
+        }
+        let context = buildPlaceholderContext(student: student, subject: report.subject, result: result, projectMetadata: project.metadata)
+        let lint = lintReportLanguage(
+            text,
+            displayName: context.displayName,
+            firstName: student.firstName,
+            expectedSubjectPronoun: context.heShe
+        )
+        if let issue = firstBlockingLanguageIssue(lint) {
+            return ReportInputFeedback(
+                tone: .error,
+                message: issue.message,
+                detail: issue.suggestion ?? issue.excerpt
+            )
+        }
+        if let warning = lint.issues.first(where: { $0.severity == .warning }) {
+            return ReportInputFeedback(
+                tone: .warning,
+                message: warning.message,
+                detail: warning.suggestion ?? warning.excerpt
+            )
+        }
+        return nil
     }
 }
 
@@ -1237,6 +1633,80 @@ private struct WorklistNote: View {
             .foregroundStyle(tone == .warning ? CommenterStationeryTheme.Colors.attentionOrange : CommenterStationeryTheme.Colors.secondaryInk)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct WorklistFieldFeedback: View {
+    let feedback: ReportInputFeedback
+
+    init(_ feedback: ReportInputFeedback) {
+        self.feedback = feedback
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(color)
+                .frame(width: 18, height: 18)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(feedback.message)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(color)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail = feedback.detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(background)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(color.opacity(0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isStaticText)
+    }
+
+    private var systemImage: String {
+        switch feedback.tone {
+        case .error:
+            return "exclamationmark.triangle"
+        case .warning:
+            return "exclamationmark.circle"
+        case .success:
+            return "checkmark.circle"
+        }
+    }
+
+    private var color: Color {
+        switch feedback.tone {
+        case .error:
+            return CommenterStationeryTheme.Colors.destructiveRed
+        case .warning:
+            return CommenterStationeryTheme.Colors.attentionOrange
+        case .success:
+            return CommenterStationeryTheme.Colors.localGreen
+        }
+    }
+
+    private var background: Color {
+        switch feedback.tone {
+        case .error:
+            return CommenterStationeryTheme.Colors.destructiveRed.opacity(0.08)
+        case .warning:
+            return CommenterStationeryTheme.Colors.attentionOrange.opacity(0.1)
+        case .success:
+            return CommenterStationeryTheme.Colors.localGreenSoft
+        }
     }
 }
 

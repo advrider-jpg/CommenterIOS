@@ -1,5 +1,78 @@
 import Foundation
 
+public struct ReportFlagOption: Equatable, Sendable {
+    public var id: String
+    public var label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
+    }
+}
+
+public let commenterEnglishFocusTags = [
+    "Inferencing",
+    "Literary Devices",
+    "Text Structure",
+    "Sentence Craft",
+    "Punctuation",
+    "Vocabulary"
+]
+
+public let commenterMathProficiencies = [
+    "Understanding",
+    "Fluency",
+    "Problem Solving",
+    "Reasoning"
+]
+
+public let commenterMathMindsetToggles = [
+    "Growth mindset",
+    "Perseveres with challenge",
+    "Asks clarifying questions",
+    "Explains/justifies reasoning",
+    "Checks working carefully"
+]
+
+public func commenterNextStepGoals(for subject: String) -> [String] {
+    let normalized = subject.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    if normalized == "english" {
+        return [
+            "improve inferencing",
+            "use evidence from text",
+            "edit for punctuation",
+            "vary sentence structure",
+            "use more descriptive vocabulary",
+            "ask clarifying questions",
+            "expand elaborations (add detail)",
+            "apply strategies independently",
+            "reflect and set goals",
+            "manage time effectively"
+        ]
+    }
+    if normalized == "mathematics" || normalized == "maths" || normalized == "math" {
+        return [
+            "check working and show steps",
+            "justify reasoning",
+            "apply problem-solving strategies",
+            "build fluency with basic facts",
+            "explain mathematical thinking",
+            "ask clarifying questions",
+            "expand elaborations (add detail)",
+            "apply strategies independently",
+            "reflect and set goals",
+            "manage time effectively"
+        ]
+    }
+    return [
+        "ask clarifying questions",
+        "expand elaborations (add detail)",
+        "apply strategies independently",
+        "reflect and set goals",
+        "manage time effectively"
+    ]
+}
+
 struct ReportFlagDefinition: Equatable, Sendable {
     enum Polarity: Equatable, Sendable {
         case positive
@@ -13,27 +86,27 @@ struct ReportFlagDefinition: Equatable, Sendable {
 }
 
 let englishFocusTemplatesSingle = [
-    "{HeShe} has shown particular strength in {tag}.",
-    "In {tag}, {heshe} demonstrates solid understanding.",
+    "They have shown particular strength in {tag}.",
+    "In {tag}, they demonstrate solid understanding.",
     "{Name} has developed skills in {tag}."
 ]
 
 let englishFocusTemplatesDouble = [
-    "{HeShe} has shown strength in {tag1} and {tag2}.",
-    "In particular, {heshe} demonstrates skill with {tag1} and {tag2}.",
+    "They have shown strength in {tag1} and {tag2}.",
+    "In particular, they demonstrate skill with {tag1} and {tag2}.",
     "{Name} has developed understanding in {tag1} and {tag2}."
 ]
 
 let mathProficiencyTemplatesSingle = [
-    "{HeShe} demonstrates strength in {prof}.",
+    "They demonstrate strength in {prof}.",
     "{Name} shows solid skills in {prof}.",
-    "In {prof}, {heshe} performs confidently."
+    "In {prof}, they perform confidently."
 ]
 
 let mathProficiencyTemplatesDouble = [
-    "{HeShe} demonstrates strength in {prof1} and {prof2}.",
+    "They demonstrate strength in {prof1} and {prof2}.",
     "{Name} shows solid skills in both {prof1} and {prof2}.",
-    "In {prof1} and {prof2}, {heshe} performs confidently."
+    "In {prof1} and {prof2}, they perform confidently."
 ]
 
 let nextStepTemplatesSingle = [
@@ -232,3 +305,7 @@ let reportFlags: [ReportFlagDefinition] = [
         ]
     )
 ]
+
+public let commenterReportFlagOptions: [ReportFlagOption] = reportFlags.map {
+    ReportFlagOption(id: $0.id, label: $0.label)
+}
