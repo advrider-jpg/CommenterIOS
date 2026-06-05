@@ -430,6 +430,39 @@ public enum ToneAxis: Int, Codable, CaseIterable, Equatable, Sendable {
     case balanced = 0
     case slightlyHigh = 1
     case high = 2
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(Int.self), let axis = ToneAxis(rawValue: value) {
+            self = axis
+            return
+        }
+        if let value = try? container.decode(String.self) {
+            switch value {
+            case "low":
+                self = .low
+            case "slightlyLow", "slightly-low":
+                self = .slightlyLow
+            case "balanced":
+                self = .balanced
+            case "slightlyHigh", "slightly-high":
+                self = .slightlyHigh
+            case "high":
+                self = .high
+            default:
+                break
+            }
+        }
+        throw DecodingError.typeMismatch(
+            ToneAxis.self,
+            DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected ToneAxis raw value or legacy string.")
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 public enum SchoolVoice: String, Codable, CaseIterable, Equatable, Sendable {

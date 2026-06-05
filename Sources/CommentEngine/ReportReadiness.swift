@@ -376,7 +376,8 @@ public func lintReportLanguage(
     }
 
     severeLanguagePatterns.forEach { pattern in
-        if let match = firstMatch(pattern: pattern.pattern, in: text, options: [.caseInsensitive]) {
+        let options: NSRegularExpression.Options = pattern.code == "sentence-start-lowercase" ? [] : [.caseInsensitive]
+        if let match = firstMatch(pattern: pattern.pattern, in: text, options: options) {
             issues.append(ReportLanguageIssue(code: pattern.code, severity: .error, message: pattern.message, excerpt: match, source: .customRule))
         }
     }
