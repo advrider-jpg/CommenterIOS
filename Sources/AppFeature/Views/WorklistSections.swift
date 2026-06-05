@@ -297,64 +297,9 @@ private struct StudentEditorView: View {
         Form {
             Section {
                 WorklistNotebookCard(clipped: true) {
-                    WorklistFormRow(label: "First name") {
-                        TextField("First name", text: Binding(get: { student.firstName }, set: onFirstNameChanged))
-                            .commenterWordsTextInput()
-                            .disabled(isDisabled)
-                            .accessibilityIdentifier("student-first-name-\(student.id)")
-                    }
+                    studentIdentityFields
                     WorklistRuledDivider()
-                    WorklistFormRow(label: "Surname") {
-                        TextField("Last name", text: Binding(get: { student.lastName }, set: onLastNameChanged))
-                            .commenterWordsTextInput()
-                            .disabled(isDisabled)
-                            .accessibilityIdentifier("student-last-name-\(student.id)")
-                    }
-                    WorklistRuledDivider()
-                    Picker("Year", selection: Binding(get: { student.yearLevel }, set: onYearChanged)) {
-                        Text("Year 5").tag(StudentYearLevel.year5)
-                        Text("Year 6").tag(StudentYearLevel.year6)
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(isDisabled)
-                    .padding(.top, 10)
-                    WorklistRuledDivider()
-                    Picker("Gender", selection: Binding(get: { student.gender ?? .unspecified }, set: { onGenderChanged($0 == .unspecified ? nil : $0) })) {
-                        Text("Unspecified").tag(Gender.unspecified)
-                        Text("Female").tag(Gender.female)
-                        Text("Male").tag(Gender.male)
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(isDisabled)
-                    WorklistRuledDivider()
-                    WorklistFormRow(label: "Pronouns") {
-                        TextField("they/them, she/her, he/him", text: Binding(get: { student.pronouns ?? "" }, set: onPronounsChanged))
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .disabled(isDisabled)
-                            .accessibilityIdentifier("student-pronouns-\(student.id)")
-                    }
-                    WorklistRuledDivider()
-                    WorklistFormRow(label: "Learner style") {
-                        TextField("e.g. thoughtful, persistent", text: Binding(get: { student.attitudeDescriptor ?? "" }, set: onAttitudeDescriptorChanged))
-                            .commenterWordsTextInput()
-                            .disabled(isDisabled)
-                            .accessibilityIdentifier("student-attitude-\(student.id)")
-                    }
-                    WorklistRuledDivider()
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Private teacher note")
-                            .font(.caption)
-                            .foregroundStyle(CommenterStationeryTheme.Colors.mutedInk)
-                        TextEditor(text: Binding(get: { student.internalTeacherNote ?? "" }, set: onInternalNoteChanged))
-                            .frame(minHeight: 96)
-                            .scrollContentBackground(.hidden)
-                            .background(CommenterStationeryTheme.Colors.paperSurface)
-                            .commenterReportTextInput()
-                            .disabled(isDisabled)
-                            .accessibilityIdentifier("student-internal-note-\(student.id)")
-                        WorklistNote("Private notes are stored in the local project for teacher reference. They are not inserted into generated report text.")
-                    }
+                    studentPersonalFields
                 }
                 .worklistSectionRow()
             } header: {
@@ -374,6 +319,69 @@ private struct StudentEditorView: View {
         .background(CommenterStationeryTheme.Colors.paperBackground)
         .navigationTitle(fullStudentName(student))
         .commenterInlineNavigationTitle()
+    }
+
+    @ViewBuilder private var studentIdentityFields: some View {
+        WorklistFormRow(label: "First name") {
+            TextField("First name", text: Binding(get: { student.firstName }, set: onFirstNameChanged))
+                .commenterWordsTextInput()
+                .disabled(isDisabled)
+                .accessibilityIdentifier("student-first-name-\(student.id)")
+        }
+        WorklistRuledDivider()
+        WorklistFormRow(label: "Surname") {
+            TextField("Last name", text: Binding(get: { student.lastName }, set: onLastNameChanged))
+                .commenterWordsTextInput()
+                .disabled(isDisabled)
+                .accessibilityIdentifier("student-last-name-\(student.id)")
+        }
+        WorklistRuledDivider()
+        Picker("Year", selection: Binding(get: { student.yearLevel }, set: onYearChanged)) {
+            Text("Year 5").tag(StudentYearLevel.year5)
+            Text("Year 6").tag(StudentYearLevel.year6)
+        }
+        .pickerStyle(.segmented)
+        .disabled(isDisabled)
+        .padding(.top, 10)
+        WorklistRuledDivider()
+        Picker("Gender", selection: Binding(get: { student.gender ?? .unspecified }, set: { onGenderChanged($0 == .unspecified ? nil : $0) })) {
+            Text("Unspecified").tag(Gender.unspecified)
+            Text("Female").tag(Gender.female)
+            Text("Male").tag(Gender.male)
+        }
+        .pickerStyle(.segmented)
+        .disabled(isDisabled)
+    }
+
+    @ViewBuilder private var studentPersonalFields: some View {
+        WorklistFormRow(label: "Pronouns") {
+            TextField("they/them, she/her, he/him", text: Binding(get: { student.pronouns ?? "" }, set: onPronounsChanged))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .disabled(isDisabled)
+                .accessibilityIdentifier("student-pronouns-\(student.id)")
+        }
+        WorklistRuledDivider()
+        WorklistFormRow(label: "Learner style") {
+            TextField("e.g. thoughtful, persistent", text: Binding(get: { student.attitudeDescriptor ?? "" }, set: onAttitudeDescriptorChanged))
+                .commenterWordsTextInput()
+                .disabled(isDisabled)
+                .accessibilityIdentifier("student-attitude-\(student.id)")
+        }
+        WorklistRuledDivider()
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Private teacher note")
+                .font(.caption)
+                .foregroundStyle(CommenterStationeryTheme.Colors.mutedInk)
+            TextEditor(text: Binding(get: { student.internalTeacherNote ?? "" }, set: onInternalNoteChanged))
+                .frame(minHeight: 96)
+                .scrollContentBackground(.hidden)
+                .background(CommenterStationeryTheme.Colors.paperSurface)
+                .commenterReportTextInput()
+                .disabled(isDisabled)
+                .accessibilityIdentifier("student-internal-note-\(student.id)")
+            WorklistNote("Private notes are stored in the local project for teacher reference. They are not inserted into generated report text.")
+        }
     }
 }
 
