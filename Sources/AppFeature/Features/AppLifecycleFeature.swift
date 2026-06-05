@@ -6,6 +6,7 @@ extension AppFeature {
         case .task:
             state.datasetStatus = .loading
             state.projectStorageStatus = .loading
+            state.aiAvailabilityStatus = .checking
             state.projectStorageMessage = "Checking local project storage."
             return .run { send in
                 do {
@@ -18,6 +19,7 @@ extension AppFeature {
                 } catch {
                     await send(.projectStoreFailed(error.localizedDescription))
                 }
+                await send(.aiAvailabilityLoaded(await aiClient.availability()))
             }
 
         case let .tabSelected(tab):
@@ -37,6 +39,14 @@ extension AppFeature {
 
         case let .datasetFailed(message):
             state.datasetStatus = .failed(message)
+            return .none
+
+        case let .aiAvailabilityLoaded(availability):
+            state.aiAvailabilityStatus = .checked(availability)
+            return .none
+
+        case let .aiAvailabilityFailed(message):
+            state.aiAvailabilityStatus = .failed(message)
             return .none
 
         case let .projectStoreLoaded(diagnostics):

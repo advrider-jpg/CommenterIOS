@@ -1,6 +1,8 @@
 import CommentEngine
 import CommenterDomain
 import CommenterImportExport
+import CommenterReportSafety
+import Foundation
 
 public func availableTeacherSubjects() -> [String] {
     teacherSubjectKeysInCurriculumOrder()
@@ -13,6 +15,9 @@ func updateSelectedProject(_ state: inout AppFeature.State, mutate: (inout Proje
     state.selectedProjectReadiness = getProjectReadiness(project)
     state.pendingImport = nil
     state.preparedFile = nil
+    state.pendingAIRevision = nil
+    state.pendingAIRevisions = []
+    state.latestReportCheck = nil
     markImportStatesStaleAfterManualEdit(&state)
     state.hasUnsavedProjectChanges = true
     state.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
@@ -208,4 +213,64 @@ func reportGenerationDisabledReason(project: Project, readiness: ProjectReadines
         return "All draft comments are up to date and export-ready."
     }
     return nil
+}
+
+func validateReportForAIReview(project: Project, report: GeneratedReport, nowMilliseconds: Int64) -> ReportValidationSummary {
+    guard let context = reportValidationContextForAIReview(project: project, report: report, nowMilliseconds: nowMilliseconds) else {
+        return ReportValidationSummary(
+            status: .blocked,
+            findings: [
+                ReportValidationFinding(
+                    id: "missing-student",
+                    severity: .block,
+                    category: .name,
+                    message: "The report references a student that is no longer in the project."
+                )
+            ],
+            validatedAt: nowMilliseconds,
+            textFingerprint: stableTextFingerprint(report.exportText)
+        )
+    }
+    return ReportSafetyValidator.validate(text: report.exportText, context: context)
+}
+
+func reportValidationContextForAIReview(project: Project, report: GeneratedReport, nowMilliseconds: Int64) -> ReportValidationContext? {
+    guard let student = project.roster.first(where: { $0.id == report.studentId }) else {
+        return nil
+    }
+    let result = project.results.first { $0.studentId == report.studentId && $0.subject == report.subject }
+    let allowedFacts = reportSafeFacts(project: project, result: result, report: report)
+    let options = effectiveAIOptions(project: project, report: report)
+    return ReportValidationContext(
+        student: student,
+        projectMetadata: project.metadata,
+        subject: report.subject,
+        allowedFacts: allowedFacts,
+        deterministicDraft: report.text,
+        knownStudents: project.roster,
+        achievementLevel: result?.achievementLevel,
+        forbiddenMentions: options.forbiddenMentions,
+        requiredMentions: options.requiredMentions,
+        validatedAt: nowMilliseconds
+    )
+}
+
+func effectiveAIOptions(project: Project, report: GeneratedReport) -> AIReportOptions {
+    report.aiOptionsOverride ?? project.metadata.aiSettings?.reportOptions ?? AIReportOptions()
+}
+
+func reportSafeFacts(project: Project, result: AchievementResult?, report: GeneratedReport) -> [ReportSafeFact] {
+    var facts: [ReportSafeFact] = [
+        ReportSafeFact(id: "draft-\(stableTextFingerprint(report.text))", text: report.text, source: .deterministicDraft)
+    ]
+    if let evidence = result?.evidenceText?.trimmingCharacters(in: .whitespacesAndNewlines), !evidence.isEmpty {
+        facts.append(ReportSafeFact(id: "evidence-\(stableTextFingerprint(evidence))", text: evidence, source: .achievementResultEvidence))
+    }
+    if let context = result?.learningContext?.trimmingCharacters(in: .whitespacesAndNewlines), !context.isEmpty {
+        facts.append(ReportSafeFact(id: "context-\(stableTextFingerprint(context))", text: context, source: .learningContext))
+    }
+    if let note = result?.reportEmphasisNote?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+        facts.append(ReportSafeFact(id: "note-\(stableTextFingerprint(note))", text: note, source: .reportEmphasisNote))
+    }
+    return facts
 }

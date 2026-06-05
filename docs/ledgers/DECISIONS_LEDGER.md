@@ -224,3 +224,87 @@ not yet proven enough for truthful production behavior.
 Evidence:
 `docs/OSS_DEPENDENCY_POLICY.md`; `docs/dependencies/DEPENDENCY_AUDIT.md`;
 upstream package documentation linked in the audit.
+
+## 2026-06-05 - Permit local Apple Foundation Models AI only behind review gates
+
+Decision:
+Apple Foundation Models on-device AI is permitted as an optional local writing
+assistance layer. Remote AI, network fallback, cloud persistence, telemetry,
+and analytics remain prohibited. Deterministic generation remains the baseline
+and fallback, and AI-generated or AI-revised report text must be validated and
+teacher-approved before export readiness can be claimed.
+
+Rationale:
+The product contract is local/offline and teacher-trust oriented. On-device
+Foundation Models can support revision and critique without sending private
+student data off-device, but only if availability is truthfully gated and AI
+output cannot bypass deterministic validation or teacher review.
+
+Evidence:
+`AGENTS.md`; `README.md`; `docs/ledgers/CORE_RULES.md`;
+`C:\Users\jackg\Downloads\CommenterIOS_AI_Implementation_Dream_Plan.md`.
+
+## 2026-06-05 - Treat AI revisions as preview artifacts until accepted and approved
+
+Decision:
+AI polish results enter app state as pending teacher-review previews. They do
+not overwrite report text, mark a report reviewed, save the project, prepare
+exports, or share files. The teacher must explicitly accept a preview before it
+becomes the current local draft, and that accepted AI-derived draft is still
+blocked from export until validation passes and the current text fingerprint is
+approved.
+
+Rationale:
+This preserves the truthfulness prime directive and prevents model output from
+silently changing durable report text or bypassing export readiness. The same
+rule must apply to future bulk AI, draft-from-evidence, App Intents, and any
+review queue automation.
+
+Evidence:
+`Sources/AppFeature/Features/ProjectAIWorkflowFeature.swift`;
+`Sources/AppFeature/Views/WorklistSections.swift`;
+`Tests/AppFeatureTests/AppFeatureTests.swift`.
+
+## 2026-06-05 - Bulk AI and App Intents cannot bypass in-app review
+
+Decision:
+Bulk AI may request model revisions for eligible unlocked drafts, but the only
+allowed result is a queue of per-report previews. Bulk AI must be cancellable:
+completed model calls may remain as reviewable previews, while queued or
+cancelled drafts remain untouched. App Intents may open safe review or
+preparation entry points, but they must not generate AI text, approve reports,
+prepare exports, or share files invisibly.
+
+Rationale:
+Bulk and system-surface actions are higher-risk than single-report buttons
+because they can imply background automation. Keeping them preview/open-only
+and cancellable preserves local teacher control, review fingerprints,
+validation gates, and truthful success states.
+
+Evidence:
+`Sources/AppFeature/Features/ProjectAIWorkflowFeature.swift`;
+`Sources/CommenterAppIntents/ReviewIntents.swift`;
+`CommenterIOS.xcodeproj/project.pbxproj`;
+`Tests/AppFeatureTests/AppFeatureTests.swift`.
+
+## 2026-06-05 - Evidence drafts and AI critique remain teacher-review artifacts
+
+Decision:
+Report-specific AI settings may override project defaults for future previews,
+including teacher-provided do-not-mention constraints. AI draft-from-evidence
+may create a pending preview only when report-safe evidence exists, and AI
+critique may store validation/review notes only. Neither workflow may overwrite
+text, approve a report, save a project, prepare exports, or share files without
+the existing explicit teacher actions.
+
+Rationale:
+Evidence drafting and critique are useful only if they stay grounded in supplied
+facts, obey teacher-provided exclusions, and remain visibly reviewable. Treating
+them as preview/check artifacts preserves the local-first truthfulness rule and
+prevents report text or export readiness from changing invisibly.
+
+Evidence:
+`Sources/AppFeature/Features/ProjectAIWorkflowFeature.swift`;
+`Sources/AppFeature/Views/WorklistSections.swift`;
+`Sources/CommenterAI/FoundationModelReportGenerator.swift`;
+`Tests/AppFeatureTests/AppFeatureTests.swift`.

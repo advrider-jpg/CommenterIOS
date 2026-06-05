@@ -521,3 +521,191 @@ Append material work history here. Keep entries short, dated, and factual.
 - Ran available Windows validation. SwiftPM and Xcode/simulator validation
   remain blocked locally because `swift`, `xcodebuild`, and `xcrun` are not
   installed on this machine.
+
+## 2026-06-05 - On-device AI foundation packets
+
+- Executed the first AI implementation packets from
+  `C:\Users\jackg\Downloads\CommenterIOS_AI_Implementation_Dream_Plan.md`.
+- Documented the product decision that Apple Foundation Models on-device AI is
+  allowed only as a local/offline, teacher-reviewed layer; remote AI and network
+  fallback remain prohibited.
+- Added persisted AI provenance, tone, review, validation, and revision-history
+  metadata to `GeneratedReport` without making the new fields required for old
+  project JSON.
+- Added `CommenterReportSafety` with deterministic placeholder, name, pronoun,
+  sensitive-information, unsupported-claim, tone, length, and layout validators.
+- Added `CommenterAI` and `CommenterAITestSupport` as compile-safe foundations;
+  live availability is gated through Foundation Models when present, while
+  generation calls remain honestly unimplemented until real model calls are
+  added.
+- Added the first prompt registry and prompt-builder tests for deterministic
+  draft revision, evidence drafting, and report critique. Prompt builders keep
+  private teacher notes out of the model prompt and keep custom instructions
+  subordinate to safety policy.
+- Wired on-device AI availability into TCA app state, Support diagnostics, and
+  the Work list draft-report surface. The UI reports unavailable/checking/failed
+  states honestly and leaves deterministic generation available.
+- Added teacher-review export gates for AI-generated or AI-revised reports.
+  AI-derived text is blocked from readiness/export until deterministic
+  validation passes and the teacher approves the current text fingerprint.
+- Added an approval action for AI drafts that records local review state as an
+  unsaved project edit, plus visible validation-blocked behavior when approval
+  is attempted on unsafe text.
+- Updated report review workbook rows with non-private AI review status and
+  kept hidden AI provenance, prompt IDs, trace IDs, validation fingerprints, and
+  review metadata out of generated DOCX/XLSX/XLS export packages.
+
+## 2026-06-05 - AI Studio report workflow pass
+
+- Added persisted project AI settings for tone profile, target length, and
+  optional local teacher instruction; these settings feed `AIReportOptions`
+  instead of remaining transient UI state.
+- Added guarded Foundation Models revision wiring behind `canImport` and OS
+  availability checks, with structured output, trace metadata, and deterministic
+  post-generation report validation.
+- Added AppFeature AI workflow state and actions for report AI polish,
+  validation-backed pending previews, accept/reject, stale-preview blocking,
+  local safety checks, and project-dirty acceptance semantics.
+- Expanded the Work list report editor with AI Studio controls, honest
+  availability-disabled states, tone controls, local safety check action,
+  before/after preview, validation findings, and accept/reject buttons.
+- Extended support diagnostics and reducer/domain/AI tests for persisted AI
+  settings, preview-not-overwrite behavior, accept/reject behavior, and local
+  safety check findings.
+
+## 2026-06-05 - Bulk AI, draft, App Intents, and eval harness pass
+
+- Added bulk AI polish workflow state/actions that sequentially request
+  on-device AI revisions for unlocked drafts and queue per-report previews
+  without changing, approving, saving, exporting, or sharing project data.
+- Added Work list bulk AI controls and queued-preview status while reusing the
+  same single-report accept/reject safeguards for each queued preview.
+- Added guarded Foundation Models draft-from-evidence plumbing with validation
+  and trace metadata, plus test-support injection for draft results.
+- Added deterministic AI quality/evaluation tests for adversarial generated
+  text and prompt evidence boundaries.
+- Added a `CommenterAppIntents` target and linked it to the app host with safe
+  open-only App Intents for AI review and report preparation; these intents do
+  not bypass reducer validation or teacher approval.
+
+## 2026-06-05 - Report-specific AI controls, evidence drafts, and critique pass
+
+- Added report-level AI option controls that inherit project defaults and store
+  draft-specific tone, length, and instruction overrides only as local project
+  state for future previews.
+- Added AI draft-from-evidence workflow actions and Work list controls. The
+  workflow requires report-safe evidence, queues a teacher-review preview, and
+  accepts as `ai-draft-from-evidence` only through the same validation and
+  approval gates used by AI polish.
+- Added AI critique workflow actions and Work list controls. The live client now
+  routes critique through Foundation Models behind compile/runtime gates, while
+  the separate local safety check remains deterministic and model-free.
+- Made bulk queued preview identifiers unique even when the model or test client
+  returns the same trace ID for multiple drafts.
+- Added AppFeature tests for report override inheritance, evidence-draft
+  preview/acceptance, missing-evidence blocking, AI critique notes, and unique
+  bulk preview IDs.
+
+## 2026-06-05 - Do-not-mention AI constraints pass
+
+- Exposed report-level do-not-mention constraints in AI Studio and wired them
+  through TCA state as cleaned `AIReportOptions.forbiddenMentions` overrides.
+- Added prompt policy text so Foundation Models requests are instructed not to
+  mention teacher-excluded details before deterministic validation runs.
+- Added deterministic validator enforcement so forbidden mentions block AI
+  preview validation, local safety checks, and teacher approval/export gates if
+  the excluded detail appears in report text.
+- Treated do-not-mention strings as internal AI metadata and added export
+  privacy checks so DOCX/XLSX/XLS packages do not leak those constraints.
+- Added reducer, prompt, validator, domain roundtrip, and import/export tests
+  for the new constraint path.
+
+## 2026-06-05 - Bulk AI cancellation pass
+
+- Added explicit bulk AI running state, per-report progress actions, and
+  cancellable TCA effect wiring for bulk on-device revision requests.
+- Bulk AI now queues each completed preview as soon as it returns, then leaves
+  those previews available if the teacher cancels the remaining queue.
+- Added a Work list cancel action for running bulk AI jobs and reducer guards
+  that reject overlapping single-report AI, evidence-draft, critique, or
+  duplicate bulk starts while the bulk job is active.
+- Updated Support diagnostics to report a running bulk AI revision and added
+  AppFeature tests for progress preview queueing and cancellation state.
+
+## 2026-06-05 - AI review queue surface pass
+
+- Added a Work list AI review queue card that lists pending single-report and
+  bulk AI previews and navigates directly to the matching report editor for
+  accept/reject review.
+- Reused the existing report editor and reducer accept/reject actions so queue
+  review cannot bypass validation, teacher approval, or local dirty-state
+  semantics.
+- Added honest stale-preview UI for any pending preview that can no longer be
+  matched to a current open draft.
+- Updated the Draft reports AI preview count to include both single pending
+  previews and queued bulk previews.
+
+## 2026-06-05 - Required-mention AI constraints pass
+
+- Exposed report-level required-mention constraints in AI Studio alongside the
+  existing do-not-mention controls and wired them through cleaned
+  `AIReportOptions.requiredMentions` overrides.
+- Added deterministic validator enforcement so a teacher-required mention that
+  is missing from report text blocks AI preview validation, local safety checks,
+  and teacher approval/export gates.
+- Passed required mentions through AI revision, evidence-draft, and local report
+  validation contexts so prompts, previews, checks, and approval use the same
+  local constraint set.
+- Treated required-mention strings as internal AI metadata and expanded
+  DOCX/XLSX/XLS privacy tests so those constraints do not leak into exports.
+
+## 2026-06-05 - Project AI mention defaults pass
+
+- Added project-level do-not-mention and required-mention defaults to
+  `ProjectAISettings` with backward-compatible decoding for older AI settings
+  that did not contain mention arrays.
+- Exposed the project defaults in AI Studio and wired TCA actions so the
+  defaults are cleaned, sorted, stored in local project metadata, and inherited
+  by draft AI options unless a report-specific override exists.
+- Expanded export privacy verification so project-level AI instructions and
+  mention defaults are treated as internal metadata and omitted from DOCX,
+  XLSX, and XLS outputs.
+
+## 2026-06-05 - AI default reset and save-default pass
+
+- Added a model conversion path from `AIReportOptions` back into
+  `ProjectAISettings` so a tuned draft override can become the local project
+  default without losing tone, length, instruction, or mention constraints.
+- Added TCA actions and AI Studio controls for resetting project AI defaults to
+  balanced settings and saving the current draft AI override as project
+  defaults.
+- Kept both operations truthful: reset is disabled unless stored defaults
+  exist, saving as defaults requires an open draft, and neither operation
+  changes existing report text or approves/export-readies AI output.
+
+## 2026-06-05 - Validation warning review pass
+
+- Added a `ReportWarningReviewRecord` tied to the validation text fingerprint so
+  warning-only findings can be marked reviewed for the exact checked draft.
+- Added a TCA action and AI Studio control for marking validation warnings
+  reviewed, while blocked validations still require correction and cannot be
+  acknowledged away.
+- Cleared warning-review metadata when manual edits, AI preview acceptance, or
+  new validation results replace the checked text/finding record.
+- Added export privacy checks so warning-review fingerprints, reviewer names,
+  and notes stay internal and do not appear in DOCX/XLSX/XLS outputs.
+
+## 2026-06-05 - Tone adjustment and bulk confirmation pass
+
+- Added a separate AI tone-adjustment workflow from prompt builder through live
+  AI client dependency, guarded reducer actions, AI Studio button, pending
+  preview state, validation summary, and teacher accept/reject path.
+- Tone-adjusted previews are tagged with the `adjust-tone` prompt purpose and
+  accepted drafts persist as `ai-tone-adjusted` local edits that still require
+  validation and teacher approval before export.
+- Added prompt, AI client, and AppFeature tests covering tone-adjust prompt
+  policy, test-client tone results, preview queueing, and acceptance into local
+  draft state.
+- Added a visible bulk AI confirmation dialog so multi-report AI requests are
+  not started from a single tap; confirmed previews still queue for teacher
+  review and do not save, approve, export, or share automatically.

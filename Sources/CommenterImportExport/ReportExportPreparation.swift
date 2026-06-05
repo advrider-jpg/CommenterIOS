@@ -32,6 +32,7 @@ public struct ReportReviewRow: Equatable, Sendable {
         "Achievement Level",
         "Report Text",
         "Manual Edit Used",
+        "AI Review Status",
         "Generated Date",
         "Project Name",
         "Term"
@@ -44,6 +45,7 @@ public struct ReportReviewRow: Equatable, Sendable {
     public var achievementLevel: String
     public var reportText: String
     public var manualEditUsed: String
+    public var aiReviewStatus: String
     public var generatedDate: String
     public var projectName: String
     public var term: String
@@ -56,6 +58,7 @@ public struct ReportReviewRow: Equatable, Sendable {
         achievementLevel: String,
         reportText: String,
         manualEditUsed: String,
+        aiReviewStatus: String,
         generatedDate: String,
         projectName: String,
         term: String
@@ -67,6 +70,7 @@ public struct ReportReviewRow: Equatable, Sendable {
         self.achievementLevel = achievementLevel
         self.reportText = reportText
         self.manualEditUsed = manualEditUsed
+        self.aiReviewStatus = aiReviewStatus
         self.generatedDate = generatedDate
         self.projectName = projectName
         self.term = term
@@ -81,6 +85,7 @@ public struct ReportReviewRow: Equatable, Sendable {
             achievementLevel,
             reportText,
             manualEditUsed,
+            aiReviewStatus,
             generatedDate,
             projectName,
             term
@@ -175,12 +180,29 @@ public func reportReviewRows(project: Project, studentId: String? = nil) throws 
                 achievementLevel: spreadsheetSafeText(result.achievementLevel?.rawValue ?? ""),
                 reportText: spreadsheetSafeText(try exportReportText(report)),
                 manualEditUsed: report.manualEdit?.isEmpty == false ? "Yes" : "No",
+                aiReviewStatus: spreadsheetSafeText(aiReviewStatus(report)),
                 generatedDate: generatedDateString(report.generatedAt),
                 projectName: spreadsheetSafeText(project.metadata.name),
                 term: spreadsheetSafeText(project.metadata.term)
             )
         }
     }
+}
+
+private func aiReviewStatus(_ report: GeneratedReport) -> String {
+    guard report.requiresTeacherApprovalForExport else {
+        return "Deterministic only"
+    }
+    let currentFingerprint = stableTextFingerprint(report.exportText)
+    if report.reviewState?.status == .approved,
+       report.reviewState?.approvalFingerprint == currentFingerprint,
+       report.approvedTextFingerprint == currentFingerprint {
+        return "AI approved"
+    }
+    if report.lastValidation?.status == .blocked {
+        return "AI validation blocked"
+    }
+    return "AI needs review"
 }
 
 public func prepareReportPacket(project: Project, studentId: String? = nil) throws -> PreparedReportPacket {

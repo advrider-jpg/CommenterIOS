@@ -14,8 +14,12 @@ let package = Package(
         .library(name: "CommentEngine", targets: ["CommentEngine"]),
         .library(name: "CommenterPersistence", targets: ["CommenterPersistence"]),
         .library(name: "CommenterImportExport", targets: ["CommenterImportExport"]),
+        .library(name: "CommenterReportSafety", targets: ["CommenterReportSafety"]),
+        .library(name: "CommenterAI", targets: ["CommenterAI"]),
+        .library(name: "CommenterAppIntents", targets: ["CommenterAppIntents"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
         .library(name: "AppFeature", targets: ["AppFeature"]),
+        .library(name: "CommenterAITestSupport", targets: ["CommenterAITestSupport"]),
         .library(name: "CommenterTestSupport", targets: ["CommenterTestSupport"]),
         .executable(name: "CommenterIOSApp", targets: ["CommenterIOSApp"])
     ],
@@ -53,6 +57,18 @@ let package = Package(
                 .product(name: "ZIPFoundation", package: "ZIPFoundation")
             ]
         ),
+        .target(
+            name: "CommenterReportSafety",
+            dependencies: ["CommenterDomain"]
+        ),
+        .target(
+            name: "CommenterAI",
+            dependencies: ["CommenterDomain", "CommenterReportSafety"]
+        ),
+        .target(
+            name: "CommenterAppIntents",
+            dependencies: ["CommenterDomain"]
+        ),
         .target(name: "DesignSystem"),
         .target(
             name: "AppFeature",
@@ -61,6 +77,8 @@ let package = Package(
                 "CommentEngine",
                 "CommenterPersistence",
                 "CommenterImportExport",
+                "CommenterReportSafety",
+                "CommenterAI",
                 "DesignSystem",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ]
@@ -68,6 +86,10 @@ let package = Package(
         .target(
             name: "CommenterTestSupport",
             dependencies: ["CommenterDomain", "CommentEngine"]
+        ),
+        .target(
+            name: "CommenterAITestSupport",
+            dependencies: ["CommenterAI", "CommenterDomain", "CommenterReportSafety"]
         ),
         .executableTarget(
             name: "CommenterIOSApp",
@@ -87,12 +109,23 @@ let package = Package(
             dependencies: ["CommenterImportExport", "CommenterPersistence", "CommentEngine", "CommenterDomain"]
         ),
         .testTarget(
+            name: "CommenterReportSafetyTests",
+            dependencies: ["CommenterReportSafety", "CommenterDomain"]
+        ),
+        .testTarget(
+            name: "CommenterAITests",
+            dependencies: ["CommenterAI", "CommenterAITestSupport", "CommenterDomain"]
+        ),
+        .testTarget(
             name: "AppFeatureTests",
             dependencies: [
                 "AppFeature",
+                "CommenterAI",
+                "CommenterAITestSupport",
                 "CommentEngine",
                 "CommenterDomain",
                 "CommenterImportExport",
+                "CommenterReportSafety",
                 "CommenterPersistence",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ]
