@@ -241,7 +241,7 @@ final class BackupEnvelopeTests: XCTestCase {
             "R7LI+XCXRtSO2mCuEMET9JsXKA8w+xFmEbXXXeKLK0hiNrhV7Sy2ipqVxtuvDjc4Dg3f34DyED9j4Y6sQYU2KXvNugx+4VyDmMgs8K7dbdpvI9uqvTOBZ5rkkSD2XoW1CdEvaE+TmoRTQxbbh2gzlFAjDa5VKooK",
             "V76mLELhROen934c03z+t+YcrVx7AFC/CXWcI9SljW1Lrm8sv5tAsPCNRepeSSCnPVHX7eu0gm1PkjiPn6eDzk+p6EV7tJrJqNK9aM7c5YCwIkEYunEQrOk8nLo+Mt7ViDITXDsDI+45qEKwmjlzGQgjJFTbC7o="
         ].joined()
-        """
+        return """
         {
           "format": "commenter-project-backup-encrypted",
           "version": 2,
