@@ -1402,7 +1402,7 @@ final class AppFeatureTests: XCTestCase {
             $0.latestReportCheck = nil
             $0.operationStatus = .busy("Requesting an on-device AI revision for teacher review.")
         }
-        await store.receive(.reportAIPolishCompleted("s1", "English", AIReportRevisionResult(
+        await store.receive(.reportAIPolishCompleted("s1", "English", "Ava reads with confidence.", AIReportRevisionResult(
             revisedText: "Ava reads with confidence.",
             changeSummary: "No change.",
             validation: validation,
@@ -1492,7 +1492,7 @@ final class AppFeatureTests: XCTestCase {
             validation: validation,
             trace: trace
         )
-        await store.receive(.reportAIDraftFromEvidenceCompleted("s1", "English", AIReportDraftResult(draftText: draftText, validation: validation, trace: trace))) {
+        await store.receive(.reportAIDraftFromEvidenceCompleted("s1", "English", "Ava reads with confidence.", AIReportDraftResult(draftText: draftText, validation: validation, trace: trace))) {
             $0.pendingAIRevision = pending
             $0.latestReportCheck = AppFeature.ReportCheckResult(
                 id: "ai-draft-preview-trace-draft-evidence",
@@ -1610,7 +1610,7 @@ final class AppFeatureTests: XCTestCase {
             trace: trace,
             reviewWarnings: ["Confirm the wording matches classroom evidence."]
         )
-        await store.receive(.reportAIPolishCompleted("s1", "English", revision)) {
+        await store.receive(.reportAIPolishCompleted("s1", "English", original.reports[0].text, revision)) {
             $0.pendingAIRevision = pending
             $0.latestReportCheck = AppFeature.ReportCheckResult(
                 id: "ai-preview-trace-polish-1",
@@ -1657,6 +1657,89 @@ final class AppFeatureTests: XCTestCase {
             )
             $0.hasUnsavedProjectChanges = true
             $0.operationStatus = .dirty("AI revision accepted into the local draft. Save the project, then approve the current AI draft before export.")
+        }
+    }
+
+    func testSingleReportAICompletionsDiscardStalePreviewsWhenDraftChanged() async {
+        var project = readyProject()
+        let requestTimeText = project.reports[0].text
+        let currentTeacherText = "Ava reads with confidence and adds her own teacher note."
+        project.reports[0].manualEdit = currentTeacherText
+        let proposedText = "Ava reads with confidence and explains ideas clearly."
+        let validation = ReportValidationSummary(
+            status: .passed,
+            findings: [],
+            validatedAt: 2_000,
+            textFingerprint: stableTextFingerprint(proposedText)
+        )
+        let revisionTrace = AIReportTrace(
+            traceId: "trace-stale-polish",
+            promptId: "report.revise.deterministic.v1",
+            promptVersion: "1.0.0",
+            promptPurpose: .reviseDeterministicDraft,
+            modelAvailabilityAtStart: .available,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            inputFingerprint: "input-fp",
+            deterministicDraftFingerprint: stableTextFingerprint(requestTimeText),
+            outputFingerprint: stableTextFingerprint(proposedText),
+            validationSummary: validation,
+            outcome: .completed
+        )
+        let toneTrace = AIReportTrace(
+            traceId: "trace-stale-tone",
+            promptId: "report.adjust.tone.v1",
+            promptVersion: "1.0.0",
+            promptPurpose: .adjustTone,
+            modelAvailabilityAtStart: .available,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            inputFingerprint: "input-fp",
+            deterministicDraftFingerprint: stableTextFingerprint(requestTimeText),
+            outputFingerprint: stableTextFingerprint(proposedText),
+            validationSummary: validation,
+            outcome: .completed
+        )
+        let draftTrace = AIReportTrace(
+            traceId: "trace-stale-draft",
+            promptId: "report.draft.evidence.v1",
+            promptVersion: "1.0.0",
+            promptPurpose: .draftFromEvidence,
+            modelAvailabilityAtStart: .available,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            inputFingerprint: "input-fp",
+            outputFingerprint: stableTextFingerprint(proposedText),
+            validationSummary: validation,
+            outcome: .completed
+        )
+        let revision = AIReportRevisionResult(
+            revisedText: proposedText,
+            changeSummary: "Improved flow and clarity.",
+            validation: validation,
+            trace: revisionTrace
+        )
+        let toneRevision = AIReportRevisionResult(
+            revisedText: proposedText,
+            changeSummary: "Adjusted tone only.",
+            validation: validation,
+            trace: toneTrace
+        )
+        let evidenceDraft = AIReportDraftResult(draftText: proposedText, validation: validation, trace: draftTrace)
+        var initial = loadedState(project: project)
+        initial.aiAvailabilityStatus = .checked(.available)
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        }
+
+        await store.send(.reportAIPolishCompleted("s1", "English", requestTimeText, revision)) {
+            $0.operationStatus = .failed("The AI revision returned after the draft changed. The stale preview was discarded; request a new preview from the current draft.")
+        }
+        await store.send(.reportAIToneAdjustCompleted("s1", "English", requestTimeText, toneRevision)) {
+            $0.operationStatus = .failed("The AI tone adjustment returned after the draft changed. The stale preview was discarded; request a new preview from the current draft.")
+        }
+        await store.send(.reportAIDraftFromEvidenceCompleted("s1", "English", requestTimeText, evidenceDraft)) {
+            $0.operationStatus = .failed("The AI evidence draft returned after the draft changed. The stale preview was discarded; request a new preview from the current draft.")
         }
     }
 
@@ -1715,7 +1798,7 @@ final class AppFeatureTests: XCTestCase {
             trace: trace,
             reviewWarnings: ["Confirm the tone still matches the teacher's intent."]
         )
-        await store.receive(.reportAIToneAdjustCompleted("s1", "English", revision)) {
+        await store.receive(.reportAIToneAdjustCompleted("s1", "English", original.reports[0].text, revision)) {
             $0.pendingAIRevision = pending
             $0.latestReportCheck = AppFeature.ReportCheckResult(
                 id: "ai-tone-preview-trace-tone-1",

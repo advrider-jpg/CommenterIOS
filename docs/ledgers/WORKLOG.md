@@ -732,3 +732,16 @@ Append material work history here. Keep entries short, dated, and factual.
   fingerprints, and added broader legacy tone-axis decoding coverage.
 - Made the screenshot UI test tap the roster navigation row deterministically
   and wait for the student editor before editing first and last name fields.
+
+## 2026-06-05 - AI stale preview guard pass
+
+- Carried request-time draft text through single-report AI polish, tone
+  adjustment, and evidence-draft completion actions.
+- Rejected stale AI completions before queuing a pending preview when the local
+  draft fingerprint changed while the on-device AI request was in flight.
+- Added AppFeature regression coverage so polish, tone-adjustment, and
+  evidence-draft completions cannot overwrite intervening teacher edits by
+  capturing the current draft as their preview baseline.
+- Strengthened roster-row accessibility and screenshot navigation taps after CI
+  showed the UI test was still on the worklist after tapping the new student
+  row.

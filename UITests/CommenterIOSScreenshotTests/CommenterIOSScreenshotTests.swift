@@ -51,9 +51,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         capture("05-roster-before-student")
         addStudent.tap()
 
-        let studentRow = scrollToAnyInWorklist(cells(identifier: "student-row-\(screenshotStudentId)", label: "Student"), name: "new student row")
-        tapElement(studentRow, named: "new student row")
-        waitForStudentEditor(studentId: screenshotStudentId)
+        openStudentEditor(studentId: screenshotStudentId)
 
         let firstName = waitForAny(textFields(identifier: "student-first-name-\(screenshotStudentId)", label: "First name"), timeout: 10)
             ?? textField(identifier: "student-first-name-\(screenshotStudentId)", label: "First name")
@@ -191,15 +189,51 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func waitForStudentEditor(studentId: String) {
+        if waitForStudentEditorIfPresent(studentId: studentId, timeout: 10) {
+            return
+        }
+        captureFailureContext("student-editor-\(studentId)")
+        XCTFail("Expected student editor for \(studentId) to open after tapping the roster row.")
+    }
+
+    private func waitForStudentEditorIfPresent(studentId: String, timeout: TimeInterval) -> Bool {
         let editor = element("student-editor-\(studentId)")
         let firstName = app.textFields["student-first-name-\(studentId)"]
-        let deadline = Date().addingTimeInterval(10)
+        let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if editor.exists || firstName.exists {
-                return
+                return true
             }
             RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
         }
+        return editor.exists || firstName.exists
+    }
+
+    private func openStudentEditor(studentId: String) {
+        let rowIdentifier = "student-row-\(studentId)"
+        let row = scrollToAnyInWorklist(
+            [app.buttons[rowIdentifier], app.cells[rowIdentifier], app.otherElements[rowIdentifier], element(rowIdentifier)],
+            name: "new student row",
+            requireHittable: false
+        )
+
+        let tapOffsets = [
+            CGVector(dx: 0.5, dy: 0.5),
+            CGVector(dx: 0.9, dy: 0.5),
+            CGVector(dx: 0.1, dy: 0.5)
+        ]
+        for (index, offset) in tapOffsets.enumerated() {
+            if index == 0, row.isHittable {
+                row.tap()
+            } else {
+                XCTAssertTrue(isVisibleOnScreen(row), "Expected new student row to be visible before tapping.")
+                row.coordinate(withNormalizedOffset: offset).tap()
+            }
+            if waitForStudentEditorIfPresent(studentId: studentId, timeout: 3) {
+                return
+            }
+        }
+
         captureFailureContext("student-editor-\(studentId)")
         XCTFail("Expected student editor for \(studentId) to open after tapping the roster row.")
     }

@@ -74,10 +74,10 @@ extension AppFeature {
             return reduceProjectEditing(&state, action)
 
         case .reportAIPolishTapped(_, _),
-             .reportAIPolishCompleted(_, _, _),
+             .reportAIPolishCompleted(_, _, _, _),
              .reportAIPolishFailed(_, _, _),
              .reportAIToneAdjustTapped(_, _),
-             .reportAIToneAdjustCompleted(_, _, _),
+             .reportAIToneAdjustCompleted(_, _, _, _),
              .reportAIToneAdjustFailed(_, _, _),
              .reportBulkAIPolishTapped,
              .reportBulkAIPolishProgress(_),
@@ -94,7 +94,7 @@ extension AppFeature {
              .reportAICritiqueCompleted(_, _, _),
              .reportAICritiqueFailed(_, _, _),
              .reportAIDraftFromEvidenceTapped(_, _),
-             .reportAIDraftFromEvidenceCompleted(_, _, _),
+             .reportAIDraftFromEvidenceCompleted(_, _, _, _),
              .reportAIDraftFromEvidenceFailed(_, _, _),
              .projectAIToneProfileChanged(_),
              .projectAITargetLengthChanged(_),

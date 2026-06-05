@@ -241,9 +241,12 @@ struct RosterSection: View {
                                 tone: .local,
                                 isEnabled: !isDisabled
                             )
+                            .contentShape(Rectangle())
                         }
                         .disabled(isDisabled)
+                        .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("student-row-\(student.id)")
+                        .accessibilityLabel(fullStudentName(student))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 onDeleteStudent(student.id)

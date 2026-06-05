@@ -41,34 +41,39 @@ extension AppFeature {
             state.pendingAIRevision = nil
             state.latestReportCheck = nil
             state.operationStatus = .busy("Requesting an on-device AI revision for teacher review.")
+            let requestOriginalText = report.exportText
             let request = AIReportRevisionRequest(
                 project: project,
                 studentId: studentId,
                 subject: subject,
-                deterministicDraft: report.exportText,
+                deterministicDraft: requestOriginalText,
                 options: report.aiOptionsOverride ?? project.metadata.aiSettings?.reportOptions ?? AIReportOptions()
             )
             return .run { send in
                 do {
                     let result = try await aiClient.reviseDeterministicDraft(request)
-                    await send(.reportAIPolishCompleted(studentId, subject, result))
+                    await send(.reportAIPolishCompleted(studentId, subject, requestOriginalText, result))
                 } catch {
                     await send(.reportAIPolishFailed(studentId, subject, error.localizedDescription))
                 }
             }
 
-        case let .reportAIPolishCompleted(studentId, subject, result):
+        case let .reportAIPolishCompleted(studentId, subject, originalText, result):
             guard let project = state.selectedProject,
                   let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
             else {
                 state.operationStatus = .failed("The AI revision returned after the draft was no longer open.")
                 return .none
             }
+            guard isCurrentDraftUnchanged(report, since: originalText) else {
+                state.operationStatus = .failed(staleAICompletionMessage(kind: "revision"))
+                return .none
+            }
             let pending = PendingAIRevision(
                 id: result.trace.traceId,
                 studentId: studentId,
                 subject: subject,
-                originalText: report.exportText,
+                originalText: originalText,
                 proposedText: result.revisedText,
                 changeSummary: result.changeSummary,
                 validation: result.validation,
@@ -127,34 +132,39 @@ extension AppFeature {
             state.pendingAIRevision = nil
             state.latestReportCheck = nil
             state.operationStatus = .busy("Requesting an on-device AI tone adjustment for teacher review.")
+            let requestOriginalText = report.exportText
             let request = AIReportRevisionRequest(
                 project: project,
                 studentId: studentId,
                 subject: subject,
-                deterministicDraft: report.exportText,
+                deterministicDraft: requestOriginalText,
                 options: report.aiOptionsOverride ?? project.metadata.aiSettings?.reportOptions ?? AIReportOptions()
             )
             return .run { send in
                 do {
                     let result = try await aiClient.adjustTone(request)
-                    await send(.reportAIToneAdjustCompleted(studentId, subject, result))
+                    await send(.reportAIToneAdjustCompleted(studentId, subject, requestOriginalText, result))
                 } catch {
                     await send(.reportAIToneAdjustFailed(studentId, subject, error.localizedDescription))
                 }
             }
 
-        case let .reportAIToneAdjustCompleted(studentId, subject, result):
+        case let .reportAIToneAdjustCompleted(studentId, subject, originalText, result):
             guard let project = state.selectedProject,
                   let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
             else {
                 state.operationStatus = .failed("The AI tone adjustment returned after the draft was no longer open.")
                 return .none
             }
+            guard isCurrentDraftUnchanged(report, since: originalText) else {
+                state.operationStatus = .failed(staleAICompletionMessage(kind: "tone adjustment"))
+                return .none
+            }
             let pending = PendingAIRevision(
                 id: result.trace.traceId,
                 studentId: studentId,
                 subject: subject,
-                originalText: report.exportText,
+                originalText: originalText,
                 proposedText: result.revisedText,
                 changeSummary: result.changeSummary,
                 validation: result.validation,
@@ -219,6 +229,7 @@ extension AppFeature {
             state.pendingAIRevision = nil
             state.latestReportCheck = nil
             state.operationStatus = .busy("Requesting an on-device AI draft from report-safe evidence for teacher review.")
+            let requestOriginalText = report.exportText
             let request = AIReportDraftRequest(
                 project: project,
                 studentId: studentId,
@@ -229,24 +240,28 @@ extension AppFeature {
             return .run { send in
                 do {
                     let result = try await aiClient.draftFromEvidence(request)
-                    await send(.reportAIDraftFromEvidenceCompleted(studentId, subject, result))
+                    await send(.reportAIDraftFromEvidenceCompleted(studentId, subject, requestOriginalText, result))
                 } catch {
                     await send(.reportAIDraftFromEvidenceFailed(studentId, subject, error.localizedDescription))
                 }
             }
 
-        case let .reportAIDraftFromEvidenceCompleted(studentId, subject, result):
+        case let .reportAIDraftFromEvidenceCompleted(studentId, subject, originalText, result):
             guard let project = state.selectedProject,
                   let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
             else {
                 state.operationStatus = .failed("The AI evidence draft returned after the draft was no longer open.")
                 return .none
             }
+            guard isCurrentDraftUnchanged(report, since: originalText) else {
+                state.operationStatus = .failed(staleAICompletionMessage(kind: "evidence draft"))
+                return .none
+            }
             let pending = PendingAIRevision(
                 id: result.trace.traceId,
                 studentId: studentId,
                 subject: subject,
-                originalText: report.exportText,
+                originalText: originalText,
                 proposedText: result.draftText,
                 changeSummary: "Drafted from report-safe evidence.",
                 validation: result.validation,
@@ -803,6 +818,14 @@ private func appendBulkAIPreview(_ state: inout AppFeature.State, completed: App
         validation: pending.validation,
         reviewNotes: pending.reviewWarnings
     )
+}
+
+private func isCurrentDraftUnchanged(_ report: GeneratedReport, since originalText: String) -> Bool {
+    stableTextFingerprint(report.exportText) == stableTextFingerprint(originalText)
+}
+
+private func staleAICompletionMessage(kind: String) -> String {
+    "The AI \(kind) returned after the draft changed. The stale preview was discarded; request a new preview from the current draft."
 }
 
 private func selectedReportAIOptions(
