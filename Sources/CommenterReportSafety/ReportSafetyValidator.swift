@@ -50,10 +50,12 @@ public enum ReportSafetyValidator {
         findings.append(contentsOf: forbiddenMentionFindings(text, context: context))
         findings.append(contentsOf: requiredMentionFindings(text, context: context))
         findings.append(contentsOf: sensitiveFindings(text, context: context))
-        findings.append(contentsOf: unsupportedFactFindings(text, context: context))
-        findings.append(contentsOf: toneFindings(text, context: context))
-        findings.append(contentsOf: lengthFindings(text, context: context))
-        findings.append(contentsOf: layoutFindings(text))
+        if !findings.contains(where: { $0.severity == .block }) {
+            findings.append(contentsOf: unsupportedFactFindings(text, context: context))
+            findings.append(contentsOf: toneFindings(text, context: context))
+            findings.append(contentsOf: lengthFindings(text, context: context))
+            findings.append(contentsOf: layoutFindings(text))
+        }
 
         let status: ReportValidationStatus
         if findings.contains(where: { $0.severity == .block }) {

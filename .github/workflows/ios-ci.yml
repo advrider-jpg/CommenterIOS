@@ -11,6 +11,62 @@ jobs:
     name: Swift package tests
     runs-on: macos-15
     timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Print runner toolchain
+        run: |
+          swift --version || true
+          xcodebuild -version || true
+          xcrun --version || true
+          xcrun simctl list runtimes || true
+          xcrun simctl list devices available || true
+
+      - name: Cache SwiftPM artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            .swiftpm
+          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-
+
+      - name: Cache Xcode derived data
+        uses: actions/cache@v4
+        with:
+          path: build/DerivedData
+          key: ${{ runner.os }}-xcode-${{ hashFiles('Package.resolved', 'Package.swift', 'CommenterIOS.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-
+
+      - name: Resolve packages
+        run: swift package resolve
+
+      - name: Run Swift tests
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          swift test 2>&1 | tee build/swift-test.log
+
+      - name: Dump Swift test tail
+        if: failure()
+        run: |
+          echo "=== Swift test tail ==="
+          tail -n 200 build/swift-test.log || true
+
+      - name: Upload Swift test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commenter-ios-swift-test-diagnostics
+          path: build/swift-test.log
+          if-no-files-found: warn
+
+  ios-build:
+    name: Build iOS app target
+    runs-on: macos-15
+    timeout-minutes: 35
     env:
       DERIVED_DATA_PATH: ${{ github.workspace }}/build/DerivedData
     steps:
@@ -44,8 +100,7 @@ jobs:
 
       - name: Resolve packages
         run: swift package resolve
-      - name: Run Swift tests
-        run: swift test
+
       - name: Build iOS app target
         run: |
           set -euo pipefail

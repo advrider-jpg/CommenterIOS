@@ -46,7 +46,7 @@ public func normalizeReportLayout(_ layout: ReportLayout?) -> ReportLayout {
         order: completedOrder,
         include: [
             .general: layout.include[.general] != false,
-            .subject: layout.include[.subject] != false,
+            .subject: true,
             .dispositions: layout.include[.dispositions] != false,
             .nextSteps: layout.include[.nextSteps] != false
         ]

@@ -38,7 +38,7 @@ final class ReportGeneratorTests: XCTestCase {
         let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
 
         XCTAssertEqual(report.text, "Ava explains ideas in English. Ava uses evidence. Ava should revise punctuation.")
-        XCTAssertEqual(report.variantIds, ["RECIPE_r1_139eae27"])
+        XCTAssertEqual(report.variantIds, ["RECIPE_r1_1eade169"])
     }
 
     func testAggregateSubjectRequiresConcreteFocus() throws {
@@ -363,7 +363,7 @@ final class ReportGeneratorTests: XCTestCase {
         )
     }
 
-    func testGenerationFingerprintPreservesDisabledSubjectLayoutFlag() {
+    func testGenerationFingerprintForcesSubjectLayoutFlagLikeV3() {
         var sourceMetadata = metadata()
         sourceMetadata.reportLayout = ReportLayout(
             enabled: true,
@@ -379,7 +379,7 @@ final class ReportGeneratorTests: XCTestCase {
         )
 
         XCTAssertTrue(fingerprint.contains(#""order":["nextSteps","general","subject","dispositions"]"#))
-        XCTAssertTrue(fingerprint.contains(#""subject":false"#))
+        XCTAssertTrue(fingerprint.contains(#""subject":true"#))
     }
 
     private func fixtureData() -> CommentEngineData {

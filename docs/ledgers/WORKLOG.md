@@ -709,3 +709,15 @@ Append material work history here. Keep entries short, dated, and factual.
 - Added a visible bulk AI confirmation dialog so multi-report AI requests are
   not started from a single tap; confirmed previews still queue for teacher
   review and do not save, approve, export, or share automatically.
+
+## 2026-06-05 - CI compatibility repair pass
+
+- Routed the evidence-draft AI actions through the top-level reducer and added
+  static action coverage checks while repairing CI compile failures.
+- Fixed report-readiness language lint false positives, preserved v3 subject
+  layout normalization, and hardened AI tone metadata decoding for legacy string
+  values and missing fields.
+- Kept project fingerprints stable while allowing backup import verification to
+  accept both legacy raw checksums and normalized persistence checksums.
+- Split SwiftPM test diagnostics from the iOS app-target build in CI so Swift
+  test failures still upload logs and no longer hide app target compilation.

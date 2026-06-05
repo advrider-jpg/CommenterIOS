@@ -21,7 +21,6 @@ public enum ProjectFingerprintError: LocalizedError, Equatable {
 public func projectFingerprintPayload(_ project: Project) -> Project {
     var copy = project
     copy.metadata.persistence = nil
-    copy.metadata.reportLayout = normalizeReportLayout(project.metadata.reportLayout)
     return copy
 }
 

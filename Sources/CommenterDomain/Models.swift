@@ -438,14 +438,19 @@ public enum ToneAxis: Int, Codable, CaseIterable, Equatable, Sendable {
             return
         }
         if let value = try? container.decode(String.self) {
-            switch value {
+            let normalized = value
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+                .replacingOccurrences(of: "-", with: "")
+                .replacingOccurrences(of: "_", with: "")
+            switch normalized {
             case "low":
                 self = .low
-            case "slightlyLow", "slightly-low":
+            case "slightlylow":
                 self = .slightlyLow
             case "balanced":
                 self = .balanced
-            case "slightlyHigh", "slightly-high":
+            case "slightlyhigh":
                 self = .slightlyHigh
             case "high":
                 self = .high
@@ -501,6 +506,29 @@ public struct AIToneProfile: Codable, Equatable, Sendable {
         self.nextStepDirectness = nextStepDirectness
         self.evidenceAnchoring = evidenceAnchoring
         self.schoolVoice = schoolVoice
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case warmth
+        case specificity
+        case concision
+        case formality
+        case encouragement
+        case nextStepDirectness
+        case evidenceAnchoring
+        case schoolVoice
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        warmth = try container.decodeIfPresent(ToneAxis.self, forKey: .warmth) ?? .balanced
+        specificity = try container.decodeIfPresent(ToneAxis.self, forKey: .specificity) ?? .balanced
+        concision = try container.decodeIfPresent(ToneAxis.self, forKey: .concision) ?? .balanced
+        formality = try container.decodeIfPresent(ToneAxis.self, forKey: .formality) ?? .balanced
+        encouragement = try container.decodeIfPresent(ToneAxis.self, forKey: .encouragement) ?? .balanced
+        nextStepDirectness = try container.decodeIfPresent(ToneAxis.self, forKey: .nextStepDirectness) ?? .balanced
+        evidenceAnchoring = try container.decodeIfPresent(ToneAxis.self, forKey: .evidenceAnchoring) ?? .balanced
+        schoolVoice = try container.decodeIfPresent(SchoolVoice.self, forKey: .schoolVoice) ?? .standard
     }
 }
 
