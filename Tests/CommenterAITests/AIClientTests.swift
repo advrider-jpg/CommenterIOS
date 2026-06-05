@@ -13,6 +13,8 @@ final class AIClientTests: XCTestCase {
             XCTFail("Expected unavailable AI client to throw.")
         } catch let error as AIClientError {
             XCTAssertEqual(error, .unavailable(.foundationModelsFrameworkMissing))
+        } catch {
+            XCTFail("Expected AIClientError, got \(error).")
         }
     }
 
@@ -38,7 +40,8 @@ final class AIClientTests: XCTestCase {
         )
         let client = AIClient.configuredForTests(revisionResult: expected)
 
-        XCTAssertEqual(await client.availability(), .available)
+        let availability = await client.availability()
+        XCTAssertEqual(availability, .available)
         let result = try await client.reviseDeterministicDraft(revisionRequest())
 
         XCTAssertEqual(result, expected)
