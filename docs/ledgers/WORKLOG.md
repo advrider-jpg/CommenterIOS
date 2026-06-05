@@ -745,3 +745,7 @@ Append material work history here. Keep entries short, dated, and factual.
 - Strengthened roster-row accessibility and screenshot navigation taps after CI
   showed the UI test was still on the worklist after tapping the new student
   row.
+- Replaced roster student-row NavigationLinks with explicit button-driven route
+  state, simplified the screenshot test to one stable row tap, and split stale
+  AI regression coverage across polish, tone, evidence-draft, single-accept,
+  and bulk-accept paths.

@@ -169,6 +169,8 @@ struct RosterSection: View {
     let onImportRoster: () -> Void
     let isDisabled: Bool
 
+    @State private var activeStudentEditorRoute: StudentEditorRoute?
+
     var body: some View {
         Section {
             WorklistNotebookCard(clipped: true) {
@@ -220,19 +222,8 @@ struct RosterSection: View {
                 }
                 WorklistNotebookCard {
                     ForEach(project.roster) { student in
-                        NavigationLink {
-                            StudentEditorView(
-                                student: student,
-                                isDisabled: isDisabled,
-                                onFirstNameChanged: { onFirstNameChanged(student.id, $0) },
-                                onLastNameChanged: { onLastNameChanged(student.id, $0) },
-                                onYearChanged: { onYearChanged(student.id, $0) },
-                                onGenderChanged: { onGenderChanged(student.id, $0) },
-                                onPronounsChanged: { onPronounsChanged(student.id, $0) },
-                                onInternalNoteChanged: { onInternalNoteChanged(student.id, $0) },
-                                onAttitudeDescriptorChanged: { onAttitudeDescriptorChanged(student.id, $0) },
-                                onDelete: { onDeleteStudent(student.id) }
-                            )
+                        Button {
+                            activeStudentEditorRoute = StudentEditorRoute(studentId: student.id)
                         } label: {
                             WorklistActionRow(
                                 title: fullStudentName(student),
@@ -243,8 +234,8 @@ struct RosterSection: View {
                             )
                             .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                         .disabled(isDisabled)
-                        .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("student-row-\(student.id)")
                         .accessibilityLabel(fullStudentName(student))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -265,6 +256,27 @@ struct RosterSection: View {
         } header: {
             WorklistTapeHeader("Roster", step: 2, detail: "Students required before results and drafts", tone: .local)
         }
+        .navigationDestination(item: $activeStudentEditorRoute) { route in
+            if let student = project.roster.first(where: { $0.id == route.studentId }) {
+                StudentEditorView(
+                    student: student,
+                    isDisabled: isDisabled,
+                    onFirstNameChanged: { onFirstNameChanged(route.studentId, $0) },
+                    onLastNameChanged: { onLastNameChanged(route.studentId, $0) },
+                    onYearChanged: { onYearChanged(route.studentId, $0) },
+                    onGenderChanged: { onGenderChanged(route.studentId, $0) },
+                    onPronounsChanged: { onPronounsChanged(route.studentId, $0) },
+                    onInternalNoteChanged: { onInternalNoteChanged(route.studentId, $0) },
+                    onAttitudeDescriptorChanged: { onAttitudeDescriptorChanged(route.studentId, $0) },
+                    onDelete: {
+                        onDeleteStudent(route.studentId)
+                        activeStudentEditorRoute = nil
+                    }
+                )
+            } else {
+                StudentEditorUnavailableView(studentId: route.studentId)
+            }
+        }
     }
 
     private var rosterValidationMessages: [String] {
@@ -281,6 +293,34 @@ struct RosterSection: View {
             messages.append("\(duplicateCount) duplicate student \(duplicateCount == 1 ? "identity needs" : "identities need") resolving before the project can be saved cleanly.")
         }
         return messages
+    }
+}
+
+private struct StudentEditorRoute: Identifiable, Hashable {
+    let studentId: String
+
+    var id: String { studentId }
+}
+
+private struct StudentEditorUnavailableView: View {
+    let studentId: String
+
+    var body: some View {
+        Form {
+            Section {
+                WorklistNotebookCard(perforated: false) {
+                    WorklistNote("This student is no longer available in the open project.", tone: .warning)
+                }
+                .worklistSectionRow()
+            } header: {
+                WorklistTapeHeader("Student details", tone: .warning)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(CommenterStationeryTheme.Colors.paperBackground)
+        .navigationTitle("Student details")
+        .commenterInlineNavigationTitle()
+        .accessibilityIdentifier("student-editor-missing-\(studentId)")
     }
 }
 

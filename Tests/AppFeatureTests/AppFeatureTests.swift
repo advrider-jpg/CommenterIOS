@@ -1660,7 +1660,19 @@ final class AppFeatureTests: XCTestCase {
         }
     }
 
-    func testSingleReportAICompletionsDiscardStalePreviewsWhenDraftChanged() async {
+    func testAIPolishCompletionDiscardsStalePreviewWhenDraftChanged() async {
+        await assertStaleAICompletionIsDiscarded(.polish)
+    }
+
+    func testAIToneAdjustCompletionDiscardsStalePreviewWhenDraftChanged() async {
+        await assertStaleAICompletionIsDiscarded(.toneAdjustment)
+    }
+
+    func testAIDraftFromEvidenceCompletionDiscardsStalePreviewWhenDraftChanged() async {
+        await assertStaleAICompletionIsDiscarded(.evidenceDraft)
+    }
+
+    private func assertStaleAICompletionIsDiscarded(_ path: StaleAICompletionPath) async {
         var project = readyProject()
         let requestTimeText = project.reports[0].text
         let currentTeacherText = "Ava reads with confidence and adds her own teacher note."
@@ -1672,74 +1684,111 @@ final class AppFeatureTests: XCTestCase {
             validatedAt: 2_000,
             textFingerprint: stableTextFingerprint(proposedText)
         )
-        let revisionTrace = AIReportTrace(
-            traceId: "trace-stale-polish",
-            promptId: "report.revise.deterministic.v1",
+        let trace = AIReportTrace(
+            traceId: path.traceId,
+            promptId: path.promptId,
             promptVersion: "1.0.0",
-            promptPurpose: .reviseDeterministicDraft,
+            promptPurpose: path.promptPurpose,
             modelAvailabilityAtStart: .available,
             startedAt: 1_000,
             completedAt: 2_000,
             inputFingerprint: "input-fp",
-            deterministicDraftFingerprint: stableTextFingerprint(requestTimeText),
+            deterministicDraftFingerprint: path.usesDeterministicDraftFingerprint ? stableTextFingerprint(requestTimeText) : nil,
             outputFingerprint: stableTextFingerprint(proposedText),
             validationSummary: validation,
             outcome: .completed
         )
-        let toneTrace = AIReportTrace(
-            traceId: "trace-stale-tone",
-            promptId: "report.adjust.tone.v1",
-            promptVersion: "1.0.0",
-            promptPurpose: .adjustTone,
-            modelAvailabilityAtStart: .available,
-            startedAt: 1_000,
-            completedAt: 2_000,
-            inputFingerprint: "input-fp",
-            deterministicDraftFingerprint: stableTextFingerprint(requestTimeText),
-            outputFingerprint: stableTextFingerprint(proposedText),
-            validationSummary: validation,
-            outcome: .completed
-        )
-        let draftTrace = AIReportTrace(
-            traceId: "trace-stale-draft",
-            promptId: "report.draft.evidence.v1",
-            promptVersion: "1.0.0",
-            promptPurpose: .draftFromEvidence,
-            modelAvailabilityAtStart: .available,
-            startedAt: 1_000,
-            completedAt: 2_000,
-            inputFingerprint: "input-fp",
-            outputFingerprint: stableTextFingerprint(proposedText),
-            validationSummary: validation,
-            outcome: .completed
-        )
-        let revision = AIReportRevisionResult(
-            revisedText: proposedText,
-            changeSummary: "Improved flow and clarity.",
-            validation: validation,
-            trace: revisionTrace
-        )
-        let toneRevision = AIReportRevisionResult(
-            revisedText: proposedText,
-            changeSummary: "Adjusted tone only.",
-            validation: validation,
-            trace: toneTrace
-        )
-        let evidenceDraft = AIReportDraftResult(draftText: proposedText, validation: validation, trace: draftTrace)
         var initial = loadedState(project: project)
         initial.aiAvailabilityStatus = .checked(.available)
         let store = TestStore(initialState: initial) {
             AppFeature()
         }
 
-        await store.send(.reportAIPolishCompleted("s1", "English", requestTimeText, revision)) {
-            $0.operationStatus = .failed("The AI revision returned after the draft changed. The stale preview was discarded; request a new preview from the current draft.")
+        switch path {
+        case .polish:
+            let revision = AIReportRevisionResult(
+                revisedText: proposedText,
+                changeSummary: "Improved flow and clarity.",
+                validation: validation,
+                trace: trace
+            )
+            await store.send(.reportAIPolishCompleted("s1", "English", requestTimeText, revision)) {
+                $0.operationStatus = .failed(path.staleMessage)
+            }
+        case .toneAdjustment:
+            let revision = AIReportRevisionResult(
+                revisedText: proposedText,
+                changeSummary: "Adjusted tone only.",
+                validation: validation,
+                trace: trace
+            )
+            await store.send(.reportAIToneAdjustCompleted("s1", "English", requestTimeText, revision)) {
+                $0.operationStatus = .failed(path.staleMessage)
+            }
+        case .evidenceDraft:
+            let evidenceDraft = AIReportDraftResult(draftText: proposedText, validation: validation, trace: trace)
+            await store.send(.reportAIDraftFromEvidenceCompleted("s1", "English", requestTimeText, evidenceDraft)) {
+                $0.operationStatus = .failed(path.staleMessage)
+            }
         }
-        await store.send(.reportAIToneAdjustCompleted("s1", "English", requestTimeText, toneRevision)) {
-            $0.operationStatus = .failed("The AI tone adjustment returned after the draft changed. The stale preview was discarded; request a new preview from the current draft.")
+    }
+
+    private enum StaleAICompletionPath {
+        case polish
+        case toneAdjustment
+        case evidenceDraft
+
+        var traceId: String {
+            switch self {
+            case .polish:
+                return "trace-stale-polish"
+            case .toneAdjustment:
+                return "trace-stale-tone"
+            case .evidenceDraft:
+                return "trace-stale-draft"
+            }
         }
-        await store.send(.reportAIDraftFromEvidenceCompleted("s1", "English", requestTimeText, evidenceDraft)) {
-            $0.operationStatus = .failed("The AI evidence draft returned after the draft changed. The stale preview was discarded; request a new preview from the current draft.")
+
+        var promptId: String {
+            switch self {
+            case .polish:
+                return "report.revise.deterministic.v1"
+            case .toneAdjustment:
+                return "report.adjust.tone.v1"
+            case .evidenceDraft:
+                return "report.draft.evidence.v1"
+            }
+        }
+
+        var promptPurpose: AIPromptPurpose {
+            switch self {
+            case .polish:
+                return .reviseDeterministicDraft
+            case .toneAdjustment:
+                return .adjustTone
+            case .evidenceDraft:
+                return .draftFromEvidence
+            }
+        }
+
+        var usesDeterministicDraftFingerprint: Bool {
+            switch self {
+            case .polish, .toneAdjustment:
+                return true
+            case .evidenceDraft:
+                return false
+            }
+        }
+
+        var staleMessage: String {
+            switch self {
+            case .polish:
+                return "The AI revision returned after the draft changed. The stale preview was discarded; request a new preview from the current draft."
+            case .toneAdjustment:
+                return "The AI tone adjustment returned after the draft changed. The stale preview was discarded; request a new preview from the current draft."
+            case .evidenceDraft:
+                return "The AI evidence draft returned after the draft changed. The stale preview was discarded; request a new preview from the current draft."
+            }
         }
     }
 
@@ -1879,6 +1928,98 @@ final class AppFeatureTests: XCTestCase {
         await store.send(.reportAIRevisionRejected("s1", "English")) {
             $0.pendingAIRevision = nil
             $0.operationStatus = .cancelled("AI revision discarded. The local draft was not changed.")
+        }
+    }
+
+    func testAIRevisionAcceptRejectsPreviewWhenDraftChangedSincePreviewCreated() async {
+        var project = readyProject()
+        let requestTimeText = project.reports[0].text
+        let teacherEditedText = "Ava reads with confidence and the teacher adds a current note."
+        project.reports[0].manualEdit = teacherEditedText
+        let proposedText = "Ava reads with confidence and explains ideas clearly."
+        let validation = ReportValidationSummary(
+            status: .passed,
+            findings: [],
+            validatedAt: 2_000,
+            textFingerprint: stableTextFingerprint(proposedText)
+        )
+        let trace = AIReportTrace(
+            traceId: "trace-accept-stale",
+            promptId: "report.revise.deterministic.v1",
+            promptVersion: "1.0.0",
+            promptPurpose: .reviseDeterministicDraft,
+            modelAvailabilityAtStart: .available,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            inputFingerprint: "input",
+            outputFingerprint: stableTextFingerprint(proposedText),
+            outcome: .completed
+        )
+        var initial = loadedState(project: project)
+        initial.pendingAIRevision = AppFeature.PendingAIRevision(
+            id: "trace-accept-stale",
+            studentId: "s1",
+            subject: "English",
+            originalText: requestTimeText,
+            proposedText: proposedText,
+            changeSummary: "Improved flow.",
+            validation: validation,
+            trace: trace
+        )
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        }
+
+        await store.send(.reportAIRevisionAccepted("s1", "English")) {
+            $0.pendingAIRevision = nil
+            $0.operationStatus = .failed("The draft changed after the AI preview was created. Request a new revision before accepting.")
+        }
+    }
+
+    func testBulkAIPolishPreviewCannotOverwriteTeacherEditAtAcceptance() async {
+        var project = readyProject()
+        let requestTimeText = project.reports[0].text
+        let teacherEditedText = "Ava reads with confidence and the teacher adds a current note."
+        project.reports[0].manualEdit = teacherEditedText
+        let proposedText = "Ava reads with confidence and explains ideas clearly."
+        let validation = ReportValidationSummary(
+            status: .passed,
+            findings: [],
+            validatedAt: 2_000,
+            textFingerprint: stableTextFingerprint(proposedText)
+        )
+        let trace = AIReportTrace(
+            traceId: "bulk-accept-stale",
+            promptId: "report.revise.deterministic.v1",
+            promptVersion: "1.0.0",
+            promptPurpose: .reviseDeterministicDraft,
+            modelAvailabilityAtStart: .available,
+            startedAt: 1_000,
+            completedAt: 2_000,
+            inputFingerprint: "input",
+            outputFingerprint: stableTextFingerprint(proposedText),
+            outcome: .completed
+        )
+        var initial = loadedState(project: project)
+        initial.pendingAIRevisions = [
+            AppFeature.PendingAIRevision(
+                id: "bulk-accept-stale-s1-\(stableTextFingerprint("English"))",
+                studentId: "s1",
+                subject: "English",
+                originalText: requestTimeText,
+                proposedText: proposedText,
+                changeSummary: "Bulk revision.",
+                validation: validation,
+                trace: trace
+            )
+        ]
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        }
+
+        await store.send(.reportAIRevisionAccepted("s1", "English")) {
+            $0.pendingAIRevisions = []
+            $0.operationStatus = .failed("The draft changed after the AI preview was created. Request a new revision before accepting.")
         }
     }
 

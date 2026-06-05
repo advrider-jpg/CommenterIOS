@@ -212,26 +212,14 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     private func openStudentEditor(studentId: String) {
         let rowIdentifier = "student-row-\(studentId)"
         let row = scrollToAnyInWorklist(
-            [app.buttons[rowIdentifier], app.cells[rowIdentifier], app.otherElements[rowIdentifier], element(rowIdentifier)],
+            [app.buttons[rowIdentifier]],
             name: "new student row",
-            requireHittable: false
+            requireHittable: true
         )
 
-        let tapOffsets = [
-            CGVector(dx: 0.5, dy: 0.5),
-            CGVector(dx: 0.9, dy: 0.5),
-            CGVector(dx: 0.1, dy: 0.5)
-        ]
-        for (index, offset) in tapOffsets.enumerated() {
-            if index == 0, row.isHittable {
-                row.tap()
-            } else {
-                XCTAssertTrue(isVisibleOnScreen(row), "Expected new student row to be visible before tapping.")
-                row.coordinate(withNormalizedOffset: offset).tap()
-            }
-            if waitForStudentEditorIfPresent(studentId: studentId, timeout: 3) {
-                return
-            }
+        tapElement(row, named: "new student row")
+        if waitForStudentEditorIfPresent(studentId: studentId, timeout: 5) {
+            return
         }
 
         captureFailureContext("student-editor-\(studentId)")
