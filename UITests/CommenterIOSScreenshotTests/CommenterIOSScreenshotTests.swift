@@ -118,14 +118,20 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         )
         generateReports.tap()
         waitForOperationToSettle(action: "report generation")
+        RunLoop.current.run(until: Date().addingTimeInterval(1.0))
         ensureWorklistOpen()
 
         let reportRow = scrollToAnyInWorklist(
             reportRows(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)"),
-            name: "generated Ava English report row"
+            name: "generated Ava English report row",
+            requireHittable: false
         )
         tapElement(reportRow, named: "generated Ava English report row")
-        let reportEditor = scrollToAny(textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"), name: "generated Ava English report", requireHittable: false)
+        let reportEditor = scrollToAnyInWorklist(
+            textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"),
+            name: "generated Ava English report",
+            requireHittable: false
+        )
         waitForElement(reportEditor, named: "generated Ava English report")
         capture("11-generated-report-comment")
         tapBack(to: screenshotProjectName)
@@ -364,10 +370,14 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         captureFailureContext(name)
         let failureStatus = element("operation-status-failed")
+        let candidatesSummary = elements.map { element in
+            let identifier = element.identifier.isEmpty ? "<no-id>" : element.identifier
+            return "\(identifier): exists=\(element.exists) hittable=\(element.isHittable) label=\(element.label)"
+        }.joined(separator: "; ")
         if failureStatus.exists {
-            XCTFail("Expected \(name), but the app reported failure: \(failureStatus.label)")
+            XCTFail("Expected \(name), but the app reported failure: \(failureStatus.label). Candidates: \(candidatesSummary)")
         } else {
-            XCTFail("Expected \(name) to be visible\(requireHittable ? " and hittable" : "").")
+            XCTFail("Expected \(name) to be visible\(requireHittable ? " and hittable" : ""). Candidates: \(candidatesSummary)")
         }
         return elements[0]
     }

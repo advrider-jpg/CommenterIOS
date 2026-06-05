@@ -752,3 +752,6 @@ Append material work history here. Keep entries short, dated, and factual.
 - Hoisted student-editor route state to `WorklistRootView`, kept roster rows as
   full-width buttons, and made the screenshot test scroll the new row into a
   safe central tap zone before activation.
+- Relaxed generated-report screenshot lookups to visible-but-not-necessarily
+  hittable elements after generation and added candidate state diagnostics for
+  future scroll failures.
