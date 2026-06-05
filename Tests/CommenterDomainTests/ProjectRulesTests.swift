@@ -2,7 +2,7 @@ import CommenterDomain
 import XCTest
 
 final class ProjectRulesTests: XCTestCase {
-    func testNormalizeReportLayoutPreservesDisabledSubjectSection() {
+    func testNormalizeReportLayoutForcesSubjectSectionLikeV3() {
         let layout = ReportLayout(
             enabled: true,
             order: [.nextSteps],
@@ -12,7 +12,19 @@ final class ProjectRulesTests: XCTestCase {
         let normalized = normalizeReportLayout(layout)
 
         XCTAssertEqual(normalized.order, [.nextSteps, .general, .subject, .dispositions])
-        XCTAssertEqual(normalized.include[.subject], false)
+        XCTAssertEqual(normalized.include[.subject], true)
+    }
+
+    func testNormalizeReportLayoutDeduplicatesMalformedOrder() {
+        let layout = ReportLayout(
+            enabled: true,
+            order: [.subject, .general, .subject],
+            include: [.general: true, .subject: true, .dispositions: true, .nextSteps: true]
+        )
+
+        let normalized = normalizeReportLayout(layout)
+
+        XCTAssertEqual(normalized.order, [.subject, .general, .dispositions, .nextSteps])
     }
 
     func testDuplicateStudentIdentityUsesNameAndYearLevel() {

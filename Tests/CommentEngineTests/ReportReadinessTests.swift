@@ -85,6 +85,60 @@ final class ReportReadinessTests: XCTestCase {
         XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .languageQualityIssue)
     }
 
+    func testLanguageLintReportsRepeatedFirstNameLikeV3() {
+        let result = lintReportLanguage(
+            "Ava Ava writes clearly.",
+            displayName: "Ava",
+            firstName: "Ava",
+            expectedSubjectPronoun: "She"
+        )
+
+        XCTAssertEqual(firstBlockingLanguageIssue(result)?.code, "repeated-first-name")
+    }
+
+    func testBlocksWrongPronounAndRepeatedWordLanguageIssues() {
+        let wrongPronoun = lintReportLanguage(
+            "Ava writes clearly. He uses feedback well.",
+            displayName: "Ava",
+            firstName: "Ava",
+            expectedSubjectPronoun: "She"
+        )
+        XCTAssertEqual(firstBlockingLanguageIssue(wrongPronoun)?.code, "wrong-pronoun")
+
+        let repeatedWord = lintReportLanguage(
+            "Ava writes with clear clear detail.",
+            displayName: "Ava",
+            firstName: "Ava",
+            expectedSubjectPronoun: "They"
+        )
+        XCTAssertEqual(firstBlockingLanguageIssue(repeatedWord)?.code, "repeated-word")
+    }
+
+    func testLanguageLintKeepsLongSentenceWarningsSeparateFromExportBlockers() {
+        let longSentence = Array(repeating: "Ava explains her ideas clearly", count: 12).joined(separator: " ") + "."
+
+        let result = lintReportLanguage(
+            longSentence,
+            displayName: "Ava",
+            firstName: "Ava",
+            expectedSubjectPronoun: "She"
+        )
+
+        XCTAssertNil(firstBlockingLanguageIssue(result))
+        XCTAssertEqual(result.issues.first?.code, "long-sentence")
+        XCTAssertEqual(result.issues.first?.severity, .warning)
+        XCTAssertEqual(result.issues.first?.source, .customRule)
+
+        let withoutWarnings = lintReportLanguage(
+            longSentence,
+            displayName: "Ava",
+            firstName: "Ava",
+            expectedSubjectPronoun: "She",
+            allowWarnings: false
+        )
+        XCTAssertTrue(withoutWarnings.issues.isEmpty)
+    }
+
     func testBlocksStaleReportsAndAllowsLockedReadyReports() {
         var project = fixtureProject()
         let fingerprint = buildGenerationFingerprint(

@@ -82,7 +82,7 @@ extension AppFeature {
             state.operationStatus = .busy("Validating backup JSON before saving it locally.")
             return .run { send in
                 do {
-                    let imported = try await projectStoreClient.importBackup(url)
+                    let imported = try await projectStoreClient.importBackup(url, nil)
                     await send(.importPreviewPrepared(PendingImport(
                         project: imported,
                         title: "Review backup import",
@@ -94,10 +94,54 @@ extension AppFeature {
                         acceptedRows: 1,
                         sourceFormat: .backupJSON
                     )))
+                } catch BackupError.encryptedPasswordRequired {
+                    await send(.encryptedBackupPasswordRequired(url))
                 } catch {
                     await send(.importFailed(error.localizedDescription))
                 }
             }
+
+        case let .encryptedBackupPasswordRequired(url):
+            state.projectStorageStatus = .loaded
+            state.activeImportKind = nil
+            state.pendingEncryptedBackupURL = url
+            state.operationStatus = .idle
+            return .none
+
+        case let .backupPasswordEntered(url, password):
+            guard state.pendingEncryptedBackupURL == url else { return .none }
+            guard canStartFileWorkflow(state: &state, label: "encrypted backup import") else { return .none }
+            state.pendingEncryptedBackupURL = nil
+            state.projectStorageStatus = .importing
+            state.activeImportKind = .backup
+            state.operationStatus = .busy("Decrypting and validating encrypted backup before saving locally.")
+            return .run { send in
+                do {
+                    let imported = try await projectStoreClient.importBackup(url, password)
+                    await send(.importPreviewPrepared(PendingImport(
+                        project: imported,
+                        title: "Review encrypted backup import",
+                        detail: "\(imported.metadata.name) was decrypted and validated. Confirm to save it locally; any matching project id will be snapshotted before replacement.",
+                        successMessage: "Encrypted backup imported, saved, and verified. A matching local project id was replaced only after a recovery snapshot was prepared.",
+                        expectedRevision: nil,
+                        recoveryReason: .beforeImportReplace,
+                        kind: .backup,
+                        acceptedRows: 1,
+                        sourceFormat: .backupJSON
+                    )))
+                } catch BackupError.encryptedCouldNotDecrypt, BackupError.encryptedPasswordRequired {
+                    await send(.importFailed("The encrypted backup could not be opened. Check the backup password and try again."))
+                } catch {
+                    await send(.importFailed(error.localizedDescription))
+                }
+            }
+
+        case .backupPasswordCancelled:
+            state.pendingEncryptedBackupURL = nil
+            state.projectStorageStatus = .loaded
+            state.activeImportKind = nil
+            state.operationStatus = .cancelled("Encrypted backup import cancelled.")
+            return .none
 
         case .importCancelled:
             state.projectStorageStatus = .loaded
@@ -129,6 +173,20 @@ extension AppFeature {
             guard let preview = state.pendingImport else {
                 state.operationStatus = .failed("No validated import is waiting for confirmation.")
                 return .none
+            }
+            if preview.kind == .backup {
+                let collision = getBackupCollisionKind(
+                    projectId: preview.project.metadata.id,
+                    existingIds: state.projects.map(\.id),
+                    invalidIds: state.invalidProjectRecords.map(\.id)
+                )
+                if collision == .invalid {
+                    state.pendingImport = nil
+                    state.projectStorageStatus = .loaded
+                    state.activeImportKind = nil
+                    state.operationStatus = .failed("A damaged local project with this ID exists. Remove the invalid record from Support diagnostics before importing this backup.")
+                    return .none
+                }
             }
             state.projectStorageStatus = .importing
             state.activeImportKind = preview.kind

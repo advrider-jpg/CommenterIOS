@@ -164,6 +164,30 @@ final class ImportValidationTests: XCTestCase {
         }
     }
 
+    func testResultsCSVImportRejectsSentenceLikeContextFields() {
+        XCTAssertThrowsError(try ImportValidation.parseResultsImportCSV(
+            [
+                "First Name,Last Name,Subject,Achievement Level,Text Type",
+                "Ava,Ng,English,At Standard,They created a persuasive paragraph"
+            ].joined(separator: "\n"),
+            roster: roster,
+            selectedSubjects: selectedSubjects
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Text type / genre must be a short phrase without leading pronouns"))
+        }
+
+        XCTAssertThrowsError(try ImportValidation.parseResultsImportCSV(
+            [
+                "First Name,Last Name,Subject,Achievement Level,Learning Context",
+                "Ava,Ng,English,At Standard,Ava solved multi-step problems"
+            ].joined(separator: "\n"),
+            roster: roster,
+            selectedSubjects: selectedSubjects
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Learning context / activity must be a short phrase, not a sentence"))
+        }
+    }
+
     func testResultsCSVImportBlocksPartialRowsWithoutReturningPartialImport() {
         XCTAssertThrowsError(try ImportValidation.parseResultsImportCSV(
             [

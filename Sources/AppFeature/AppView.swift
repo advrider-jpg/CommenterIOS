@@ -13,6 +13,7 @@ public struct AppView: View {
     @State private var isExportingFile = false
     @State private var sharePresentation: SharePresentation?
     @State private var projectDeletionCandidate: ProjectDeletionCandidate?
+    @State private var encryptedBackupPassword = ""
 
     public init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -67,11 +68,24 @@ public struct AppView: View {
                     onStudentFirstNameChanged: { viewStore.send(.studentFirstNameChanged($0, $1)) },
                     onStudentLastNameChanged: { viewStore.send(.studentLastNameChanged($0, $1)) },
                     onStudentYearChanged: { viewStore.send(.studentYearLevelChanged($0, $1)) },
+                    onStudentGenderChanged: { viewStore.send(.studentGenderChanged($0, $1)) },
+                    onStudentPronounsChanged: { viewStore.send(.studentPronounsChanged($0, $1)) },
+                    onStudentInternalNoteChanged: { viewStore.send(.studentInternalNoteChanged($0, $1)) },
+                    onStudentAttitudeDescriptorChanged: { viewStore.send(.studentAttitudeDescriptorChanged($0, $1)) },
                     onSubjectToggled: { viewStore.send(.subjectToggled($0)) },
                     onSelectAllSubjects: { viewStore.send(.subjectSelectAllTapped) },
                     onDeselectAllSubjects: { viewStore.send(.subjectDeselectAllTapped) },
                     onAchievementChanged: { viewStore.send(.achievementLevelChanged($0, $1, $2)) },
                     onFocusChanged: { viewStore.send(.focusChanged($0, $1, $2)) },
+                    onResultEvidenceChanged: { viewStore.send(.resultEvidenceChanged($0, $1, $2)) },
+                    onResultTextTypeChanged: { viewStore.send(.resultTextTypeChanged($0, $1, $2)) },
+                    onResultLearningContextChanged: { viewStore.send(.resultLearningContextChanged($0, $1, $2)) },
+                    onResultReportEmphasisNoteChanged: { viewStore.send(.resultReportEmphasisNoteChanged($0, $1, $2)) },
+                    onResultFlagChanged: { viewStore.send(.resultFlagChanged($0, $1, $2, $3)) },
+                    onResultEnglishFocusTagsChanged: { viewStore.send(.resultEnglishFocusTagsChanged($0, $1, $2)) },
+                    onResultMathProficienciesChanged: { viewStore.send(.resultMathProficienciesChanged($0, $1, $2)) },
+                    onResultMathMindsetTogglesChanged: { viewStore.send(.resultMathMindsetTogglesChanged($0, $1, $2)) },
+                    onResultNextStepGoalsChanged: { viewStore.send(.resultNextStepGoalsChanged($0, $1, $2)) },
                     onGenerate: { viewStore.send(.generateReportsTapped) },
                     onManualEditChanged: { viewStore.send(.reportManualEditChanged($0, $1, $2)) },
                     onLockChanged: { viewStore.send(.reportLockChanged($0, $1, $2)) },
@@ -185,6 +199,27 @@ public struct AppView: View {
                 }
             } message: { _ in
                 Text("A recovery snapshot of the verified local project will be created before the project file is removed. Save or reopen first if there are unsaved edits.")
+            }
+            .alert(
+                "Encrypted backup",
+                isPresented: Binding(
+                    get: { viewStore.pendingEncryptedBackupURL != nil },
+                    set: { _ in }
+                ),
+                presenting: viewStore.pendingEncryptedBackupURL
+            ) { url in
+                SecureField("Backup password", text: $encryptedBackupPassword)
+                Button("Import") {
+                    let password = encryptedBackupPassword
+                    encryptedBackupPassword = ""
+                    viewStore.send(.backupPasswordEntered(url, password))
+                }
+                Button("Cancel", role: .cancel) {
+                    encryptedBackupPassword = ""
+                    viewStore.send(.backupPasswordCancelled)
+                }
+            } message: { _ in
+                Text("Enter the password used to encrypt this backup.")
             }
         }
     }

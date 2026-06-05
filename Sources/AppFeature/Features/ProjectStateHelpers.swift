@@ -72,12 +72,20 @@ func sortedProjects(_ projects: [ProjectSummary]) -> [ProjectSummary] {
     projects.sorted { $0.updatedAt > $1.updatedAt }
 }
 
-func projectStorageLoadedMessage(projectCount: Int) -> String {
+func projectStorageLoadedMessage(projectCount: Int, invalidProjectCount: Int = 0) -> String {
+    let invalidSuffix: String
+    if invalidProjectCount == 0 {
+        invalidSuffix = ""
+    } else {
+        let invalidLabel = invalidProjectCount == 1 ? "record" : "records"
+        invalidSuffix = " \(invalidProjectCount) local project \(invalidLabel) could not be loaded and is listed in Support diagnostics."
+    }
+
     if projectCount == 0 {
-        return "Project storage is available and ready."
+        return "Project storage is available and ready." + invalidSuffix
     }
     let label = projectCount == 1 ? "project" : "projects"
-    return "\(projectCount) saved \(label) loaded from local storage."
+    return "\(projectCount) saved \(label) loaded from local storage." + invalidSuffix
 }
 
 func generationSuccessMessage(_ result: CommentGenerationResult) -> String {

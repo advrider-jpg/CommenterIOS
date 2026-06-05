@@ -83,6 +83,7 @@ public struct ReportGenerator {
         guard let achievementLevel = result.achievementLevel else {
             throw ReportGenerationError.missingAchievementLevel(studentName: displayName, subject: subject)
         }
+        try validateReportContextInputs(result)
 
         let mappedBand = bandMapping[achievementLevel.rawValue] ?? achievementLevel.rawValue
         let normalizedLevel = Self.normalizeLevel(student.yearLevel.rawValue)
@@ -143,13 +144,14 @@ public struct ReportGenerator {
             repairedEvidence: repairedEvidence,
             trace: &trace
         )
-        let finalText = applyReportLayout(
+        let rawText = applyReportLayout(
             subjectText,
             student: student,
             subject: concreteSubject,
             result: result,
             context: generationContext
         )
+        let finalText = normalizeSentenceCase(rawText, displayName: generationContext.displayName, protectedTerms: [generationContext.subject])
         let unresolved = findUnresolvedPlaceholders(finalText)
         guard unresolved.isEmpty else {
             throw ReportGenerationError.unresolvedPlaceholders(label: "\(generationContext.displayName) \(subject) report", placeholders: unresolved)
@@ -265,19 +267,49 @@ public struct ReportGenerator {
         }
 
         let evidence = components(type: .evidence).first
+        let sourceIds = [strength.component.keyID, evidence?.component.keyID, nextStep.component.keyID].compactMap { $0 }
+        let slots = recipeSlots(strength: strength, evidence: evidence, nextStep: nextStep)
+
+        for recipe in data.recipeBank {
+            let rendered = renderRecipe(recipe: recipe, slots: slots, context: context)
+            if rendered.ok {
+                guard canUseVariant(rendered.recipeID) else {
+                    trace.append("Recipe \(rendered.sourceRecipeID) blocked by uniqueness rules.")
+                    continue
+                }
+                trace.append("Assembled comment with recipe \(rendered.sourceRecipeID).")
+                return GeneratedCandidate(text: rendered.text, variantID: rendered.recipeID)
+            }
+            trace.append("Recipe \(rendered.sourceRecipeID.ifEmpty(recipe.recipeID)) rejected: \(rendered.errors.prefix(2).joined(separator: " "))")
+        }
+
         let parts = [strength.renderedText, evidence?.renderedText, nextStep.renderedText]
             .compactMap { $0?.trimmedNonEmpty }
             .map(Self.ensureSentence)
-        let sourceIds = [strength.component.keyID, evidence?.component.keyID, nextStep.component.keyID].compactMap { $0 }
-        let variantID = "ASSEMBLED_\(String(Self.fnv1a(sourceIds.joined(separator: "|")), radix: 16))"
+        let variantID = recipeSyntheticVariantID(recipeID: "LOCAL_SENTENCE_JOIN", componentIDs: sourceIds)
 
         guard canUseVariant(variantID) else {
             trace.append("Component assembly blocked by uniqueness rules.")
             return nil
         }
 
-        trace.append("Assembled comment from eligible components.")
+        trace.append("Assembled comment with local sentence recipe fallback.")
         return GeneratedCandidate(text: cleanSpacing(parts.joined(separator: " ")), variantID: variantID)
+    }
+
+    private func recipeSlots(
+        strength: ComponentCandidate,
+        evidence: ComponentCandidate?,
+        nextStep: ComponentCandidate
+    ) -> [RecipeComponentType: RenderedRecipeSlot] {
+        var slots: [RecipeComponentType: RenderedRecipeSlot] = [
+            .strength: RenderedRecipeSlot(type: .strength, component: strength.component, renderedText: strength.renderedText),
+            .nextStep: RenderedRecipeSlot(type: .nextStep, component: nextStep.component, renderedText: nextStep.renderedText)
+        ]
+        if let evidence {
+            slots[.evidence] = RenderedRecipeSlot(type: .evidence, component: evidence.component, renderedText: evidence.renderedText)
+        }
+        return slots
     }
 
     private func selectBestVariant(_ variants: [VariantCandidate]) -> VariantCandidate? {
@@ -314,6 +346,12 @@ public struct ReportGenerator {
             }
         }
 
+        let contextSentence = generateReportContextSentence(subjectText: subjectText, context: context)
+        if !contextSentence.isEmpty {
+            trace.append("Teacher report context included.")
+            subjectText = "\(Self.ensureSentence(subjectText)) \(contextSentence)"
+        }
+
         let normalizedSubject = normalizeSubjectLabel(subject)
         if normalizedSubject == "english", let englishFocus = generateEnglishFocusSentence(student: student, subject: subject, result: result, displayName: context.displayName, pronouns: context) {
             subjectText = "\(Self.ensureSentence(subjectText)) \(englishFocus)"
@@ -339,7 +377,6 @@ public struct ReportGenerator {
         context: PlaceholderContext
     ) -> String {
         let reportLayout = normalizeReportLayout(projectMetadata.reportLayout)
-        if !reportLayout.enabled { return cleanSpacing(subjectText) }
 
         let paragraphs: [ReportSection: String] = [
             .general: generateGeneralParagraph(student: student, subject: subject, displayName: context.displayName),
@@ -348,10 +385,13 @@ public struct ReportGenerator {
             .nextSteps: generateNextStepsParagraph(student: student, subject: subject, result: result, displayName: context.displayName)
         ]
 
-        return reportLayout.order
+        let selected = reportLayout.order
             .filter { reportLayout.include[$0] != false }
             .compactMap { paragraphs[$0]?.trimmingCharacters(in: .whitespacesAndNewlines).trimmedNonEmpty }
-            .joined(separator: "\n\n")
+        if !reportLayout.enabled {
+            return cleanSpacing(selected.joined(separator: " "))
+        }
+        return selected.joined(separator: "\n\n")
     }
 
     private func generateGeneralParagraph(student: Student, subject: String, displayName: String) -> String {
@@ -371,6 +411,9 @@ public struct ReportGenerator {
     private func generateEnglishFocusSentence(student: Student, subject: String, result: AchievementResult, displayName: String, pronouns: PlaceholderContext) -> String? {
         let tags = stableOrderedArray(result.englishFocusTags)
         guard !tags.isEmpty else { return nil }
+        if tags.count > 2 {
+            return "\(displayName) has shown strength in \(formatList(tags))."
+        }
         let hash = Self.fnv1a("\(student.id)::\(subject)::english-focus")
         let template: String
         if tags.count == 1 {
@@ -387,6 +430,9 @@ public struct ReportGenerator {
     private func generateMathProficiencySentence(student: Student, subject: String, result: AchievementResult, displayName: String, pronouns: PlaceholderContext) -> String? {
         let proficiencies = stableOrderedArray(result.mathProficiencies)
         guard !proficiencies.isEmpty else { return nil }
+        if proficiencies.count > 2 {
+            return "\(displayName) demonstrates strength in \(formatList(proficiencies))."
+        }
         let hash = Self.fnv1a("\(student.id)::\(subject)::math-prof")
         let template: String
         if proficiencies.count == 1 {
@@ -412,6 +458,9 @@ public struct ReportGenerator {
     private func generateNextStepsParagraph(student: Student, subject: String, result: AchievementResult, displayName: String) -> String {
         let goals = stableOrderedArray(result.nextStepGoals)
         guard !goals.isEmpty else { return "" }
+        if goals.count > 2 {
+            return "Next steps for \(displayName) include \(formatList(goals))."
+        }
         let hash = Self.fnv1a("\(student.id)::\(subject)::next-steps")
         if goals.count == 1 {
             return nextStepTemplatesSingle[Int(hash % UInt32(nextStepTemplatesSingle.count))]
@@ -424,6 +473,40 @@ public struct ReportGenerator {
             .replacingOccurrences(of: "{goal2}", with: goals[1])
     }
 
+    private func generateReportContextSentence(subjectText: String, context: PlaceholderContext) -> String {
+        let textType = cleanSpacing(context.textType ?? "")
+        let learningContext = cleanSpacing(context.context ?? "")
+        let textTypeNeeded = !textType.isEmpty && !includesPhrase(subjectText, phrase: textType)
+        let learningContextNeeded = !learningContext.isEmpty && !includesPhrase(subjectText, phrase: learningContext)
+
+        if !textTypeNeeded, !learningContextNeeded { return "" }
+        if textTypeNeeded, learningContextNeeded {
+            return "This was demonstrated through \(textType) \(learningContextPhrase(learningContext))."
+        }
+        if textTypeNeeded {
+            return "This was demonstrated through \(textType)."
+        }
+        return "This was demonstrated \(learningContextPhrase(learningContext))."
+    }
+
+    private func learningContextPhrase(_ value: String) -> String {
+        let phrase = cleanSpacing(value)
+        if phrase.range(of: #"^(during|in|through|with|on|for|while|as part of)\b"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return phrase
+        }
+        return "in \(phrase)"
+    }
+
+    private func includesPhrase(_ text: String, phrase: String) -> Bool {
+        !phrase.isEmpty && text.range(of: phrase, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    }
+
+    private func formatList(_ items: [String]) -> String {
+        if items.count <= 1 { return items.first ?? "" }
+        if items.count == 2 { return "\(items[0]) and \(items[1])" }
+        return "\(items.dropLast().joined(separator: ", ")), and \(items[items.count - 1])"
+    }
+
     private func sanitizeNote(_ value: String?, label: String) throws -> String {
         let trimmed = cleanSpacing((value ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
         if trimmed.isEmpty { return "" }
@@ -434,6 +517,17 @@ public struct ReportGenerator {
             throw ReportGenerationError.unsafeTeacherText(label: label, message: "must be 180 characters or fewer before generation.")
         }
         return trimmed
+    }
+
+    private func validateReportContextInputs(_ result: AchievementResult) throws {
+        if let feedback = reportContextPhraseFeedback(value: result.textType, label: "Text type / genre", example: "persuasive paragraph"),
+           feedback.tone == .error {
+            throw ReportGenerationError.unsafeTeacherText(label: "Text type / genre", message: feedback.message)
+        }
+        if let feedback = reportContextPhraseFeedback(value: result.learningContext, label: "Learning context / activity", example: "class novel discussion"),
+           feedback.tone == .error {
+            throw ReportGenerationError.unsafeTeacherText(label: "Learning context / activity", message: feedback.message)
+        }
     }
 
     private func generateTeacherNoteSentence(student: Student, result: AchievementResult, repairContext: TeacherTextRepairContext) throws -> String {
@@ -485,9 +579,7 @@ public struct ReportGenerator {
         if current >= maxUsagePerClass { return false }
         if minVariantDistance <= 0 || usedVariantIds.isEmpty { return true }
 
-        guard let order = variantOrder[variantID] else {
-            return current == 0
-        }
+        guard let order = variantOrder[variantID] else { return true }
         for usedID in usedVariantIds {
             guard let usedOrder = variantOrder[usedID] else { continue }
             if abs(order - usedOrder) < minVariantDistance {
@@ -723,5 +815,9 @@ private extension String {
     var trimmedNonEmpty: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    func ifEmpty(_ fallback: String) -> String {
+        isEmpty ? fallback : self
     }
 }

@@ -55,6 +55,34 @@ final class BackupFileWorkflowTests: XCTestCase {
         }
     }
 
+    func testLoadProjectBackupFileSurfacesEncryptedPasswordStates() throws {
+        let root = temporaryRoot()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let password = "correct horse battery"
+        let encrypted = try serializeEncryptedProjectBackup(
+            project: fixtureProject(),
+            password: password,
+            createdAt: Date(timeIntervalSince1970: 0),
+            iterations: 2,
+            salt: Data((0..<16).map { UInt8($0) }),
+            iv: Data((16..<28).map { UInt8($0) })
+        )
+        let url = root.appendingPathComponent("encrypted.report-writer-backup.json")
+        try encrypted.write(to: url, atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try loadProjectBackupFile(from: url)) { error in
+            XCTAssertEqual(error as? BackupError, .encryptedPasswordRequired)
+        }
+
+        XCTAssertThrowsError(try loadProjectBackupFile(from: url, password: "wrong horse battery")) { error in
+            XCTAssertEqual(error as? BackupError, .encryptedCouldNotDecrypt)
+        }
+
+        let loaded = try loadProjectBackupFile(from: url, password: password)
+        XCTAssertEqual(loaded.project.metadata.id, "p1")
+        XCTAssertGreaterThan(loaded.byteCount, 0)
+    }
+
     func testPrepareProjectBackupFileRemovesFileWhenReadbackVerificationFails() throws {
         let root = temporaryRoot()
         let createdAt = Date(timeIntervalSince1970: 0)

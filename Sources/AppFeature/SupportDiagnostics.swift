@@ -91,6 +91,12 @@ public func supportDiagnosticsText(
     lines.append("Project storage status: \(projectStorageStatusDescription(state.projectStorageStatus))")
     lines.append("Project storage message: \(state.projectStorageMessage)")
     lines.append("Projects on device: \(CommenterFormatters.integer(state.projects.count, locale: locale))")
+    if !state.invalidProjectRecords.isEmpty {
+        lines.append("Invalid local project records:")
+        state.invalidProjectRecords.forEach { record in
+            lines.append("- \(record.id): \(record.reason)")
+        }
+    }
 
     if let project = state.selectedProject {
         lines.append("")

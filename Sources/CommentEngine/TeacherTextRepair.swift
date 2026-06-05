@@ -128,8 +128,8 @@ private let placeholderPattern = #"\[[^\]]+\]|\{[^}]+\}"#
 private let sentenceEndPattern = #"[.!?]$"#
 private let leadingPronounPattern = #"^(he|she|they)\b"#
 private let leadingNamePattern = #"^[A-Z][a-z]+\b"#
-private let verbPhrasePattern = #"^(checks?|uses?|used|solves?|solved|shows?|showed|demonstrates?|demonstrated|applies?|applied|works?|worked|writes?|wrote|reads?|read|explains?|explained|identifies?|identified|analyses?|analysed|participates?|participated|contributes?|contributed|creates?|created|keeps?|kept|plans?|planned|listens?|listened|focuses?|focused|understands?|understood|improves?|improved|completes?|completed|attempts?|attempted|prefers?)\b"#
-private let gerundPattern = #"^(using|checking|solving|showing|demonstrating|applying|working|writing|reading|explaining|identifying|participating|contributing|creating|keeping|planning|listening|focusing|improving|completing)\b"#
+private let verbPhrasePattern = #"^(checks?|uses?|used|solves?|solved|shows?|showed|demonstrates?|demonstrated|applies?|applied|works?|worked|writes?|wrote|reads?|read|explains?|explained|identifies?|identified|analyses?|analysed|participates?|participated|contributes?|contributed|creates?|created|keeps?|kept|plans?|planned|listens?|listened|focuses?|focused|understands?|understood|improves?|improved|completes?|completed|attempts?|attempted|prefers?|organises?|organised|organizes?|organized)\b"#
+private let gerundPattern = #"^(using|checking|solving|showing|demonstrating|applying|working|writing|reading|explaining|identifying|participating|contributing|creating|keeping|planning|listening|focusing|improving|completing|organising|organizing)\b"#
 private let negativePattern = #"^(needs?|does not|doesn't|struggles? to|struggles with|finds it difficult to|requires? reminders? to|requires? support to)\b"#
 private let subordinatePattern = #"^(because|when|while|although|if|as)\b"#
 private let contextPattern = #"^(during|in|through|with|on|for|the|a|an)\b"#
@@ -162,13 +162,53 @@ private let thirdPersonVerbs = [
     "participate": "participates",
     "plan": "plans",
     "prefer": "prefers",
+    "organise": "organises",
+    "organize": "organizes",
     "read": "reads",
+    "share": "shares",
     "show": "shows",
     "solve": "solves",
     "understand": "understands",
     "use": "uses",
     "work": "works",
     "write": "writes"
+]
+private let irregularPluralToSingular = [
+    "are": "is",
+    "do": "does",
+    "have": "has",
+    "were": "was"
+]
+private let irregularSingularToPlural = [
+    "does": "do",
+    "has": "have",
+    "is": "are",
+    "was": "were"
+]
+private let thirdPersonToBase = Dictionary(uniqueKeysWithValues: thirdPersonVerbs.map { ($0.value, $0.key) })
+private let gerundToThirdPerson = [
+    "using": "uses",
+    "checking": "checks",
+    "solving": "solves",
+    "showing": "shows",
+    "demonstrating": "demonstrates",
+    "applying": "applies",
+    "working": "works",
+    "writing": "writes",
+    "reading": "reads",
+    "explaining": "explains",
+    "identifying": "identifies",
+    "participating": "participates",
+    "contributing": "contributes",
+    "creating": "creates",
+    "keeping": "keeps",
+    "planning": "plans",
+    "listening": "listens",
+    "focusing": "focuses",
+    "improving": "improves",
+    "completing": "completes",
+    "organising": "organises",
+    "organizing": "organizes"
 ]
 
 private func repairText(_ rawValue: String?, context: TeacherTextRepairContext) -> (raw: String, units: [RepairedTextUnit], sentences: [String], issues: [RepairIssue]) {
@@ -207,8 +247,10 @@ private func repairUnit(_ raw: String, context: TeacherTextRepairContext) -> Rep
         text = ensureSentence("This was evident \(stripTerminalPunctuation(cleaned))")
     case .verbPhrase:
         text = ensureSentence("\(context.displayName) \(stripTerminalPunctuation(cleaned))")
-    case .gerundPhrase, .nounPhrase, .fragment:
-        text = ensureSentence("\(context.displayName) has shown \(stripTerminalPunctuation(cleaned))")
+    case .gerundPhrase:
+        text = repairGerundPhrase(cleaned, context: context)
+    case .nounPhrase, .fragment:
+        text = ensureSentence("\(context.displayName) shows \(stripTerminalPunctuation(cleaned))")
     case .contextPhrase:
         let phrase = stripTerminalPunctuation(cleaned)
         text = ensureSentence(matchesPattern(#"^(the|a|an)\b"#, in: phrase, options: [.caseInsensitive]) ? "This was evident in \(phrase)" : "This was evident \(phrase)")
@@ -259,27 +301,92 @@ private func phraseSafeEvidence(_ raw: String) -> String? {
 }
 
 private func repairNegativeGrowthNote(_ raw: String, context: TeacherTextRepairContext) -> String {
-    let phrase = negativeGrowthPrefixes.reduce(stripTerminalPunctuation(raw)) { value, pattern in
-        value.replacingOccurrences(of: pattern, with: "", options: [.regularExpression, .caseInsensitive])
-    }.trimmingCharacters(in: .whitespacesAndNewlines)
-    return ensureSentence("\(context.displayName) would benefit from \(phrase.ifEmpty("continue developing this skill"))")
+    let phrase = stripTerminalPunctuation(raw)
+    let constructive: String
+    if let match = firstMatch(pattern: #"^(requires? support to|needs? support to|finds it difficult to|struggles? to|needs? to)\s+(.+)$"#, in: phrase, options: [.caseInsensitive]), let remainder = match.groups[safe: 1] {
+        constructive = "support to \(remainder)"
+    } else if let match = firstMatch(pattern: #"^(requires? reminders? to|needs? reminders? to)\s+(.+)$"#, in: phrase, options: [.caseInsensitive]), let remainder = match.groups[safe: 1] {
+        constructive = "reminders to \(remainder)"
+    } else if let match = firstMatch(pattern: #"^struggles? with\s+(.+)$"#, in: phrase, options: [.caseInsensitive]), let remainder = match.groups[safe: 0] {
+        constructive = "continued practice with \(remainder)"
+    } else if let match = firstMatch(pattern: #"^(does not|doesn't)\s+(.+)$"#, in: phrase, options: [.caseInsensitive]), let remainder = match.groups[safe: 1] {
+        constructive = "support to \(remainder)"
+    } else if let match = firstMatch(pattern: #"^needs?\s+(.+)$"#, in: phrase, options: [.caseInsensitive]), let remainder = match.groups[safe: 0] {
+        constructive = "support with \(remainder)"
+    } else {
+        constructive = "continued practice with this skill"
+    }
+    return ensureSentence("\(context.displayName) would benefit from \(constructive)")
+}
+
+private func repairGerundPhrase(_ raw: String, context: TeacherTextRepairContext) -> String {
+    let phrase = stripTerminalPunctuation(raw)
+    guard let match = firstMatch(pattern: #"^([a-z]+)(\b.*)$"#, in: phrase, options: [.caseInsensitive]),
+          let gerund = match.groups[safe: 0]?.lowercased(),
+          let remainder = match.groups[safe: 1],
+          let finiteVerb = gerundToThirdPerson[gerund]
+    else {
+        return ensureSentence("\(context.displayName) demonstrates this skill when \(phrase)")
+    }
+    return ensureSentence("\(context.displayName) \(finiteVerb)\(remainder)")
 }
 
 private func normalizeLeadingPronoun(_ text: String, context: TeacherTextRepairContext) -> String {
     guard let match = firstMatch(pattern: leadingPronounPattern, in: text, options: [.caseInsensitive]) else {
         return text
     }
-    let startsUppercase = match.value.first.map { String($0).rangeOfCharacter(from: .uppercaseLetters) != nil } ?? false
+    let original = match.value
+    let startsUppercase = original.first.map { String($0).rangeOfCharacter(from: .uppercaseLetters) != nil } ?? false
     let replacement = match.range.lowerBound == text.startIndex && startsUppercase
         ? context.subjectPronoun
         : context.subjectPronounLower
     var remainder = String(text[match.range.upperBound...])
-    if match.value.lowercased() == "they", context.pronounMode != .neutral {
-        remainder = conjugateLeadingVerb(in: remainder)
-        remainder = replaceWord("their", with: context.possessivePronoun, in: remainder)
-        remainder = replaceWord("them", with: context.objectPronoun, in: remainder)
-    }
+    let sourceMode = modeForSubjectPronoun(original) ?? context.pronounMode
+    remainder = adjustAgreementVerbs(in: remainder, from: sourceMode, to: context.pronounMode)
+    remainder = normalizeRelatedPronouns(remainder, context: context)
     return "\(replacement)\(remainder)"
+}
+
+private func modeForSubjectPronoun(_ pronoun: String) -> TeacherTextRepairContext.PronounMode? {
+    if pronoun.range(of: #"^he$"#, options: [.regularExpression, .caseInsensitive]) != nil { return .masculine }
+    if pronoun.range(of: #"^she$"#, options: [.regularExpression, .caseInsensitive]) != nil { return .feminine }
+    if pronoun.range(of: #"^they$"#, options: [.regularExpression, .caseInsensitive]) != nil { return .neutral }
+    return nil
+}
+
+private func adjustVerb(_ verb: String, from sourceMode: TeacherTextRepairContext.PronounMode, to targetMode: TeacherTextRepairContext.PronounMode) -> String {
+    let lower = verb.lowercased()
+    let adjusted: String
+    if sourceMode == .neutral, targetMode != .neutral {
+        adjusted = irregularPluralToSingular[lower] ?? thirdPersonVerbs[lower] ?? lower
+    } else if sourceMode != .neutral, targetMode == .neutral {
+        adjusted = irregularSingularToPlural[lower] ?? thirdPersonToBase[lower] ?? lower
+    } else {
+        adjusted = lower
+    }
+    return verb.first.map { String($0).rangeOfCharacter(from: .uppercaseLetters) != nil } == true ? adjusted.capitalizedFirst : adjusted
+}
+
+private func adjustAgreementVerbs(in text: String, from sourceMode: TeacherTextRepairContext.PronounMode, to targetMode: TeacherTextRepairContext.PronounMode) -> String {
+    guard sourceMode != targetMode, (sourceMode == .neutral || targetMode == .neutral) else { return text }
+    let withLeadingVerb = replaceFirst(pattern: #"^(\s+)([a-z]+)\b"#, in: text, options: [.caseInsensitive]) { match in
+        guard let whitespace = match.groups[safe: 0], let verb = match.groups[safe: 1] else { return match.value }
+        let adjusted = adjustVerb(verb, from: sourceMode, to: targetMode)
+        return adjusted == verb ? match.value : "\(whitespace)\(adjusted)"
+    }
+    return replaceAll(pattern: #"\b(and|or)\s+([a-z]+)\b"#, in: withLeadingVerb, options: [.caseInsensitive]) { match in
+        guard let conjunction = match.groups[safe: 0], let verb = match.groups[safe: 1] else { return match.value }
+        let adjusted = adjustVerb(verb, from: sourceMode, to: targetMode)
+        return adjusted == verb ? match.value : "\(conjunction) \(adjusted)"
+    }
+}
+
+private func normalizeRelatedPronouns(_ text: String, context: TeacherTextRepairContext) -> String {
+    replaceAll(pattern: #"\b(their|his|her)\s+([a-z][a-z'-]*)"#, in: text, options: [.caseInsensitive]) { match in
+        guard let noun = match.groups[safe: 1] else { return match.value }
+        return "\(context.possessivePronoun) \(noun)"
+    }
+    .replacingOccurrences(of: #"\b(them|him|her)\b"#, with: context.objectPronoun, options: [.regularExpression, .caseInsensitive])
 }
 
 private func conjugateLeadingVerb(in text: String) -> String {
@@ -363,6 +470,41 @@ private func firstMatch(pattern: String, in text: String, options: NSRegularExpr
 
 private func matchesPattern(_ pattern: String, in text: String, options: NSRegularExpression.Options = []) -> Bool {
     firstMatch(pattern: pattern, in: text, options: options) != nil
+}
+
+private func replaceFirst(
+    pattern: String,
+    in text: String,
+    options: NSRegularExpression.Options = [],
+    replacement: (RegexMatch) -> String
+) -> String {
+    guard let match = firstMatch(pattern: pattern, in: text, options: options) else { return text }
+    return text.replacingCharacters(in: match.range, with: replacement(match))
+}
+
+private func replaceAll(
+    pattern: String,
+    in text: String,
+    options: NSRegularExpression.Options = [],
+    replacement: (RegexMatch) -> String
+) -> String {
+    guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { return text }
+    var output = ""
+    var cursor = text.startIndex
+    let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+    regex.matches(in: text, range: nsRange).forEach { match in
+        guard let range = Range(match.range, in: text) else { return }
+        let groups = (1..<match.numberOfRanges).compactMap { index -> String? in
+            let groupRange = match.range(at: index)
+            guard groupRange.location != NSNotFound, let range = Range(groupRange, in: text) else { return nil }
+            return String(text[range])
+        }
+        output += String(text[cursor..<range.lowerBound])
+        output += replacement(RegexMatch(value: String(text[range]), range: range, groups: groups))
+        cursor = range.upperBound
+    }
+    output += String(text[cursor...])
+    return output
 }
 
 private extension String {

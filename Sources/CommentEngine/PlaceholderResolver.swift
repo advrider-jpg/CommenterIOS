@@ -169,6 +169,23 @@ public func cleanSpacing(_ text: String) -> String {
         .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
+public func normalizeSentenceCase(_ text: String, displayName: String, protectedTerms: [String] = []) -> String {
+    text
+        .components(separatedBy: "\n\n")
+        .map { paragraph in
+            var result = capitalizeSentenceStarts(paragraph)
+            let starts = sentenceStartOffsets(in: result)
+            let protectedRanges = protectedTermRanges(in: result, terms: [displayName] + protectedTerms)
+            result = replacePronounWords(in: result) { word, offset in
+                if starts.contains(offset) { return word }
+                if isInsideProtectedRange(offset: offset, length: word.count, ranges: protectedRanges) { return word }
+                return word.lowercased()
+            }
+            return result
+        }
+        .joined(separator: "\n\n")
+}
+
 public func normalizeReportContextField(_ value: String?) -> String? {
     guard let value else { return nil }
     let normalized = value
@@ -222,6 +239,84 @@ private func matches(pattern: String, in text: String) -> [String] {
     }
 }
 
+private func capitalizeSentenceStarts(_ text: String) -> String {
+    replaceAll(pattern: #"(^|[.!?]\s+)([a-z])"#, in: text) { match in
+        guard let prefix = match.groups[safe: 0], let letter = match.groups[safe: 1] else { return match.value }
+        return "\(prefix)\(letter.uppercased())"
+    }
+}
+
+private func sentenceStartOffsets(in text: String) -> Set<Int> {
+    guard let regex = try? NSRegularExpression(pattern: #"[.!?]\s+"#) else { return [0] }
+    var starts: Set<Int> = [0]
+    let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+    regex.matches(in: text, range: nsRange).forEach { match in
+        starts.insert(match.range.location + match.range.length)
+    }
+    return starts
+}
+
+private func protectedTermRanges(in text: String, terms: [String]) -> [Range<Int>] {
+    terms
+        .map(cleanSpacing)
+        .filter { !$0.isEmpty }
+        .flatMap { term -> [Range<Int>] in
+            var ranges: [Range<Int>] = []
+            var searchStart = text.startIndex
+            while searchStart < text.endIndex,
+                  let range = text.range(of: term, range: searchStart..<text.endIndex) {
+                let nsRange = NSRange(range, in: text)
+                ranges.append(nsRange.location..<(nsRange.location + nsRange.length))
+                searchStart = range.upperBound
+            }
+            return ranges
+        }
+}
+
+private func isInsideProtectedRange(offset: Int, length: Int, ranges: [Range<Int>]) -> Bool {
+    ranges.contains { range in
+        offset >= range.lowerBound && offset + length <= range.upperBound
+    }
+}
+
+private func replacePronounWords(in text: String, replacement: (String, Int) -> String) -> String {
+    replaceAll(pattern: #"\b(He|She|They|Him|Her|His|Them|Their)\b"#, in: text) { match in
+        replacement(match.value, match.utf16Offset)
+    }
+}
+
+private struct RegexMatch {
+    var value: String
+    var range: Range<String.Index>
+    var utf16Offset: Int
+    var groups: [String]
+}
+
+private func replaceAll(
+    pattern: String,
+    in text: String,
+    options: NSRegularExpression.Options = [],
+    replacement: (RegexMatch) -> String
+) -> String {
+    guard let regex = try? NSRegularExpression(pattern: pattern, options: options) else { return text }
+    var output = ""
+    var cursor = text.startIndex
+    let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+    regex.matches(in: text, range: nsRange).forEach { match in
+        guard let range = Range(match.range, in: text) else { return }
+        let groups = (1..<match.numberOfRanges).compactMap { index -> String? in
+            let groupRange = match.range(at: index)
+            guard groupRange.location != NSNotFound, let range = Range(groupRange, in: text) else { return nil }
+            return String(text[range])
+        }
+        output += String(text[cursor..<range.lowerBound])
+        output += replacement(RegexMatch(value: String(text[range]), range: range, utf16Offset: match.range.location, groups: groups))
+        cursor = range.upperBound
+    }
+    output += String(text[cursor...])
+    return output
+}
+
 private extension String {
     var trimmedNonEmpty: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
@@ -235,5 +330,11 @@ private extension String {
     var capitalizedFirst: String {
         guard let first = self.first else { return self }
         return first.uppercased() + String(dropFirst())
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

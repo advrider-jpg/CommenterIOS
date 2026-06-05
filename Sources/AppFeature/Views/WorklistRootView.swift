@@ -28,11 +28,24 @@ struct WorklistRootView: View {
     let onStudentFirstNameChanged: (String, String) -> Void
     let onStudentLastNameChanged: (String, String) -> Void
     let onStudentYearChanged: (String, StudentYearLevel) -> Void
+    let onStudentGenderChanged: (String, Gender?) -> Void
+    let onStudentPronounsChanged: (String, String) -> Void
+    let onStudentInternalNoteChanged: (String, String) -> Void
+    let onStudentAttitudeDescriptorChanged: (String, String) -> Void
     let onSubjectToggled: (String) -> Void
     let onSelectAllSubjects: () -> Void
     let onDeselectAllSubjects: () -> Void
     let onAchievementChanged: (String, String, AchievementLevel?) -> Void
     let onFocusChanged: (String, String, String) -> Void
+    let onResultEvidenceChanged: (String, String, String) -> Void
+    let onResultTextTypeChanged: (String, String, String) -> Void
+    let onResultLearningContextChanged: (String, String, String) -> Void
+    let onResultReportEmphasisNoteChanged: (String, String, String) -> Void
+    let onResultFlagChanged: (String, String, String, Bool) -> Void
+    let onResultEnglishFocusTagsChanged: (String, String, [String]) -> Void
+    let onResultMathProficienciesChanged: (String, String, [String]) -> Void
+    let onResultMathMindsetTogglesChanged: (String, String, [String]) -> Void
+    let onResultNextStepGoalsChanged: (String, String, [String]) -> Void
     let onGenerate: () -> Void
     let onManualEditChanged: (String, String, String) -> Void
     let onLockChanged: (String, String, Bool) -> Void
@@ -91,6 +104,10 @@ struct WorklistRootView: View {
                         onFirstNameChanged: onStudentFirstNameChanged,
                         onLastNameChanged: onStudentLastNameChanged,
                         onYearChanged: onStudentYearChanged,
+                        onGenderChanged: onStudentGenderChanged,
+                        onPronounsChanged: onStudentPronounsChanged,
+                        onInternalNoteChanged: onStudentInternalNoteChanged,
+                        onAttitudeDescriptorChanged: onStudentAttitudeDescriptorChanged,
                         onImportRoster: onImportRoster,
                         isDisabled: isEditingLocked
                     )
@@ -109,6 +126,15 @@ struct WorklistRootView: View {
                         importState: resultsImportState,
                         onAchievementChanged: onAchievementChanged,
                         onFocusChanged: onFocusChanged,
+                        onEvidenceChanged: onResultEvidenceChanged,
+                        onTextTypeChanged: onResultTextTypeChanged,
+                        onLearningContextChanged: onResultLearningContextChanged,
+                        onReportEmphasisNoteChanged: onResultReportEmphasisNoteChanged,
+                        onFlagChanged: onResultFlagChanged,
+                        onEnglishFocusTagsChanged: onResultEnglishFocusTagsChanged,
+                        onMathProficienciesChanged: onResultMathProficienciesChanged,
+                        onMathMindsetTogglesChanged: onResultMathMindsetTogglesChanged,
+                        onNextStepGoalsChanged: onResultNextStepGoalsChanged,
                         onImportResults: onImportResults,
                         isDisabled: isEditingLocked
                     )

@@ -74,6 +74,26 @@ public struct RecoverySnapshot: Codable, Equatable, Sendable {
     }
 }
 
+public struct InvalidProjectRecord: Equatable, Sendable {
+    public var id: String
+    public var reason: String
+
+    public init(id: String, reason: String) {
+        self.id = id
+        self.reason = reason
+    }
+}
+
+public struct ProjectLoadDiagnostics: Equatable, Sendable {
+    public var projects: [Project]
+    public var invalidProjects: [InvalidProjectRecord]
+
+    public init(projects: [Project], invalidProjects: [InvalidProjectRecord]) {
+        self.projects = projects
+        self.invalidProjects = invalidProjects
+    }
+}
+
 public protocol ProjectStore: Sendable {
     func listProjects() async throws -> [Project]
     func loadProject(id: String) async throws -> Project
@@ -120,20 +140,38 @@ public struct FileProjectStore: ProjectStore {
     }
 
     public func listProjects() async throws -> [Project] {
+        try await listProjectsWithDiagnostics().projects
+    }
+
+    public func listProjectsWithDiagnostics() async throws -> ProjectLoadDiagnostics {
         try ensureStorageLayout()
         let projectDirs = try FileManager.default.contentsOfDirectory(
             at: projectsURL,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         )
-        let projects = try projectDirs.compactMap { url -> Project? in
+        var projects: [Project] = []
+        var invalidProjects: [InvalidProjectRecord] = []
+        try projectDirs.sorted { $0.lastPathComponent < $1.lastPathComponent }.forEach { url in
             let values = try url.resourceValues(forKeys: [.isDirectoryKey])
-            guard values.isDirectory == true, url.lastPathComponent != "recovery" else { return nil }
+            guard values.isDirectory == true, url.lastPathComponent != "recovery" else { return }
             let projectFile = url.appendingPathComponent("project.json")
-            guard FileManager.default.fileExists(atPath: projectFile.path) else { return nil }
-            return try readProject(at: projectFile)
+            guard FileManager.default.fileExists(atPath: projectFile.path) else { return }
+            do {
+                projects.append(try readProject(at: projectFile))
+            } catch {
+                invalidProjects.append(
+                    InvalidProjectRecord(
+                        id: diagnosticProjectID(at: projectFile, fallbackID: url.lastPathComponent),
+                        reason: invalidProjectReason(error)
+                    )
+                )
+            }
         }
-        return projects.sorted { $0.metadata.updatedAt > $1.metadata.updatedAt }
+        return ProjectLoadDiagnostics(
+            projects: projects.sorted { $0.metadata.updatedAt > $1.metadata.updatedAt },
+            invalidProjects: invalidProjects
+        )
     }
 
     public func loadProject(id: String) async throws -> Project {
@@ -358,6 +396,58 @@ public struct FileProjectStore: ProjectStore {
         let validation = validateStoredProjectShape(project)
         guard validation.ok else {
             throw ProjectStoreError.invalidProject(validation.issues)
+        }
+    }
+
+    private func diagnosticProjectID(at url: URL, fallbackID: String) -> String {
+        guard let data = try? Data(contentsOf: url) else { return fallbackID }
+        if let project = try? jsonDecoder().decode(Project.self, from: data) {
+            let id = project.metadata.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            return id.isEmpty ? fallbackID : id
+        }
+        guard
+            let json = try? JSONSerialization.jsonObject(with: data),
+            let object = json as? [String: Any],
+            let metadata = object["metadata"] as? [String: Any],
+            let rawID = metadata["id"] as? String
+        else {
+            return fallbackID
+        }
+        let id = rawID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return id.isEmpty ? fallbackID : id
+    }
+
+    private func invalidProjectReason(_ error: Error) -> String {
+        if let storeError = error as? ProjectStoreError {
+            switch storeError {
+            case let .invalidProject(issues):
+                return issues.first ?? "Stored project shape is invalid."
+            case .verificationFailed:
+                return "Stored project fingerprint verification failed."
+            default:
+                return storeError.localizedDescription
+            }
+        }
+        if let decoding = error as? DecodingError {
+            return "Project JSON could not be decoded: \(decoding.diagnosticSummary)"
+        }
+        return "Project record could not be loaded: \(error.localizedDescription)"
+    }
+}
+
+private extension DecodingError {
+    var diagnosticSummary: String {
+        switch self {
+        case let .dataCorrupted(context):
+            return context.debugDescription
+        case let .keyNotFound(_, context):
+            return context.debugDescription
+        case let .typeMismatch(_, context):
+            return context.debugDescription
+        case let .valueNotFound(_, context):
+            return context.debugDescription
+        @unknown default:
+            return localizedDescription
         }
     }
 }
