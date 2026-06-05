@@ -18,6 +18,18 @@ signing, TestFlight, and App Store archive checks must run on a macOS Apple
 toolchain with network access to package dependencies before release claims are
 made.
 
+The AI posture is now an additive on-device-only foundation: deterministic
+generation remains the baseline/fallback, remote AI remains out of scope, and
+Apple Foundation Models can be used only behind truthful availability,
+validation, and teacher-review gates. The Work list report editor now has an
+AI Studio surface for persisted project tone defaults, report-specific AI
+overrides, on-device revision and evidence-draft previews, accept/reject review
+flow, an AI review queue, local safety checks, AI critique notes, and explicit
+approval before AI-derived text can become export-ready. Bulk AI support queues
+previews for individual teacher review rather than applying changes
+automatically, and safe App Intents can open review/preparation flows without
+generating, approving, exporting, or sharing report text outside the app.
+
 ## Product Purpose
 
 Build a production-ready native iOS MVP for teachers to create report-writing
@@ -37,6 +49,10 @@ MVP scope includes:
 - DOCX, XLSX, and XLS export
 - backup JSON import/export
 - recovery snapshots
+- optional Apple Foundation Models on-device AI writing assistance, only when
+  local availability is verified and teacher review remains mandatory
+- safe App Intents entry points for opening AI review/report preparation flows
+  without bypassing in-app readiness gates
 - iPhone-first teacher workflow
 - support/diagnostics/privacy surfaces
 - TestFlight and App Store readiness
@@ -47,6 +63,7 @@ MVP scope includes:
 - cloud sync
 - backend project persistence
 - remote AI generation
+- remote AI fallback for on-device AI features
 - analytics
 - telemetry
 - paywalls
@@ -59,6 +76,8 @@ MVP scope includes:
 - `CommentEngine`
 - `CommenterPersistence`
 - `CommenterImportExport`
+- `CommenterReportSafety`
+- `CommenterAI`
 - `DesignSystem`
 - TCA feature packages
 - test support and golden fixtures

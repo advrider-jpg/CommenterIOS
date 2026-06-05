@@ -1,4 +1,6 @@
+import CommentEngine
 import CommenterDomain
+import CommenterReportSafety
 import ComposableArchitecture
 extension AppFeature {
     func reduceProjectEditing(_ state: inout State, _ action: Action) -> Effect<Action> {
@@ -152,17 +154,79 @@ extension AppFeature {
             return .none
 
         case let .reportManualEditChanged(studentId, subject, text):
-            updateReport(&state, studentId: studentId, subject: subject) { $0.manualEdit = text }
+            let projectBeforeEdit = state.selectedProject
+            updateReport(&state, studentId: studentId, subject: subject) { report in
+                report.manualEdit = text
+                report.latestAIReviewNotes = nil
+                report.validationWarningReview = nil
+                markAIReportNeedsReviewIfRequired(&report, in: projectBeforeEdit, nowMilliseconds: dateClient.nowMilliseconds())
+            }
             return .none
 
         case let .reportLockChanged(studentId, subject, isLocked):
             updateReport(&state, studentId: studentId, subject: subject) { $0.isLocked = isLocked }
             return .none
 
+        case let .reportApprovedForExport(studentId, subject):
+            guard let project = state.selectedProject,
+                  let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
+            else {
+                state.operationStatus = .failed("Open an AI draft before approving it for export.")
+                return .none
+            }
+            guard report.requiresTeacherApprovalForExport else {
+                state.operationStatus = .failed("This deterministic draft does not require AI review approval.")
+                return .none
+            }
+            let validation = validateReportForAIReview(project: project, report: report, nowMilliseconds: dateClient.nowMilliseconds())
+            guard validation.status != .blocked else {
+                updateReport(&state, studentId: studentId, subject: subject) { report in
+                    let currentFingerprint = stableTextFingerprint(report.exportText)
+                    report.currentTextFingerprint = currentFingerprint
+                    report.lastValidation = validation
+                    report.validationWarningReview = nil
+                    report.reviewState = ReportReviewState(
+                        status: .blockedByValidation,
+                        reviewedAt: dateClient.nowMilliseconds(),
+                        notes: validation.findings.map(\.message).joined(separator: " ")
+                    )
+                }
+                state.operationStatus = .failed("AI draft cannot be approved until validation blockers are fixed.")
+                return .none
+            }
+            updateReport(&state, studentId: studentId, subject: subject) { report in
+                let currentFingerprint = stableTextFingerprint(report.exportText)
+                report.currentTextFingerprint = currentFingerprint
+                report.approvedTextFingerprint = currentFingerprint
+                report.lastValidation = validation
+                report.validationWarningReview = nil
+                report.reviewState = ReportReviewState(
+                    status: .approved,
+                    reviewedAt: dateClient.nowMilliseconds(),
+                    approvedAt: dateClient.nowMilliseconds(),
+                    reviewerDisplayName: "Local teacher",
+                    approvalFingerprint: currentFingerprint
+                )
+            }
+            return .none
+
         default:
             return .none
         }
     }
+}
+
+private func markAIReportNeedsReviewIfRequired(_ report: inout GeneratedReport, in project: Project?, nowMilliseconds: Int64) {
+    guard report.requiresTeacherApprovalForExport else { return }
+    report.generationMode = report.effectiveGenerationMode == .manuallyEdited ? .manuallyEdited : .hybrid
+    report.currentTextFingerprint = stableTextFingerprint(report.exportText)
+    if let project {
+        report.lastValidation = validateReportForAIReview(project: project, report: report, nowMilliseconds: nowMilliseconds)
+    }
+    report.latestAIReviewNotes = nil
+    report.validationWarningReview = nil
+    report.reviewState = ReportReviewState(status: .needsTeacherReview, reviewedAt: nil, approvedAt: nil, approvalFingerprint: nil)
+    report.approvedTextFingerprint = nil
 }
 
 private func nextManualStudentId(in project: Project) -> String {

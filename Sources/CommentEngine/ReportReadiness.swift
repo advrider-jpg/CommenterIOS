@@ -9,6 +9,8 @@ public enum ReportReadinessStatus: String, Codable, Equatable, Sendable {
     case missingReport = "missing-report"
     case unresolvedPlaceholder = "unresolved-placeholder"
     case languageQualityIssue = "language-quality-issue"
+    case aiNeedsReview = "ai-needs-review"
+    case aiValidationBlocked = "ai-validation-blocked"
     case staleReport = "stale-report"
     case ready
     case lockedReady = "locked-ready"
@@ -215,6 +217,35 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
         )
     }
 
+    if report.requiresTeacherApprovalForExport {
+        if report.lastValidation?.status == .blocked {
+            return ReportReadiness(
+                status: .aiValidationBlocked,
+                studentId: studentId,
+                subject: subject,
+                studentName: resultReadiness.studentName,
+                message: "\(resultReadiness.studentName)'s \(subject) AI draft is blocked by validation and needs teacher correction.",
+                result: result,
+                report: report
+            )
+        }
+        let currentFingerprint = stableTextFingerprint(text)
+        guard report.reviewState?.status == .approved,
+              report.reviewState?.approvalFingerprint == currentFingerprint,
+              report.approvedTextFingerprint == currentFingerprint
+        else {
+            return ReportReadiness(
+                status: .aiNeedsReview,
+                studentId: studentId,
+                subject: subject,
+                studentName: resultReadiness.studentName,
+                message: "\(resultReadiness.studentName)'s \(subject) AI draft needs teacher review and approval before export.",
+                result: result,
+                report: report
+            )
+        }
+    }
+
     let expectedFingerprint = buildGenerationFingerprint(
         projectMetadata: project.metadata,
         student: student,
@@ -265,6 +296,10 @@ public func readinessLabel(_ status: ReportReadinessStatus) -> String {
         return "Contains template text"
     case .languageQualityIssue:
         return "Language check needed"
+    case .aiNeedsReview:
+        return "AI review needed"
+    case .aiValidationBlocked:
+        return "AI validation blocked"
     case .ready:
         return "Ready"
     case .lockedReady:
@@ -275,6 +310,21 @@ public func readinessLabel(_ status: ReportReadinessStatus) -> String {
         return "Missing subject"
     case .autosaveBlocked:
         return "Save paused"
+    }
+}
+
+public extension GeneratedReport {
+    var exportText: String {
+        manualEdit?.isEmpty == false ? manualEdit ?? "" : text
+    }
+
+    var requiresTeacherApprovalForExport: Bool {
+        switch effectiveGenerationMode {
+        case .aiPolishedDeterministic, .aiToneAdjusted, .aiDraftFromEvidence, .hybrid:
+            return true
+        case .deterministic, .manuallyEdited:
+            return aiTrace != nil
+        }
     }
 }
 
@@ -326,7 +376,8 @@ public func lintReportLanguage(
     }
 
     severeLanguagePatterns.forEach { pattern in
-        if let match = firstMatch(pattern: pattern.pattern, in: text, options: [.caseInsensitive]) {
+        let options: NSRegularExpression.Options = pattern.code == "sentence-start-lowercase" ? [] : [.caseInsensitive]
+        if let match = firstMatch(pattern: pattern.pattern, in: text, options: options) {
             issues.append(ReportLanguageIssue(code: pattern.code, severity: .error, message: pattern.message, excerpt: match, source: .customRule))
         }
     }

@@ -47,6 +47,9 @@ CommenterIOS must preserve CommenterV3's core product posture:
 - deterministic generation
 - truthful persistence, import, export, share, and generation states
 - no unresolved placeholders in generated or exported report text
+- on-device Apple Foundation Models AI may be added only as a local/offline,
+  teacher-reviewed layer on top of deterministic generation; remote AI remains
+  prohibited
 
 The production MVP includes CSV, XLSX, legacy XLS, DOCX, backup JSON,
 deterministic generation, local persistence, native iOS file workflows,
@@ -88,7 +91,8 @@ native iOS completion/cancellation result.
 Every incomplete, unavailable, pending, errored, cancelled, or unsupported path
 must be surfaced honestly. If something cannot be implemented correctly, fail
 openly and visibly with a clear error or disabled path rather than silently
-pretending it works.
+pretending it works. AI-generated or AI-revised text is not export-ready until
+the app validates it and a teacher reviews and approves the current text.
 
 If you encounter fake state, placeholder behavior, misleading UI, silent
 failure, or stateless implementation while working in this codebase, fix it

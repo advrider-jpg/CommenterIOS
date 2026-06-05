@@ -10,6 +10,7 @@
         1A2B3C4D5E6F700000000001 /* CommenterIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F700000000011 /* CommenterIOSApp.swift */; };
         1A2B3C4D5E6F700000000002 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F700000000012 /* PrivacyInfo.xcprivacy */; };
         1A2B3C4D5E6F700000000003 /* AppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F700000000013 /* AppFeature */; };
+        1A2B3C4D5E6F700000000004 /* CommenterAppIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F700000000015 /* CommenterAppIntents */; };
         2B3C4D5E6F70000000000001 /* CommenterIOSScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3C4D5E6F70000000000011 /* CommenterIOSScreenshotTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +38,7 @@
             buildActionMask = 2147483647;
             files = (
                 1A2B3C4D5E6F700000000003 /* AppFeature in Frameworks */,
+                1A2B3C4D5E6F700000000004 /* CommenterAppIntents in Frameworks */,
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -95,6 +97,7 @@
             name = CommenterIOS;
             packageProductDependencies = (
                 1A2B3C4D5E6F700000000013 /* AppFeature */,
+                1A2B3C4D5E6F700000000015 /* CommenterAppIntents */,
             );
             productName = CommenterIOS;
             productReference = 1A2B3C4D5E6F700000000014 /* CommenterIOS.app */;
@@ -474,6 +477,11 @@
             isa = XCSwiftPackageProductDependency;
             package = 1A2B3C4D5E6F700000000071 /* XCLocalSwiftPackageReference "." */;
             productName = AppFeature;
+        };
+        1A2B3C4D5E6F700000000015 /* CommenterAppIntents */ = {
+            isa = XCSwiftPackageProductDependency;
+            package = 1A2B3C4D5E6F700000000071 /* XCLocalSwiftPackageReference "." */;
+            productName = CommenterAppIntents;
         };
 /* End XCSwiftPackageProductDependency section */
     };

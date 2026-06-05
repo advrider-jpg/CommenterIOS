@@ -386,7 +386,9 @@ private func parsePlainProjectBackup(serialized: String) throws -> Project {
         else {
             throw BackupError.couldNotOpen
         }
-        guard try projectFingerprint(normalizedProject) == checksum.projectFingerprint else {
+        let rawFingerprint = try projectFingerprint(payload.project)
+        let normalizedFingerprint = try projectFingerprint(normalizedProject)
+        guard checksum.projectFingerprint == rawFingerprint || checksum.projectFingerprint == normalizedFingerprint else {
             throw BackupError.couldNotVerify
         }
     }

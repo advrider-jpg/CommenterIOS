@@ -46,7 +46,9 @@ Rule:
 Core project, roster, result, draft, report, backup, recovery, import, export,
 and generation workflows must remain local to the device and must not require
 accounts, cloud sync, backend persistence, remote AI, analytics, telemetry, or
-network services.
+network services. Apple Foundation Models on-device inference is permitted only
+when it remains local/offline, runtime-gated by real availability, and backed by
+deterministic fallback behavior.
 
 Why it matters:
 The app handles private teacher/student data and exists to preserve the
@@ -57,8 +59,9 @@ Evidence:
 `docs/ledgers/CORE_RULES.md`.
 
 Validation:
-Future validation must include no-network checks, privacy manifest review, and
-airplane-mode workflow testing.
+Future validation must include no-network checks, privacy manifest review,
+airplane-mode workflow testing, and proof that any AI path uses only local
+on-device availability with no remote fallback.
 
 Release impact:
 Violation of this rule is a release blocker unless the user expressly changes
@@ -96,7 +99,9 @@ The app must not present saved state, generated reports, imported data,
 exported files, shared files, backups, recovery operations, or unavailable
 functionality as successful unless the underlying local operation really
 completed and was verified. Generated and exported report text must not contain
-unresolved placeholders.
+unresolved placeholders. AI-generated or AI-revised report text must not be
+treated as export-ready until the app validates it and the teacher approves the
+current text.
 
 Why it matters:
 This is a teacher report-writing tool. Fake success states or unresolved
@@ -109,7 +114,8 @@ CommenterV3 `docs/ledgers/CORE_RULES.md`.
 Validation:
 Future validation must cover save read-after-write verification, generation
 parity, placeholder blocking, all-or-nothing import, export file existence,
-native share/export cancellation, and backup roundtrips.
+native share/export cancellation, backup roundtrips, AI availability truth, AI
+validation blocking, and teacher approval gates for AI output.
 
 Release impact:
 Violation of this rule is a release blocker.

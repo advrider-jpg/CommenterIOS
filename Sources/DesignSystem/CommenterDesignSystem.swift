@@ -67,6 +67,17 @@ public extension View {
         self
         #endif
     }
+
+    @ViewBuilder
+    func commenterUncapitalizedTextInput() -> some View {
+        #if os(iOS)
+        self
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+        #else
+        self
+        #endif
+    }
 }
 
 public struct CommenterSectionHeader: View {

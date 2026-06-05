@@ -8,6 +8,11 @@ final class ReviewWorkbookFileTests: XCTestCase {
     func testPrepareReviewWorkbookFileWritesVerifiedXLSXPackage() throws {
         let root = temporaryRoot()
         var project = fixtureProject()
+        project.metadata.aiSettings = ProjectAISettings(
+            customInstruction: "Project private AI instruction.",
+            forbiddenMentions: ["Project hidden do-not-mention."],
+            requiredMentions: ["Project hidden required mention."]
+        )
         project.reports = [
             readyReport(
                 project: project,
@@ -19,6 +24,17 @@ final class ReviewWorkbookFileTests: XCTestCase {
                 trace: "private trace"
             )
         ]
+        project.reports[0].latestAIReviewNotes = ["Private AI critique note should stay local."]
+        project.reports[0].validationWarningReview = ReportWarningReviewRecord(
+            validationFingerprint: "private-warning-fingerprint",
+            reviewedAt: 2,
+            reviewerDisplayName: "Private reviewer",
+            notes: "Private warning review note."
+        )
+        project.reports[0].aiOptionsOverride = AIReportOptions(
+            forbiddenMentions: ["Do not export this constraint."],
+            requiredMentions: ["Required private constraint."]
+        )
 
         let prepared = try prepareReviewWorkbookFile(project: project, format: .xlsx, directory: root)
         let entries = try readStoredZipEntries(prepared.url)
@@ -40,6 +56,15 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertFalse(sheet.contains("Generated text should not be exported."))
         XCTAssertFalse(sheet.contains("private-variant"))
         XCTAssertFalse(sheet.contains("private trace"))
+        XCTAssertFalse(sheet.contains("Private AI critique note should stay local."))
+        XCTAssertFalse(sheet.contains("private-warning-fingerprint"))
+        XCTAssertFalse(sheet.contains("Private reviewer"))
+        XCTAssertFalse(sheet.contains("Private warning review note."))
+        XCTAssertFalse(sheet.contains("Do not export this constraint."))
+        XCTAssertFalse(sheet.contains("Required private constraint."))
+        XCTAssertFalse(sheet.contains("Project private AI instruction."))
+        XCTAssertFalse(sheet.contains("Project hidden do-not-mention."))
+        XCTAssertFalse(sheet.contains("Project hidden required mention."))
         XCTAssertFalse(sheet.contains("Private student note should stay local."))
         XCTAssertFalse(sheet.contains("Private result note should stay local."))
     }
@@ -47,6 +72,11 @@ final class ReviewWorkbookFileTests: XCTestCase {
     func testPrepareReviewWorkbookFileWritesVerifiedLegacyXLSWorkbook() throws {
         let root = temporaryRoot()
         var project = fixtureProject()
+        project.metadata.aiSettings = ProjectAISettings(
+            customInstruction: "Project private AI instruction.",
+            forbiddenMentions: ["Project hidden do-not-mention."],
+            requiredMentions: ["Project hidden required mention."]
+        )
         project.reports = [
             readyReport(
                 project: project,
@@ -58,6 +88,17 @@ final class ReviewWorkbookFileTests: XCTestCase {
                 trace: "private trace"
             )
         ]
+        project.reports[0].latestAIReviewNotes = ["Private AI critique note should stay local."]
+        project.reports[0].validationWarningReview = ReportWarningReviewRecord(
+            validationFingerprint: "private-warning-fingerprint",
+            reviewedAt: 2,
+            reviewerDisplayName: "Private reviewer",
+            notes: "Private warning review note."
+        )
+        project.reports[0].aiOptionsOverride = AIReportOptions(
+            forbiddenMentions: ["Do not export this constraint."],
+            requiredMentions: ["Required private constraint."]
+        )
 
         let prepared = try prepareReviewWorkbookFile(project: project, format: .xls, directory: root)
         let data = try Data(contentsOf: prepared.url)
@@ -75,6 +116,15 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertFalse(labels.contains("Generated text should not be exported."))
         XCTAssertFalse(labels.contains("private-variant"))
         XCTAssertFalse(labels.contains("private trace"))
+        XCTAssertFalse(labels.contains("Private AI critique note should stay local."))
+        XCTAssertFalse(labels.contains("private-warning-fingerprint"))
+        XCTAssertFalse(labels.contains("Private reviewer"))
+        XCTAssertFalse(labels.contains("Private warning review note."))
+        XCTAssertFalse(labels.contains("Do not export this constraint."))
+        XCTAssertFalse(labels.contains("Required private constraint."))
+        XCTAssertFalse(labels.contains("Project private AI instruction."))
+        XCTAssertFalse(labels.contains("Project hidden do-not-mention."))
+        XCTAssertFalse(labels.contains("Project hidden required mention."))
         XCTAssertFalse(labels.contains("Private student note should stay local."))
         XCTAssertFalse(labels.contains("Private result note should stay local."))
         XCTAssertTrue(try readBoundSheetNames(workbookStream).contains("Reports"))

@@ -143,10 +143,14 @@ private func forbiddenWorkbookExportStrings(project: Project) -> [String] {
     var values: [String?] = []
     values.append(contentsOf: project.roster.map(\.internalTeacherNote))
     values.append(contentsOf: project.results.map(\.internalTeacherNote))
+    values.append(project.metadata.aiSettings?.customInstruction)
+    values.append(contentsOf: project.metadata.aiSettings?.forbiddenMentions ?? [])
+    values.append(contentsOf: project.metadata.aiSettings?.requiredMentions ?? [])
     for report in project.reports {
         values.append(contentsOf: report.variantIds.map(Optional.some))
         values.append(report.trace)
         values.append(report.resultFingerprint)
+        values.append(contentsOf: hiddenAIExportStrings(report))
         if let manualEdit = report.manualEdit,
            !manualEdit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            manualEdit != report.text {

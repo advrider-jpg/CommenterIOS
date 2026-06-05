@@ -167,6 +167,7 @@ struct RosterSection: View {
     let onInternalNoteChanged: (String, String) -> Void
     let onAttitudeDescriptorChanged: (String, String) -> Void
     let onImportRoster: () -> Void
+    let onOpenStudentEditor: (String) -> Void
     let isDisabled: Bool
 
     var body: some View {
@@ -220,19 +221,8 @@ struct RosterSection: View {
                 }
                 WorklistNotebookCard {
                     ForEach(project.roster) { student in
-                        NavigationLink {
-                            StudentEditorView(
-                                student: student,
-                                isDisabled: isDisabled,
-                                onFirstNameChanged: { onFirstNameChanged(student.id, $0) },
-                                onLastNameChanged: { onLastNameChanged(student.id, $0) },
-                                onYearChanged: { onYearChanged(student.id, $0) },
-                                onGenderChanged: { onGenderChanged(student.id, $0) },
-                                onPronounsChanged: { onPronounsChanged(student.id, $0) },
-                                onInternalNoteChanged: { onInternalNoteChanged(student.id, $0) },
-                                onAttitudeDescriptorChanged: { onAttitudeDescriptorChanged(student.id, $0) },
-                                onDelete: { onDeleteStudent(student.id) }
-                            )
+                        Button {
+                            onOpenStudentEditor(student.id)
                         } label: {
                             WorklistActionRow(
                                 title: fullStudentName(student),
@@ -241,9 +231,13 @@ struct RosterSection: View {
                                 tone: .local,
                                 isEnabled: !isDisabled
                             )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                         .disabled(isDisabled)
                         .accessibilityIdentifier("student-row-\(student.id)")
+                        .accessibilityLabel(fullStudentName(student))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 onDeleteStudent(student.id)
@@ -281,7 +275,35 @@ struct RosterSection: View {
     }
 }
 
-private struct StudentEditorView: View {
+struct StudentEditorRoute: Identifiable, Hashable {
+    let studentId: String
+
+    var id: String { studentId }
+}
+
+struct StudentEditorUnavailableView: View {
+    let studentId: String
+
+    var body: some View {
+        Form {
+            Section {
+                WorklistNotebookCard(perforated: false) {
+                    WorklistNote("This student is no longer available in the open project.", tone: .warning)
+                }
+                .worklistSectionRow()
+            } header: {
+                WorklistTapeHeader("Student details", tone: .warning)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(CommenterStationeryTheme.Colors.paperBackground)
+        .navigationTitle("Student details")
+        .commenterInlineNavigationTitle()
+        .accessibilityIdentifier("student-editor-missing-\(studentId)")
+    }
+}
+
+struct StudentEditorView: View {
     let student: Student
     let isDisabled: Bool
     let onFirstNameChanged: (String) -> Void
@@ -319,6 +341,7 @@ private struct StudentEditorView: View {
         .background(CommenterStationeryTheme.Colors.paperBackground)
         .navigationTitle(fullStudentName(student))
         .commenterInlineNavigationTitle()
+        .accessibilityIdentifier("student-editor-\(student.id)")
     }
 
     @ViewBuilder private var studentIdentityFields: some View {
@@ -356,8 +379,7 @@ private struct StudentEditorView: View {
     @ViewBuilder private var studentPersonalFields: some View {
         WorklistFormRow(label: "Pronouns") {
             TextField("they/them, she/her, he/him", text: Binding(get: { student.pronouns ?? "" }, set: onPronounsChanged))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+                .commenterUncapitalizedTextInput()
                 .disabled(isDisabled)
                 .accessibilityIdentifier("student-pronouns-\(student.id)")
         }
@@ -990,15 +1012,49 @@ struct ReportsSection: View {
     let project: Project
     let readiness: ProjectReadiness?
     let datasetStatus: AppFeature.DatasetStatus
+    let aiAvailabilityStatus: AppFeature.AIAvailabilityStatus
+    let operationStatus: AppFeature.OperationStatus
+    let pendingAIRevision: AppFeature.PendingAIRevision?
+    let pendingAIRevisions: [AppFeature.PendingAIRevision]
+    let isBulkAIRevisionRunning: Bool
+    let latestReportCheck: AppFeature.ReportCheckResult?
     let isGenerating: Bool
     let onGenerate: () -> Void
     let onManualEditChanged: (String, String, String) -> Void
     let onLockChanged: (String, String, Bool) -> Void
+    let onApproveReportForExport: (String, String) -> Void
+    let onAIPolishReport: (String, String) -> Void
+    let onAIToneAdjustReport: (String, String) -> Void
+    let onAIDraftFromEvidenceReport: (String, String) -> Void
+    let onBulkAIPolishReports: () -> Void
+    let onCancelBulkAIPolish: () -> Void
+    let onAcceptAIRevision: (String, String) -> Void
+    let onRejectAIRevision: (String, String) -> Void
+    let onLocalSafetyCheck: (String, String) -> Void
+    let onValidationWarningsReviewed: (String, String) -> Void
+    let onAICritiqueReport: (String, String) -> Void
+    let onAIToneProfileChanged: (AIToneProfile) -> Void
+    let onAITargetLengthChanged: (ReportLengthTarget) -> Void
+    let onAICustomInstructionChanged: (String) -> Void
+    let onAIForbiddenMentionsChanged: ([String]) -> Void
+    let onAIRequiredMentionsChanged: ([String]) -> Void
+    let onAISettingsResetBalanced: () -> Void
+    let onReportAIToneProfileChanged: (String, String, AIToneProfile) -> Void
+    let onReportAITargetLengthChanged: (String, String, ReportLengthTarget) -> Void
+    let onReportAICustomInstructionChanged: (String, String, String) -> Void
+    let onReportAIForbiddenMentionsChanged: (String, String, [String]) -> Void
+    let onReportAIRequiredMentionsChanged: (String, String, [String]) -> Void
+    let onReportAIOptionsSavedAsProjectDefaults: (String, String) -> Void
+    let onReportAIOptionsReset: (String, String) -> Void
     let isDisabled: Bool
+
+    @State private var isBulkAIConfirmationPresented = false
 
     var body: some View {
         Section {
             WorklistNotebookCard(clipped: true) {
+                AIAvailabilityCard(status: aiAvailabilityStatus)
+                WorklistRuledDivider()
                 Button(action: onGenerate) {
                     WorklistActionRow(
                         title: reportGenerationButtonTitle(project: project, readiness: readiness),
@@ -1021,6 +1077,53 @@ struct ReportsSection: View {
                     WorklistRuledDivider()
                     WorklistNote(disabledReason, tone: .warning)
                 }
+                WorklistRuledDivider()
+                Button {
+                    isBulkAIConfirmationPresented = true
+                } label: {
+                    WorklistActionRow(
+                        title: "Improve Eligible Drafts with AI",
+                        subtitle: bulkAIDisabledReason ?? "Queues teacher-review previews for unlocked drafts. Nothing is applied or approved automatically.",
+                        systemImage: "sparkles.rectangle.stack",
+                        tone: .action,
+                        isEnabled: bulkAIDisabledReason == nil,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(bulkAIDisabledReason != nil)
+                .accessibilityIdentifier("bulk-ai-polish-reports-button")
+                .confirmationDialog(
+                    "Queue Bulk AI Previews?",
+                    isPresented: $isBulkAIConfirmationPresented,
+                    titleVisibility: .visible
+                ) {
+                    Button("Queue \(bulkAIEligibleCount) AI Preview\(bulkAIEligibleCount == 1 ? "" : "s")") {
+                        onBulkAIPolishReports()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("The app will request on-device AI revisions sequentially for eligible unlocked drafts. Completed previews wait for teacher review and do not approve, save, export, or share report text.")
+                }
+                if isBulkAIRevisionRunning {
+                    WorklistRuledDivider()
+                    Button(action: onCancelBulkAIPolish) {
+                        WorklistActionRow(
+                            title: "Cancel Bulk AI",
+                            subtitle: "Stops queued AI requests. Completed previews stay available; draft text is not changed.",
+                            systemImage: "xmark.circle",
+                            tone: .warning,
+                            isEnabled: true,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("cancel-bulk-ai-polish-button")
+                }
+                if !pendingReviewQueue.isEmpty {
+                    WorklistRuledDivider()
+                    WorklistStatusChip("\(pendingReviewQueue.count) AI preview \(pendingReviewQueue.count == 1 ? "waiting" : "waiting")", systemImage: "doc.text.magnifyingglass", tone: .prepared)
+                }
                 if readiness?.entries.contains(where: { $0.status == .staleReport || $0.status == .lockedStale }) == true {
                     WorklistRuledDivider()
                     WorklistStatusChip("Stale drafts need review", systemImage: "arrow.triangle.2.circlepath", tone: .warning)
@@ -1035,17 +1138,44 @@ struct ReportsSection: View {
                 )
                 .worklistSectionRow()
             }
+            if !pendingReviewQueue.isEmpty {
+                WorklistNotebookCard {
+                    ForEach(pendingReviewQueue) { pending in
+                        if let report = report(for: pending) {
+                            NavigationLink {
+                                reportEditorView(report: report, pendingRevision: pending)
+                            } label: {
+                                WorklistActionRow(
+                                    title: reportTitle(report, project: project),
+                                    subtitle: reviewQueueSubtitle(pending),
+                                    systemImage: pending.validation.status == .blocked ? "exclamationmark.triangle" : "doc.text.magnifyingglass",
+                                    tone: pending.validation.status == .blocked ? .warning : .prepared
+                                )
+                            }
+                            .accessibilityIdentifier("ai-review-queue-row-\(pending.studentId)-\(accessibilityKey(pending.subject))")
+                        } else {
+                            WorklistActionRow(
+                                title: "\(pending.studentId) / \(pending.subject)",
+                                subtitle: "Preview can no longer be matched to an open draft. Reject or regenerate after reviewing the project state.",
+                                systemImage: "exclamationmark.triangle",
+                                tone: .warning,
+                                isEnabled: false,
+                                showsChevron: false
+                            )
+                            .accessibilityIdentifier("ai-review-queue-stale-\(pending.studentId)-\(accessibilityKey(pending.subject))")
+                        }
+                        if pending.id != pendingReviewQueue.last?.id {
+                            WorklistRuledDivider()
+                        }
+                    }
+                }
+                .worklistSectionRow()
+            }
             if project.reports.isEmpty == false {
                 WorklistNotebookCard {
                     ForEach(project.reports, id: \.reportListIdentifier) { report in
                         NavigationLink {
-                            ReportEditorView(
-                                report: report,
-                                project: project,
-                                isDisabled: isDisabled,
-                                onManualEditChanged: { onManualEditChanged(report.studentId, report.subject, $0) },
-                                onLockChanged: { onLockChanged(report.studentId, report.subject, $0) }
-                            )
+                            reportEditorView(report: report, pendingRevision: pendingRevision(for: report))
                         } label: {
                             WorklistActionRow(
                                 title: reportTitle(report, project: project),
@@ -1079,19 +1209,157 @@ struct ReportsSection: View {
     private var generationSubtitle: String {
         generationDisabledReason ?? "Creates local draft comments and saves only after project verification succeeds."
     }
+
+    private var bulkAIDisabledReason: String? {
+        if isDisabled { return "Wait for the current operation or import preview to finish before requesting AI previews." }
+        if isBulkAIRevisionRunning { return "Bulk AI revision is already running." }
+        if case .busy = operationStatus { return "Wait for the current workflow operation to finish." }
+        if pendingAIRevision != nil || !pendingAIRevisions.isEmpty { return "Accept or reject waiting AI previews before starting another bulk request." }
+        switch aiAvailabilityStatus {
+        case .checked(.available):
+            break
+        case .notChecked:
+            return "On-device AI has not been checked yet."
+        case .checking:
+            return "On-device AI availability is still being checked."
+        case let .checked(.unavailable(reason)):
+            return "On-device AI is unavailable: \(reason.rawValue)."
+        case let .failed(message):
+            return "On-device AI availability failed: \(message)"
+        }
+        return bulkAIEligibleCount == 0 ? "No unlocked draft reports are eligible for AI revision." : nil
+    }
+
+    private var bulkAIEligibleCount: Int {
+        project.reports.filter {
+            !$0.isLocked && !$0.exportText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }.count
+    }
+
+    private func pendingRevision(for report: GeneratedReport) -> AppFeature.PendingAIRevision? {
+        guard let pendingAIRevision,
+              pendingAIRevision.studentId == report.studentId,
+              pendingAIRevision.subject == report.subject
+        else {
+            return pendingAIRevisions.first { $0.studentId == report.studentId && $0.subject == report.subject }
+        }
+        return pendingAIRevision
+    }
+
+    private var pendingReviewQueue: [AppFeature.PendingAIRevision] {
+        var queue = pendingAIRevisions
+        if let pendingAIRevision,
+           !queue.contains(where: { $0.studentId == pendingAIRevision.studentId && $0.subject == pendingAIRevision.subject }) {
+            queue.insert(pendingAIRevision, at: 0)
+        }
+        return queue
+    }
+
+    private func report(for pending: AppFeature.PendingAIRevision) -> GeneratedReport? {
+        project.reports.first { $0.studentId == pending.studentId && $0.subject == pending.subject }
+    }
+
+    private func reviewQueueSubtitle(_ pending: AppFeature.PendingAIRevision) -> String {
+        let status: String
+        switch pending.validation.status {
+        case .passed:
+            status = "Validation passed"
+        case .passedWithWarnings:
+            status = "Validation warnings"
+        case .blocked:
+            status = "Validation blockers"
+        }
+        return "\(status). Review, accept, or reject this AI preview."
+    }
+
+    private func reportEditorView(report: GeneratedReport, pendingRevision: AppFeature.PendingAIRevision?) -> ReportEditorView {
+        ReportEditorView(
+            report: report,
+            project: project,
+            aiAvailabilityStatus: aiAvailabilityStatus,
+            operationStatus: operationStatus,
+            pendingAIRevision: pendingRevision,
+            latestReportCheck: reportCheck(for: report),
+            isDisabled: isDisabled,
+            onManualEditChanged: { onManualEditChanged(report.studentId, report.subject, $0) },
+            onLockChanged: { onLockChanged(report.studentId, report.subject, $0) },
+            onApproveForExport: { onApproveReportForExport(report.studentId, report.subject) },
+            onAIPolish: { onAIPolishReport(report.studentId, report.subject) },
+            onAIToneAdjust: { onAIToneAdjustReport(report.studentId, report.subject) },
+            onAIDraftFromEvidence: { onAIDraftFromEvidenceReport(report.studentId, report.subject) },
+            onAcceptAIRevision: { onAcceptAIRevision(report.studentId, report.subject) },
+            onRejectAIRevision: { onRejectAIRevision(report.studentId, report.subject) },
+            onLocalSafetyCheck: { onLocalSafetyCheck(report.studentId, report.subject) },
+            onValidationWarningsReviewed: { onValidationWarningsReviewed(report.studentId, report.subject) },
+            onAICritique: { onAICritiqueReport(report.studentId, report.subject) },
+            onAIToneProfileChanged: onAIToneProfileChanged,
+            onAITargetLengthChanged: onAITargetLengthChanged,
+            onAICustomInstructionChanged: onAICustomInstructionChanged,
+            onAIForbiddenMentionsChanged: onAIForbiddenMentionsChanged,
+            onAIRequiredMentionsChanged: onAIRequiredMentionsChanged,
+            onAISettingsResetBalanced: onAISettingsResetBalanced,
+            onReportAIToneProfileChanged: { onReportAIToneProfileChanged(report.studentId, report.subject, $0) },
+            onReportAITargetLengthChanged: { onReportAITargetLengthChanged(report.studentId, report.subject, $0) },
+            onReportAICustomInstructionChanged: { onReportAICustomInstructionChanged(report.studentId, report.subject, $0) },
+            onReportAIForbiddenMentionsChanged: { onReportAIForbiddenMentionsChanged(report.studentId, report.subject, $0) },
+            onReportAIRequiredMentionsChanged: { onReportAIRequiredMentionsChanged(report.studentId, report.subject, $0) },
+            onReportAIOptionsSavedAsProjectDefaults: { onReportAIOptionsSavedAsProjectDefaults(report.studentId, report.subject) },
+            onReportAIOptionsReset: { onReportAIOptionsReset(report.studentId, report.subject) }
+        )
+    }
+
+    private func reportCheck(for report: GeneratedReport) -> AppFeature.ReportCheckResult? {
+        guard let latestReportCheck,
+              latestReportCheck.studentId == report.studentId,
+              latestReportCheck.subject == report.subject
+        else {
+            return nil
+        }
+        return latestReportCheck
+    }
 }
 
 private struct ReportEditorView: View {
     let report: GeneratedReport
     let project: Project
+    let aiAvailabilityStatus: AppFeature.AIAvailabilityStatus
+    let operationStatus: AppFeature.OperationStatus
+    let pendingAIRevision: AppFeature.PendingAIRevision?
+    let latestReportCheck: AppFeature.ReportCheckResult?
     let isDisabled: Bool
     let onManualEditChanged: (String) -> Void
     let onLockChanged: (Bool) -> Void
+    let onApproveForExport: () -> Void
+    let onAIPolish: () -> Void
+    let onAIToneAdjust: () -> Void
+    let onAIDraftFromEvidence: () -> Void
+    let onAcceptAIRevision: () -> Void
+    let onRejectAIRevision: () -> Void
+    let onLocalSafetyCheck: () -> Void
+    let onValidationWarningsReviewed: () -> Void
+    let onAICritique: () -> Void
+    let onAIToneProfileChanged: (AIToneProfile) -> Void
+    let onAITargetLengthChanged: (ReportLengthTarget) -> Void
+    let onAICustomInstructionChanged: (String) -> Void
+    let onAIForbiddenMentionsChanged: ([String]) -> Void
+    let onAIRequiredMentionsChanged: ([String]) -> Void
+    let onAISettingsResetBalanced: () -> Void
+    let onReportAIToneProfileChanged: (AIToneProfile) -> Void
+    let onReportAITargetLengthChanged: (ReportLengthTarget) -> Void
+    let onReportAICustomInstructionChanged: (String) -> Void
+    let onReportAIForbiddenMentionsChanged: ([String]) -> Void
+    let onReportAIRequiredMentionsChanged: ([String]) -> Void
+    let onReportAIOptionsSavedAsProjectDefaults: () -> Void
+    let onReportAIOptionsReset: () -> Void
 
     var body: some View {
         Form {
             Section {
                 WorklistNotebookCard(clipped: true) {
+                    aiReviewStatus
+                    if report.requiresTeacherApprovalForExport {
+                        WorklistRuledDivider()
+                    }
                     TextEditor(text: Binding(
                         get: { report.manualEdit ?? report.text },
                         set: onManualEditChanged
@@ -1109,6 +1377,21 @@ private struct ReportEditorView: View {
                     Toggle("Lock against regeneration", isOn: Binding(get: { report.isLocked }, set: onLockChanged))
                         .tint(CommenterStationeryTheme.Colors.localGreen)
                         .disabled(isDisabled)
+                    if report.requiresTeacherApprovalForExport {
+                        WorklistRuledDivider()
+                        Button(action: onApproveForExport) {
+                            WorklistActionRow(
+                                title: "Approve Current AI Draft for Export",
+                                subtitle: "Runs deterministic validation and records teacher approval in the local project.",
+                                systemImage: "checkmark.seal",
+                                tone: .local,
+                                isEnabled: !isDisabled && canApproveAIReport,
+                                showsChevron: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDisabled || !canApproveAIReport)
+                    }
                 }
                 .worklistSectionRow()
             } header: {
@@ -1117,6 +1400,8 @@ private struct ReportEditorView: View {
                 Text("Locked drafts are preserved during regeneration. Unlocked stale drafts can be regenerated from current results and selected subjects.")
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            aiStudioSection
         }
         .scrollContentBackground(.hidden)
         .background(CommenterStationeryTheme.Colors.paperBackground)
@@ -1161,6 +1446,798 @@ private struct ReportEditorView: View {
             )
         }
         return nil
+    }
+
+    @ViewBuilder private var aiReviewStatus: some View {
+        if report.requiresTeacherApprovalForExport {
+            let currentFingerprint = stableTextFingerprint(report.exportText)
+            let approved = report.reviewState?.status == .approved &&
+                report.reviewState?.approvalFingerprint == currentFingerprint &&
+                report.approvedTextFingerprint == currentFingerprint
+            if approved {
+                WorklistStatusChip("AI draft approved for export", systemImage: "checkmark.seal", tone: .success)
+            } else if report.lastValidation?.status == .blocked {
+                WorklistStatusChip("AI draft blocked by validation", systemImage: "exclamationmark.triangle", tone: .failure)
+            } else {
+                WorklistStatusChip("AI draft needs teacher review", systemImage: "person.crop.circle.badge.checkmark", tone: .warning)
+            }
+            if let finding = report.lastValidation?.findings.first {
+                WorklistNote(finding.message, tone: finding.severity == .block ? .warning : .neutral)
+            }
+        }
+    }
+
+    private var canApproveAIReport: Bool {
+        guard report.requiresTeacherApprovalForExport else { return false }
+        return report.lastValidation?.status != .blocked
+    }
+
+    private var aiStudioSection: some View {
+        Section {
+            WorklistNotebookCard(clipped: true) {
+                AIAvailabilityCard(status: aiAvailabilityStatus)
+                WorklistRuledDivider()
+                AIToneControls(
+                    title: "Project AI defaults",
+                    settings: project.metadata.aiSettings ?? ProjectAISettings(),
+                    hasStoredSettings: project.metadata.aiSettings != nil,
+                    isDisabled: isDisabled || isAIWorkflowBusy,
+                    onToneProfileChanged: onAIToneProfileChanged,
+                    onTargetLengthChanged: onAITargetLengthChanged,
+                    onCustomInstructionChanged: onAICustomInstructionChanged,
+                    onForbiddenMentionsChanged: onAIForbiddenMentionsChanged,
+                    onRequiredMentionsChanged: onAIRequiredMentionsChanged,
+                    onResetBalanced: onAISettingsResetBalanced
+                )
+                WorklistRuledDivider()
+                AIReportOptionControls(
+                    options: effectiveReportOptions,
+                    hasOverride: report.aiOptionsOverride != nil,
+                    isDisabled: isDisabled || isAIWorkflowBusy,
+                    onToneProfileChanged: onReportAIToneProfileChanged,
+                    onTargetLengthChanged: onReportAITargetLengthChanged,
+                    onCustomInstructionChanged: onReportAICustomInstructionChanged,
+                    onForbiddenMentionsChanged: onReportAIForbiddenMentionsChanged,
+                    onRequiredMentionsChanged: onReportAIRequiredMentionsChanged,
+                    onSaveAsProjectDefaults: onReportAIOptionsSavedAsProjectDefaults,
+                    onReset: onReportAIOptionsReset
+                )
+                WorklistRuledDivider()
+                Button(action: onAIPolish) {
+                    WorklistActionRow(
+                        title: "Improve with On-device AI",
+                        subtitle: aiPolishDisabledReason ?? "Creates a teacher-review preview. It does not overwrite, approve, save, prepare, export, or share the draft.",
+                        systemImage: "sparkles",
+                        tone: .action,
+                        isEnabled: aiPolishDisabledReason == nil,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(aiPolishDisabledReason != nil)
+                .accessibilityIdentifier("ai-polish-report-\(report.studentId)-\(accessibilityKey(report.subject))")
+                WorklistRuledDivider()
+                Button(action: onAIToneAdjust) {
+                    WorklistActionRow(
+                        title: "Adjust Tone with On-device AI",
+                        subtitle: aiToneAdjustDisabledReason ?? "Creates a teacher-review preview that changes tone only. It does not overwrite, approve, save, prepare, export, or share the draft.",
+                        systemImage: "slider.horizontal.3",
+                        tone: .action,
+                        isEnabled: aiToneAdjustDisabledReason == nil,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(aiToneAdjustDisabledReason != nil)
+                .accessibilityIdentifier("ai-tone-adjust-report-\(report.studentId)-\(accessibilityKey(report.subject))")
+                WorklistRuledDivider()
+                Button(action: onAIDraftFromEvidence) {
+                    WorklistActionRow(
+                        title: "Draft from Evidence with AI",
+                        subtitle: aiEvidenceDraftDisabledReason ?? "Creates a teacher-review preview from report-safe evidence. It does not overwrite, approve, save, prepare, export, or share the draft.",
+                        systemImage: "doc.badge.gearshape",
+                        tone: .action,
+                        isEnabled: aiEvidenceDraftDisabledReason == nil,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(aiEvidenceDraftDisabledReason != nil)
+                .accessibilityIdentifier("ai-draft-evidence-report-\(report.studentId)-\(accessibilityKey(report.subject))")
+                WorklistRuledDivider()
+                Button(action: onLocalSafetyCheck) {
+                    WorklistActionRow(
+                        title: "Run Local Safety Check",
+                        subtitle: "Recomputes deterministic validators and stores the finding record locally. No model is required.",
+                        systemImage: "checkmark.shield",
+                        tone: .local,
+                        isEnabled: !isDisabled && !isAIWorkflowBusy,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled || isAIWorkflowBusy)
+                .accessibilityIdentifier("local-safety-check-\(report.studentId)-\(accessibilityKey(report.subject))")
+                WorklistRuledDivider()
+                Button(action: onAICritique) {
+                    WorklistActionRow(
+                        title: "Run AI Critique",
+                        subtitle: aiCritiqueDisabledReason ?? "Asks on-device AI for teacher-review notes. It does not rewrite or approve the draft.",
+                        systemImage: "text.magnifyingglass",
+                        tone: .action,
+                        isEnabled: aiCritiqueDisabledReason == nil,
+                        showsChevron: false
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(aiCritiqueDisabledReason != nil)
+                .accessibilityIdentifier("ai-critique-report-\(report.studentId)-\(accessibilityKey(report.subject))")
+                if isAIWorkflowBusy {
+                    WorklistRuledDivider()
+                    ProgressView("Waiting for AI workflow to finish")
+                        .tint(CommenterStationeryTheme.Colors.localGreen)
+                }
+                if let pendingAIRevision {
+                    WorklistRuledDivider()
+                    AIRevisionPreviewCard(
+                        pendingRevision: pendingAIRevision,
+                        isDisabled: isDisabled || isAIWorkflowBusy,
+                        onAccept: onAcceptAIRevision,
+                        onReject: onRejectAIRevision
+                    )
+                }
+                if let latestReportCheck {
+                    WorklistRuledDivider()
+                    ReportValidationSummaryCard(title: "Latest local check", validation: latestReportCheck.validation, notes: latestReportCheck.reviewNotes)
+                    if latestWarningsReviewed {
+                        WorklistStatusChip("Warnings reviewed for this draft", systemImage: "checkmark.seal", tone: .success)
+                    } else if canReviewWarnings {
+                        Button(action: onValidationWarningsReviewed) {
+                            WorklistActionRow(
+                                title: "Mark Warnings Reviewed",
+                                subtitle: "Records that the teacher reviewed the warning-only findings for the current draft.",
+                                systemImage: "checkmark.seal",
+                                tone: .local,
+                                isEnabled: !isDisabled && !isAIWorkflowBusy,
+                                showsChevron: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDisabled || isAIWorkflowBusy)
+                    }
+                }
+            }
+            .worklistSectionRow()
+        } header: {
+            WorklistTapeHeader("AI Studio", detail: "Local, preview-first, teacher-approved", tone: .action)
+        } footer: {
+            Text("AI revisions are blocked unless Apple on-device AI is available. Accepted AI text remains unapproved until the teacher runs approval for the current draft.")
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var isAIWorkflowBusy: Bool {
+        if case .busy = operationStatus { return true }
+        return false
+    }
+
+    private var aiPolishDisabledReason: String? {
+        if let common = commonAIDisabledReason(actionName: "AI revision") { return common }
+        if (report.manualEdit ?? report.text).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Draft text is required before AI can revise it."
+        }
+        return nil
+    }
+
+    private var aiToneAdjustDisabledReason: String? {
+        if let common = commonAIDisabledReason(actionName: "AI tone adjustment") { return common }
+        if (report.manualEdit ?? report.text).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Draft text is required before AI can adjust its tone."
+        }
+        return nil
+    }
+
+    private var aiEvidenceDraftDisabledReason: String? {
+        if let common = commonAIDisabledReason(actionName: "AI evidence draft") { return common }
+        if reportSafeEvidenceFacts.isEmpty {
+            return "Add report-safe evidence, learning context, or a report emphasis note before requesting an AI evidence draft."
+        }
+        return nil
+    }
+
+    private var aiCritiqueDisabledReason: String? {
+        if let common = commonAIDisabledReason(actionName: "AI critique") { return common }
+        if (report.manualEdit ?? report.text).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Draft text is required before AI can critique it."
+        }
+        return nil
+    }
+
+    private func commonAIDisabledReason(actionName: String) -> String? {
+        if isDisabled { return "Finish the current local operation or import preview before requesting \(actionName)." }
+        if isAIWorkflowBusy { return "Wait for the current AI workflow to finish." }
+        if report.isLocked { return "Unlock this draft before requesting \(actionName)." }
+        if pendingAIRevision != nil { return "Accept or reject the current AI preview before requesting another AI draft." }
+        switch aiAvailabilityStatus {
+        case .checked(.available):
+            return nil
+        case .notChecked:
+            return "On-device AI has not been checked yet."
+        case .checking:
+            return "On-device AI availability is still being checked."
+        case let .checked(.unavailable(reason)):
+            return "On-device AI is unavailable: \(reason.rawValue)."
+        case let .failed(message):
+            return "On-device AI availability failed: \(message)"
+        }
+    }
+
+    private var reportSafeEvidenceFacts: [ReportSafeFact] {
+        guard let result = project.results.first(where: { $0.studentId == report.studentId && $0.subject == report.subject }) else {
+            return []
+        }
+        return reportSafeFacts(project: project, result: result, report: report)
+            .filter { $0.source != .deterministicDraft && $0.approvedForPrompt && $0.sensitivity == .reportSafe }
+    }
+
+    private var effectiveReportOptions: AIReportOptions {
+        report.aiOptionsOverride ?? project.metadata.aiSettings?.reportOptions ?? AIReportOptions()
+    }
+
+    private var canReviewWarnings: Bool {
+        latestReportCheck?.validation.status == .passedWithWarnings
+    }
+
+    private var latestWarningsReviewed: Bool {
+        guard let latestReportCheck else { return false }
+        return report.validationWarningReview?.validationFingerprint == latestReportCheck.validation.textFingerprint
+    }
+}
+
+private struct AIToneControls: View {
+    let title: String
+    let settings: ProjectAISettings
+    let hasStoredSettings: Bool
+    let isDisabled: Bool
+    let onToneProfileChanged: (AIToneProfile) -> Void
+    let onTargetLengthChanged: (ReportLengthTarget) -> Void
+    let onCustomInstructionChanged: (String) -> Void
+    let onForbiddenMentionsChanged: ([String]) -> Void
+    let onRequiredMentionsChanged: ([String]) -> Void
+    let onResetBalanced: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+            tonePicker("Voice", selection: settings.defaultToneProfile.schoolVoice, values: SchoolVoice.allCases, label: schoolVoiceLabel) { value in
+                var profile = settings.defaultToneProfile
+                profile.schoolVoice = value
+                onToneProfileChanged(profile)
+            }
+            toneAxisPicker("Warmth", value: settings.defaultToneProfile.warmth) { value in
+                var profile = settings.defaultToneProfile
+                profile.warmth = value
+                onToneProfileChanged(profile)
+            }
+            toneAxisPicker("Specificity", value: settings.defaultToneProfile.specificity) { value in
+                var profile = settings.defaultToneProfile
+                profile.specificity = value
+                onToneProfileChanged(profile)
+            }
+            toneAxisPicker("Concision", value: settings.defaultToneProfile.concision) { value in
+                var profile = settings.defaultToneProfile
+                profile.concision = value
+                onToneProfileChanged(profile)
+            }
+            toneAxisPicker("Evidence anchoring", value: settings.defaultToneProfile.evidenceAnchoring) { value in
+                var profile = settings.defaultToneProfile
+                profile.evidenceAnchoring = value
+                onToneProfileChanged(profile)
+            }
+            Picker("Target length", selection: Binding(get: { settings.targetLength }, set: onTargetLengthChanged)) {
+                ForEach(ReportLengthTarget.allCases, id: \.self) { target in
+                    Text(targetLengthLabel(target)).tag(target)
+                }
+            }
+            .disabled(isDisabled)
+            .accessibilityIdentifier("ai-target-length-picker")
+            WorklistFormRow(label: "Instruction") {
+                TextField("Optional teacher instruction", text: Binding(get: { settings.customInstruction ?? "" }, set: onCustomInstructionChanged))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("ai-custom-instruction-field")
+            }
+            WorklistFormRow(label: "Do not mention") {
+                TextField("Comma, semicolon, or line separated details", text: Binding(
+                    get: { mentionListText(settings.forbiddenMentions) },
+                    set: { onForbiddenMentionsChanged(parseMentionList($0)) }
+                ))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("ai-forbidden-mentions-field")
+            }
+            WorklistFormRow(label: "Required mentions") {
+                TextField("Comma, semicolon, or line separated details", text: Binding(
+                    get: { mentionListText(settings.requiredMentions) },
+                    set: { onRequiredMentionsChanged(parseMentionList($0)) }
+                ))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("ai-required-mentions-field")
+            }
+            Button(action: onResetBalanced) {
+                WorklistActionRow(
+                    title: "Reset Balanced Project Defaults",
+                    subtitle: "Clears stored project AI defaults. Existing report text and draft-specific overrides are not changed.",
+                    systemImage: "arrow.counterclockwise",
+                    tone: .neutral,
+                    isEnabled: hasStoredSettings && !isDisabled,
+                    showsChevron: false
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasStoredSettings || isDisabled)
+            WorklistNote("Project defaults are stored in this local project and included in AI prompt metadata for drafts without overrides. Mention constraints are kept out of exports and enforced during validation.")
+        }
+    }
+
+    private func toneAxisPicker(_ title: String, value: ToneAxis, onChange: @escaping (ToneAxis) -> Void) -> some View {
+        tonePicker(title, selection: value, values: ToneAxis.allCases, label: toneAxisLabel, onChange: onChange)
+    }
+
+    private func tonePicker<Value: Hashable>(
+        _ title: String,
+        selection: Value,
+        values: [Value],
+        label: @escaping (Value) -> String,
+        onChange: @escaping (Value) -> Void
+    ) -> some View {
+        Picker(title, selection: Binding(get: { selection }, set: onChange)) {
+            ForEach(values, id: \.self) { value in
+                Text(label(value)).tag(value)
+            }
+        }
+        .disabled(isDisabled)
+    }
+
+    private func toneAxisLabel(_ axis: ToneAxis) -> String {
+        switch axis {
+        case .low:
+            return "Low"
+        case .slightlyLow:
+            return "Slightly low"
+        case .balanced:
+            return "Balanced"
+        case .slightlyHigh:
+            return "Slightly high"
+        case .high:
+            return "High"
+        }
+    }
+
+    private func schoolVoiceLabel(_ voice: SchoolVoice) -> String {
+        switch voice {
+        case .standard:
+            return "Standard"
+        case .warmPrimary:
+            return "Warm primary"
+        case .formalReport:
+            return "Formal report"
+        case .conciseSystem:
+            return "Concise system"
+        case .strengthsBased:
+            return "Strengths based"
+        }
+    }
+
+    private func targetLengthLabel(_ target: ReportLengthTarget) -> String {
+        switch target {
+        case .shorter:
+            return "Shorter"
+        case .standard:
+            return "Standard"
+        case .fuller:
+            return "Fuller"
+        case .strictCharacterLimit:
+            return "Strict character limit"
+        }
+    }
+
+    private func mentionListText(_ mentions: [String]) -> String {
+        mentions.joined(separator: "; ")
+    }
+
+    private func parseMentionList(_ text: String) -> [String] {
+        Array(
+            Set(
+                text.components(separatedBy: CharacterSet(charactersIn: ",;\n"))
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            )
+        )
+        .sorted()
+    }
+}
+
+private struct AIReportOptionControls: View {
+    let options: AIReportOptions
+    let hasOverride: Bool
+    let isDisabled: Bool
+    let onToneProfileChanged: (AIToneProfile) -> Void
+    let onTargetLengthChanged: (ReportLengthTarget) -> Void
+    let onCustomInstructionChanged: (String) -> Void
+    let onForbiddenMentionsChanged: ([String]) -> Void
+    let onRequiredMentionsChanged: ([String]) -> Void
+    let onSaveAsProjectDefaults: () -> Void
+    let onReset: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("This draft AI settings")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+                Spacer(minLength: 0)
+                WorklistStatusChip(hasOverride ? "Override" : "Project defaults", systemImage: hasOverride ? "slider.horizontal.3" : "arrow.triangle.2.circlepath", tone: hasOverride ? .prepared : .neutral)
+            }
+            reportToneAxisPicker("Warmth", value: options.toneProfile.warmth) { value in
+                var profile = options.toneProfile
+                profile.warmth = value
+                onToneProfileChanged(profile)
+            }
+            reportToneAxisPicker("Specificity", value: options.toneProfile.specificity) { value in
+                var profile = options.toneProfile
+                profile.specificity = value
+                onToneProfileChanged(profile)
+            }
+            reportToneAxisPicker("Next step directness", value: options.toneProfile.nextStepDirectness) { value in
+                var profile = options.toneProfile
+                profile.nextStepDirectness = value
+                onToneProfileChanged(profile)
+            }
+            Picker("Target length", selection: Binding(get: { options.targetLength }, set: onTargetLengthChanged)) {
+                ForEach(ReportLengthTarget.allCases, id: \.self) { target in
+                    Text(targetLengthLabel(target)).tag(target)
+                }
+            }
+            .disabled(isDisabled)
+            .accessibilityIdentifier("report-ai-target-length-picker")
+            WorklistFormRow(label: "Instruction") {
+                TextField("Optional instruction for this draft", text: Binding(get: { options.customInstruction ?? "" }, set: onCustomInstructionChanged))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("report-ai-custom-instruction-field")
+            }
+            WorklistFormRow(label: "Do not mention") {
+                TextField("Comma, semicolon, or line separated details", text: Binding(
+                    get: { mentionListText(options.forbiddenMentions) },
+                    set: { onForbiddenMentionsChanged(parseMentionList($0)) }
+                ))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("report-ai-forbidden-mentions-field")
+            }
+            WorklistFormRow(label: "Required mentions") {
+                TextField("Comma, semicolon, or line separated details", text: Binding(
+                    get: { mentionListText(options.requiredMentions) },
+                    set: { onRequiredMentionsChanged(parseMentionList($0)) }
+                ))
+                    .commenterWordsTextInput()
+                    .disabled(isDisabled)
+                    .accessibilityIdentifier("report-ai-required-mentions-field")
+            }
+            Button(action: onSaveAsProjectDefaults) {
+                WorklistActionRow(
+                    title: "Save as Project AI Defaults",
+                    subtitle: "Copies this draft's AI settings into the local project defaults. Existing report text is not changed.",
+                    systemImage: "square.and.arrow.down",
+                    tone: .local,
+                    isEnabled: hasOverride && !isDisabled,
+                    showsChevron: false
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasOverride || isDisabled)
+            Button(action: onReset) {
+                WorklistActionRow(
+                    title: "Use Project AI Defaults",
+                    subtitle: "Removes this draft's AI override. Existing report text is not changed.",
+                    systemImage: "arrow.counterclockwise",
+                    tone: .neutral,
+                    isEnabled: hasOverride && !isDisabled,
+                    showsChevron: false
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasOverride || isDisabled)
+            WorklistNote("These settings affect only new AI previews and validation for this draft. Mention constraints are kept out of exports. Do-not-mention details block approval if present; required mentions block approval if missing.")
+        }
+    }
+
+    private func reportToneAxisPicker(_ title: String, value: ToneAxis, onChange: @escaping (ToneAxis) -> Void) -> some View {
+        Picker(title, selection: Binding(get: { value }, set: onChange)) {
+            ForEach(ToneAxis.allCases, id: \.self) { axis in
+                Text(toneAxisLabel(axis)).tag(axis)
+            }
+        }
+        .disabled(isDisabled)
+    }
+
+    private func toneAxisLabel(_ axis: ToneAxis) -> String {
+        switch axis {
+        case .low:
+            return "Low"
+        case .slightlyLow:
+            return "Slightly low"
+        case .balanced:
+            return "Balanced"
+        case .slightlyHigh:
+            return "Slightly high"
+        case .high:
+            return "High"
+        }
+    }
+
+    private func targetLengthLabel(_ target: ReportLengthTarget) -> String {
+        switch target {
+        case .shorter:
+            return "Shorter"
+        case .standard:
+            return "Standard"
+        case .fuller:
+            return "Fuller"
+        case .strictCharacterLimit:
+            return "Strict character limit"
+        }
+    }
+
+    private func mentionListText(_ mentions: [String]) -> String {
+        mentions.joined(separator: "; ")
+    }
+
+    private func parseMentionList(_ text: String) -> [String] {
+        Array(
+            Set(
+                text.components(separatedBy: CharacterSet(charactersIn: ",;\n"))
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            )
+        )
+        .sorted()
+    }
+}
+
+private struct AIRevisionPreviewCard: View {
+    let pendingRevision: AppFeature.PendingAIRevision
+    let isDisabled: Bool
+    let onAccept: () -> Void
+    let onReject: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            WorklistStatusChip(statusTitle, systemImage: "doc.text.magnifyingglass", tone: pendingRevision.validation.status == .blocked ? .warning : .prepared)
+            if !pendingRevision.changeSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                WorklistNote(pendingRevision.changeSummary)
+            }
+            AIRevisionDiffView(original: pendingRevision.originalText, proposed: pendingRevision.proposedText)
+            ReportValidationSummaryCard(title: "Preview validation", validation: pendingRevision.validation, notes: pendingRevision.reviewWarnings)
+            HStack(spacing: 10) {
+                Button(action: onReject) {
+                    Label("Reject", systemImage: "xmark.circle")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(CommenterStationeryTheme.Colors.attentionOrange)
+                .disabled(isDisabled)
+                Button(action: onAccept) {
+                    Label("Accept", systemImage: "checkmark.circle")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(CommenterStationeryTheme.Colors.localGreen)
+                .disabled(isDisabled || pendingRevision.validation.status == .blocked)
+            }
+        }
+        .accessibilityIdentifier("ai-revision-preview-\(pendingRevision.studentId)-\(accessibilityKey(pendingRevision.subject))")
+    }
+
+    private var statusTitle: String {
+        pendingRevision.validation.status == .blocked ? "AI preview needs fixes before acceptance" : "AI preview ready for teacher review"
+    }
+}
+
+private struct AIRevisionDiffView: View {
+    let original: String
+    let proposed: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Before and after")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(CommenterStationeryTheme.Colors.mutedInk)
+            if removedSentences.isEmpty && addedSentences.isEmpty {
+                WorklistNote("The revised text has no sentence-level additions or removals compared with the current draft.")
+            } else {
+                ForEach(removedSentences.prefix(3), id: \.self) { sentence in
+                    diffRow(prefix: "Removed", text: sentence, tone: .warning)
+                }
+                ForEach(addedSentences.prefix(3), id: \.self) { sentence in
+                    diffRow(prefix: "Added", text: sentence, tone: .local)
+                }
+            }
+            DisclosureGroup("Proposed text") {
+                Text(proposed)
+                    .font(.body)
+                    .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+            }
+        }
+    }
+
+    private var removedSentences: [String] {
+        sentenceSet(original).filter { !sentenceSet(proposed).contains($0) }
+    }
+
+    private var addedSentences: [String] {
+        sentenceSet(proposed).filter { !sentenceSet(original).contains($0) }
+    }
+
+    private func diffRow(prefix: String, text: String, tone: WorklistTone) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(prefix)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tone.color)
+            Text(text)
+                .font(.footnote)
+                .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(tone.softColor)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func sentenceSet(_ text: String) -> [String] {
+        text
+            .components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+private struct ReportValidationSummaryCard: View {
+    let title: String
+    let validation: ReportValidationSummary
+    let notes: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            WorklistStatusChip(statusTitle, systemImage: statusImage, tone: tone)
+            ForEach(validation.findings.prefix(4)) { finding in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(finding.message)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(finding.severity == .block ? CommenterStationeryTheme.Colors.destructiveRed : CommenterStationeryTheme.Colors.attentionOrange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let suggestedFix = finding.suggestedFix {
+                        Text(suggestedFix)
+                            .font(.caption)
+                            .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            ForEach(notes.prefix(3), id: \.self) { note in
+                WorklistNote(note, tone: .neutral)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var statusTitle: String {
+        switch validation.status {
+        case .passed:
+            return "\(title): passed"
+        case .passedWithWarnings:
+            return "\(title): \(validation.findings.count) warning \(validation.findings.count == 1 ? "item" : "items")"
+        case .blocked:
+            return "\(title): blocked"
+        }
+    }
+
+    private var statusImage: String {
+        switch validation.status {
+        case .passed:
+            return "checkmark.shield"
+        case .passedWithWarnings:
+            return "exclamationmark.triangle"
+        case .blocked:
+            return "xmark.shield"
+        }
+    }
+
+    private var tone: WorklistTone {
+        switch validation.status {
+        case .passed:
+            return .success
+        case .passedWithWarnings:
+            return .warning
+        case .blocked:
+            return .failure
+        }
+    }
+}
+
+private struct AIAvailabilityCard: View {
+    let status: AppFeature.AIAvailabilityStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            WorklistStatusChip(title, systemImage: systemImage, tone: tone)
+            WorklistNote(detail, tone: tone == .warning || tone == .failure ? .warning : .neutral)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("ai-availability-card")
+    }
+
+    private var title: String {
+        switch status {
+        case .notChecked:
+            return "On-device AI not checked"
+        case .checking:
+            return "Checking on-device AI"
+        case .checked(.available):
+            return "On-device AI available"
+        case .checked(.unavailable):
+            return "On-device AI unavailable"
+        case .failed:
+            return "On-device AI check failed"
+        }
+    }
+
+    private var detail: String {
+        switch status {
+        case .notChecked:
+            return "Deterministic generation remains available. AI actions stay disabled until local availability is checked."
+        case .checking:
+            return "Checking local Apple Intelligence availability. No student data leaves the device."
+        case .checked(.available):
+            return "Apple on-device AI can be used only for teacher-reviewed drafts. Deterministic generation remains the fallback."
+        case let .checked(.unavailable(reason)):
+            return "AI actions are disabled because local availability reported \(reason.rawValue). Deterministic reports still work."
+        case let .failed(message):
+            return "AI actions are disabled because availability could not be checked: \(message)"
+        }
+    }
+
+    private var systemImage: String {
+        switch status {
+        case .checked(.available):
+            return "sparkles"
+        case .checking:
+            return "arrow.triangle.2.circlepath"
+        case .failed:
+            return "exclamationmark.triangle"
+        case .notChecked, .checked(.unavailable):
+            return "sparkles.rectangle.stack"
+        }
+    }
+
+    private var tone: WorklistTone {
+        switch status {
+        case .checked(.available):
+            return .local
+        case .checking:
+            return .prepared
+        case .failed:
+            return .failure
+        case .notChecked, .checked(.unavailable):
+            return .warning
+        }
     }
 }
 

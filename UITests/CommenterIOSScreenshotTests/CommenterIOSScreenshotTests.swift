@@ -51,12 +51,17 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         capture("05-roster-before-student")
         addStudent.tap()
 
-        let studentRow = scrollToAnyInWorklist(cells(identifier: "student-row-\(screenshotStudentId)", label: "Student"), name: "new student row")
-        studentRow.tap()
+        let newRow = element("student-row-\(screenshotStudentId)")
+        waitForElement(newRow, named: "new student row")
+        openStudentEditor(studentId: screenshotStudentId)
 
-        let firstName = scrollToAny(textFields(identifier: "student-first-name-\(screenshotStudentId)", label: "First name"), name: "student first name field")
+        let firstName = waitForAny(textFields(identifier: "student-first-name-\(screenshotStudentId)", label: "First name"), timeout: 10)
+            ?? textField(identifier: "student-first-name-\(screenshotStudentId)", label: "First name")
+        waitForElement(firstName, named: "student first name field")
         enterText("Ava", in: firstName, named: "student first name")
-        let lastName = scrollToAny(textFields(identifier: "student-last-name-\(screenshotStudentId)", label: "Last name"), name: "student last name field")
+        let lastName = waitForAny(textFields(identifier: "student-last-name-\(screenshotStudentId)", label: "Last name"), timeout: 10)
+            ?? textField(identifier: "student-last-name-\(screenshotStudentId)", label: "Last name")
+        waitForElement(lastName, named: "student last name field")
         enterText("Ng", in: lastName, named: "student last name")
         capture("06-roster-student-entered")
         tapBack(to: screenshotProjectName)
@@ -113,14 +118,20 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         )
         generateReports.tap()
         waitForOperationToSettle(action: "report generation")
+        RunLoop.current.run(until: Date().addingTimeInterval(1.0))
         ensureWorklistOpen()
 
         let reportRow = scrollToAnyInWorklist(
             reportRows(identifier: "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)"),
-            name: "generated Ava English report row"
+            name: "generated Ava English report row",
+            requireHittable: false
         )
         tapElement(reportRow, named: "generated Ava English report row")
-        let reportEditor = scrollToAny(textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"), name: "generated Ava English report", requireHittable: false)
+        let reportEditor = scrollToAnyInWorklist(
+            textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"),
+            name: "generated Ava English report",
+            requireHittable: false
+        )
         waitForElement(reportEditor, named: "generated Ava English report")
         capture("11-generated-report-comment")
         tapBack(to: screenshotProjectName)
@@ -185,6 +196,78 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         }
     }
 
+    private func waitForStudentEditorIfPresent(studentId: String, timeout: TimeInterval) -> Bool {
+        let editor = element("student-editor-\(studentId)")
+        let firstName = app.textFields["student-first-name-\(studentId)"]
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if editor.exists || firstName.exists {
+                return true
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+        }
+        return editor.exists || firstName.exists
+    }
+
+    private func openStudentEditor(studentId: String) {
+        let rowIdentifier = "student-row-\(studentId)"
+        let row = scrollToAnyInWorklist(
+            [app.buttons[rowIdentifier], element(rowIdentifier)],
+            name: "new student row",
+            requireHittable: false
+        )
+
+        scrollElementIntoSafeTapZone(row, named: "new student row", container: worklistScrollContainer())
+        guard row.isHittable else {
+            captureFailureContext("student-row-\(studentId)-not-hittable")
+            XCTFail("Expected new student row to be hittable after scrolling it away from the footer.")
+            return
+        }
+        row.tap()
+        if waitForStudentEditorIfPresent(studentId: studentId, timeout: 5) {
+            return
+        }
+
+        captureFailureContext("student-editor-\(studentId)")
+        XCTFail("Expected student editor for \(studentId) to open after tapping the roster row.")
+    }
+
+    private func scrollElementIntoSafeTapZone(_ element: XCUIElement, named name: String, container: XCUIElement) {
+        waitForElement(element, named: name)
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            let frame = element.frame
+            let safeRange = safeVerticalTapRange()
+            if frame.midY >= safeRange.lowerBound && frame.midY <= safeRange.upperBound && isVisibleOnScreen(element) {
+                return
+            }
+            if frame.midY > safeRange.upperBound {
+                scrollWithin(container, up: true)
+            } else {
+                scrollWithin(container, up: false)
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.15))
+        }
+
+        let frame = element.frame
+        let safeRange = safeVerticalTapRange()
+        if !(frame.midY >= safeRange.lowerBound && frame.midY <= safeRange.upperBound) {
+            captureFailureContext("\(name)-safe-zone")
+            XCTFail("Expected \(name) to be away from the footer before tapping. frame=\(frame), safeY=\(safeRange)")
+        }
+    }
+
+    private func safeVerticalTapRange() -> ClosedRange<CGFloat> {
+        let appFrame = app.frame
+        let tabTop = app.tabBars.firstMatch.exists ? app.tabBars.firstMatch.frame.minY : appFrame.maxY
+        let lower = appFrame.minY + 140
+        let upper = min(tabTop, appFrame.maxY) - 120
+        if upper > lower {
+            return lower...upper
+        }
+        return (appFrame.midY - 40)...(appFrame.midY + 40)
+    }
+
     private func waitForEnabledElement(_ element: XCUIElement, named name: String) {
         let predicate = NSPredicate(format: "exists == true AND enabled == true")
         let readyExpectation = expectation(for: predicate, evaluatedWith: element)
@@ -212,7 +295,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     }
 
     private func cells(identifier: String, label: String) -> [XCUIElement] {
-        [app.cells[identifier], app.buttons[identifier], app.staticTexts[label], element(identifier)]
+        [app.buttons[identifier], app.cells[identifier], app.otherElements[identifier], element(identifier)]
     }
 
     private func reportRows(identifier: String) -> [XCUIElement] {
@@ -287,10 +370,14 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         captureFailureContext(name)
         let failureStatus = element("operation-status-failed")
+        let candidatesSummary = elements.map { element in
+            let identifier = element.identifier.isEmpty ? "<no-id>" : element.identifier
+            return "\(identifier): exists=\(element.exists) hittable=\(element.isHittable) label=\(element.label)"
+        }.joined(separator: "; ")
         if failureStatus.exists {
-            XCTFail("Expected \(name), but the app reported failure: \(failureStatus.label)")
+            XCTFail("Expected \(name), but the app reported failure: \(failureStatus.label). Candidates: \(candidatesSummary)")
         } else {
-            XCTFail("Expected \(name) to be visible\(requireHittable ? " and hittable" : "").")
+            XCTFail("Expected \(name) to be visible\(requireHittable ? " and hittable" : ""). Candidates: \(candidatesSummary)")
         }
         return elements[0]
     }
@@ -624,6 +711,10 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             "worklist-list",
             "support-page",
             "support-list",
+            "student-row-\(screenshotStudentId)",
+            "student-editor-\(screenshotStudentId)",
+            "student-first-name-\(screenshotStudentId)",
+            "student-last-name-\(screenshotStudentId)",
             "operation-status-busy",
             "operation-status-failed"
         ]

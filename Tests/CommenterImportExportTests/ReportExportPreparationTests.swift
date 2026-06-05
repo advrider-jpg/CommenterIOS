@@ -28,6 +28,7 @@ final class ReportExportPreparationTests: XCTestCase {
             "Achievement Level",
             "Report Text",
             "Manual Edit Used",
+            "AI Review Status",
             "Generated Date",
             "Project Name",
             "Term"
@@ -36,8 +37,35 @@ final class ReportExportPreparationTests: XCTestCase {
         XCTAssertEqual(rows[0].studentName, "Ava Ng")
         XCTAssertEqual(rows[0].reportText, "'=Manual edit stays visible.")
         XCTAssertEqual(rows[0].manualEditUsed, "Yes")
+        XCTAssertEqual(rows[0].aiReviewStatus, "Deterministic only")
         XCTAssertEqual(rows[0].generatedDate, "1970-01-01T00:00:00.001Z")
         XCTAssertFalse(rows[0].orderedValues.joined(separator: " ").contains("internal"))
+    }
+
+    func testPreparationBlocksAIReportsUntilApproved() throws {
+        var project = fixtureProject()
+        let text = "Ava writes clearly."
+        project.reports = [
+            readyReport(
+                project: project,
+                result: project.results[0],
+                text: text,
+                generationMode: .aiPolishedDeterministic,
+                reviewState: ReportReviewState(status: .needsTeacherReview),
+                currentTextFingerprint: stableTextFingerprint(text)
+            )
+        ]
+
+        XCTAssertThrowsError(try reportReviewRows(project: project)) { error in
+            XCTAssertTrue(String(describing: error).contains("AI draft needs teacher review"))
+        }
+
+        let fingerprint = stableTextFingerprint(text)
+        project.reports[0].reviewState = ReportReviewState(status: .approved, approvedAt: 2, approvalFingerprint: fingerprint)
+        project.reports[0].approvedTextFingerprint = fingerprint
+
+        let rows = try reportReviewRows(project: project)
+        XCTAssertEqual(rows[0].aiReviewStatus, "AI approved")
     }
 
     func testPreparationBlocksUnreadyReportsBeforeRowsOrPacketsAreReturned() throws {
@@ -159,7 +187,10 @@ final class ReportExportPreparationTests: XCTestCase {
         manualEdit: String? = nil,
         generatedAt: Int64 = 1,
         variantIds: [String] = [],
-        trace: String? = nil
+        trace: String? = nil,
+        generationMode: ReportGenerationMode? = nil,
+        reviewState: ReportReviewState? = nil,
+        currentTextFingerprint: String? = nil
     ) -> GeneratedReport {
         guard let student = project.roster.first(where: { $0.id == result.studentId }) else {
             XCTFail("Missing fixture student")
@@ -179,7 +210,10 @@ final class ReportExportPreparationTests: XCTestCase {
                 student: student,
                 result: result,
                 concreteSubject: result.focusStrand ?? result.subject
-            )
+            ),
+            generationMode: generationMode,
+            reviewState: reviewState,
+            currentTextFingerprint: currentTextFingerprint
         )
     }
 }

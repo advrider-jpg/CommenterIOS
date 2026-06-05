@@ -469,6 +469,248 @@ list_schemes(projectPath: "C:\CommenterIOS\CommenterIOS.xcodeproj")
   `timeout-minutes` limit for the main iOS CI job, xcodebuild result bundles,
   xcodebuild log capture, and failure artifact uploads for CI diagnosis.
 
+- Windows validation after the on-device AI foundation packets passed
+  `git diff --check`, `git diff --cached --check`, and
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'` with no
+  output. New AI/safety Swift files contained no CR bytes. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. Direct `swift test` remains blocked because `swift` is
+  not installed on this Windows PATH. Direct `xcodebuild` remains blocked
+  because `xcodebuild` is not installed. XcodeBuildMCP discovered
+  `C:\CommenterIOS\CommenterIOS.xcodeproj`, but `list_schemes` failed with
+  `spawn xcodebuild ENOENT` and `list_sims` failed with `spawn xcrun ENOENT`.
+
+- Windows validation after the prompt/availability/review-gate AI slice passed
+  `git diff --check`, `git diff --cached --check`, and
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'` with no
+  output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. Direct `swift test` remains blocked because `swift` is
+  not installed on this Windows PATH. XcodeBuildMCP showed no configured
+  defaults, discovered `C:\CommenterIOS\CommenterIOS.xcodeproj`, then
+  `list_sims` failed with `spawn xcrun ENOENT` and `list_schemes` failed with
+  `spawn xcodebuild ENOENT`.
+
+- Windows validation after the AI Studio workflow pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. Untracked AI/safety files are LF. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The production network/remote-AI scan found only package
+  URLs, OOXML namespace strings, and the privacy plist DTD; no production
+  `URLSession`, analytics, telemetry, Firebase, remote config, OpenAI,
+  Anthropic, Gemini, or remote AI path was added. Direct `swift test` failed
+  because `swift` is not recognized on this Windows PATH. `Get-Command
+  swift,xcodebuild,xcrun` returned no local tools. XcodeBuildMCP had no session
+  defaults, discovered `C:\CommenterIOS\CommenterIOS.xcodeproj`, and then
+  `list_sims` failed with `spawn xcrun ENOENT` while `list_schemes` failed with
+  `spawn xcodebuild ENOENT`.
+
+- Windows validation after the bulk AI, draft-from-evidence, App Intents, and
+  eval-harness pass passed `git diff --check`, `git diff --cached --check`,
+  tracked CRLF/mixed scan, and untracked CRLF/mixed scan with no output. The
+  source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. Direct `swift test` failed because `swift` is not
+  recognized on this Windows PATH. `Get-Command swift,xcodebuild,xcrun`
+  returned no local tools. XcodeBuildMCP discovered
+  `C:\CommenterIOS\CommenterIOS.xcodeproj`; `list_schemes` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The new App Intents and Foundation Models guarded code therefore still need
+  macOS/Xcode 26 SDK compile validation before release claims.
+
+- Windows validation after the report-specific AI controls, evidence-draft
+  preview, and AI critique pass passed `git diff --check`,
+  `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  Direct `swift test` failed because `swift` is not recognized on this Windows
+  PATH. Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. XcodeBuildMCP
+  `session_show_defaults` showed no configured project/scheme/simulator;
+  `list_schemes` for `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The guarded Foundation Models and App Intents code still needs macOS/Xcode 26
+  SDK compile validation before release claims.
+
+- Windows validation after the do-not-mention AI constraints pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. Direct
+  `swift test` failed because `swift` is not recognized on this Windows PATH.
+  Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The guarded Foundation Models, App Intents, and SwiftUI changes still need
+  macOS/Xcode 26 SDK compile validation before release claims.
+
+- Windows validation after the bulk AI cancellation pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. Direct
+  `swift test` failed because `swift` is not recognized on this Windows PATH.
+  Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The cancellable TCA effect and SwiftUI cancel control still need macOS/Xcode
+  compile validation before release claims.
+
+- Windows validation after the AI review queue surface pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. Direct
+  `swift test` failed because `swift` is not recognized on this Windows PATH.
+  Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The SwiftUI queue navigation still needs macOS/Xcode compile and simulator UI
+  validation before release claims.
+
+- Windows validation after the required-mention AI constraints pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. Direct
+  `swift test` failed because `swift` is not recognized on this Windows PATH.
+  Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The SwiftUI required-mention control, reducer wiring, and validator category
+  still need macOS/Xcode compile and simulator UI validation before release
+  claims.
+
+- Windows validation after the project AI mention defaults pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. Direct
+  `swift test` failed because `swift` is not recognized on this Windows PATH.
+  Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The expanded `ProjectAISettings` decoding, SwiftUI defaults controls, and TCA
+  action wiring still need macOS/Xcode compile and simulator UI validation
+  before release claims.
+
+- Windows validation after the AI default reset and save-default pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. Direct
+  `swift test` failed because `swift` is not recognized on this Windows PATH.
+  Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The new SwiftUI reset/save-default buttons and TCA wiring still need
+  macOS/Xcode compile and simulator UI validation before release claims.
+
+- Windows validation after the validation warning review pass passed
+  `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests`
+  returned no matches. The network/remote-AI scan found package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names, and
+  explicit docs prohibiting remote AI; no production `URLSession`, Firebase,
+  analytics, telemetry, OpenAI, Anthropic, Gemini, or remote AI path was added.
+  `Get-Command swift,xcodebuild,xcrun` returned no local tools. Direct
+  `swift test` failed because `swift` is not recognized on this Windows PATH.
+  Direct `xcodebuild` failed because `xcodebuild` is not recognized.
+  XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The warning-review record, SwiftUI acknowledgement control, and TCA action
+  still need macOS/Xcode compile and simulator UI validation before release
+  claims.
+
+- Windows validation after the tone adjustment and bulk confirmation pass
+  passed `git diff --check`, `git diff --cached --check`,
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed'`, and
+  `git ls-files --eol --others --exclude-standard | Select-String -Pattern 'w/crlf|w/mixed'`
+  with no output. The source scan
+  `rg -n "fake|mocked|placeholder logic|pretend|stateless|decorative|not been ported yet|TODO|FIXME" Sources Tests --glob '!Sources/CommentEngine/Resources/**'`
+  returned no matches. The network/remote-AI scan found existing package and
+  documentation URLs, XML namespace/plist DTD URLs, App Intent type names,
+  support text, and explicit docs prohibiting remote AI; no production
+  `URLSession`, Firebase, analytics, telemetry, OpenAI, Anthropic, Gemini, or
+  remote AI path was added. `Get-Command swift,xcodebuild,xcrun` returned no
+  local tools. Direct `swift test` failed because `swift` is not recognized on
+  this Windows PATH. Direct `xcodebuild` failed because `xcodebuild` is not
+  recognized. XcodeBuildMCP `session_show_defaults` showed no configured
+  project/scheme/simulator; `list_schemes` for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with
+  `spawn xcodebuild ENOENT`, and `list_sims` failed with `spawn xcrun ENOENT`.
+  The tone-adjust SwiftUI control, bulk confirmation dialog, reducer wiring,
+  prompt builder, and guarded Foundation Models call still need macOS/Xcode SDK
+  compile and simulator UI validation before release claims.
+
+- CI validation was hardened on 2026-06-05 so `.github/workflows/ios-ci.yml`
+  runs Swift package tests, the iOS app-target build, and then the screenshot
+  UI test only after both prerequisites pass. The standalone
+  `.github/workflows/ios-screenshots.yml` trigger is manual-only. Compiled
+  `.build` and `build/DerivedData` caches were removed from CI workflows to
+  avoid stale Swift module reuse across source changes.
+
 ## Future Required Gates
 
 Future required gates beyond current Swift package checks:

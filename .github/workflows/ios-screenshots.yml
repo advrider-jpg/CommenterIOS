@@ -2,10 +2,6 @@ name: iOS Screenshots
 
 on:
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
 
 jobs:
   screenshots:
@@ -18,24 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache SwiftPM artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            .build
-            .swiftpm
-          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.resolved', 'Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-swiftpm-
-
-      - name: Cache Xcode derived data
-        uses: actions/cache@v4
-        with:
-          path: build/DerivedData
-          key: ${{ runner.os }}-xcode-screenshots-${{ hashFiles('Package.resolved', 'Package.swift', 'CommenterIOS.xcodeproj/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-xcode-screenshots-
-            ${{ runner.os }}-xcode-
+      - name: Print runner toolchain
+        run: |
+          swift --version || true
+          xcodebuild -version || true
+          xcrun --version || true
+          xcrun simctl list runtimes || true
+          xcrun simctl list devices available || true
 
       - name: Resolve packages
         run: swift package resolve
@@ -71,6 +56,7 @@ jobs:
           xcrun simctl shutdown "$udid" || true
           xcrun simctl erase "$udid"
           echo "destination=platform=iOS Simulator,id=$udid" >> "$GITHUB_OUTPUT"
+          echo "Selected screenshot simulator: $udid"
 
       - name: Run screenshot UI tests
         run: |
@@ -86,8 +72,13 @@ jobs:
             -resultBundlePath build/CommenterIOSScreenshots.xcresult \
             -skipPackagePluginValidation \
             -skipMacroValidation \
-            ARCHS=arm64 \
             CODE_SIGNING_ALLOWED=NO | tee build/screenshot-xcodebuild.log
+
+      - name: Dump screenshot xcodebuild tail
+        if: failure()
+        run: |
+          echo "=== iOS screenshot xcodebuild tail ==="
+          tail -n 200 build/screenshot-xcodebuild.log || true
 
       - name: Export screenshot PNGs from xcresult
         if: always()

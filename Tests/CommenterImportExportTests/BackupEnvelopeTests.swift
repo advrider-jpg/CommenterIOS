@@ -105,9 +105,11 @@ final class BackupEnvelopeTests: XCTestCase {
         XCTAssertEqual(encryption["aad"] as? String, "backup-envelope-v2")
 
         let restored = try parseProjectBackup(serialized: encrypted, password: password)
+        var expected = fixtureProject()
+        expected.metadata.reportLayout = normalizeReportLayout(expected.metadata.reportLayout)
         XCTAssertEqual(restored.metadata.id, "p1")
         XCTAssertEqual(restored.results.first?.textType, "persuasive text")
-        XCTAssertEqual(try projectFingerprint(restored), try projectFingerprint(fixtureProject()))
+        XCTAssertEqual(try projectFingerprint(restored), try projectFingerprint(expected))
     }
 
     func testParsesV3WebCryptoEncryptedBackupFixture() throws {
