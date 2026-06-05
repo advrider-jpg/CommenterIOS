@@ -18,6 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Print runner toolchain
+        run: |
+          swift --version || true
+          xcodebuild -version || true
+          xcrun --version || true
+          xcrun simctl list runtimes || true
+          xcrun simctl list devices available || true
+
       - name: Cache SwiftPM artifacts
         uses: actions/cache@v4
         with:
@@ -71,6 +79,7 @@ jobs:
           xcrun simctl shutdown "$udid" || true
           xcrun simctl erase "$udid"
           echo "destination=platform=iOS Simulator,id=$udid" >> "$GITHUB_OUTPUT"
+          echo "Selected screenshot simulator: $udid"
 
       - name: Run screenshot UI tests
         run: |
@@ -86,8 +95,13 @@ jobs:
             -resultBundlePath build/CommenterIOSScreenshots.xcresult \
             -skipPackagePluginValidation \
             -skipMacroValidation \
-            ARCHS=arm64 \
             CODE_SIGNING_ALLOWED=NO | tee build/screenshot-xcodebuild.log
+
+      - name: Dump screenshot xcodebuild tail
+        if: failure()
+        run: |
+          echo "=== iOS screenshot xcodebuild tail ==="
+          tail -n 200 build/screenshot-xcodebuild.log || true
 
       - name: Export screenshot PNGs from xcresult
         if: always()

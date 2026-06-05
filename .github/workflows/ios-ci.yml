@@ -16,6 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Print runner toolchain
+        run: |
+          swift --version || true
+          xcodebuild -version || true
+          xcrun --version || true
+          xcrun simctl list runtimes || true
+          xcrun simctl list devices available || true
+
       - name: Cache SwiftPM artifacts
         uses: actions/cache@v4
         with:
@@ -52,6 +60,12 @@ jobs:
             -skipMacroValidation \
             build \
             CODE_SIGNING_ALLOWED=NO | tee build/ios-ci-xcodebuild.log
+
+      - name: Dump xcodebuild tail
+        if: failure()
+        run: |
+          echo "=== iOS CI xcodebuild tail ==="
+          tail -n 200 build/ios-ci-xcodebuild.log || true
 
       - name: Upload CI diagnostics
         if: always()
