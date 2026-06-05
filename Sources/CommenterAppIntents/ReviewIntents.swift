@@ -32,26 +32,24 @@ public struct OpenReportPreparationIntent: AppIntent {
 @available(iOS 17.0, macOS 14.0, *)
 public struct CommenterShortcuts: AppShortcutsProvider {
     public static var appShortcuts: [AppShortcut] {
-        [
-            AppShortcut(
-                intent: OpenAIReviewQueueIntent(),
-                phrases: [
-                    "Open AI review in \(.applicationName)",
-                    "Review AI drafts in \(.applicationName)"
-                ],
-                shortTitle: "AI Review",
-                systemImageName: "person.crop.circle.badge.checkmark"
-            ),
-            AppShortcut(
-                intent: OpenReportPreparationIntent(),
-                phrases: [
-                    "Prepare reports in \(.applicationName)",
-                    "Open report preparation in \(.applicationName)"
-                ],
-                shortTitle: "Prepare Reports",
-                systemImageName: "doc.badge.gearshape"
-            )
-        ]
+        AppShortcut(
+            intent: OpenAIReviewQueueIntent(),
+            phrases: [
+                "Open AI review in \(.applicationName)",
+                "Review AI drafts in \(.applicationName)"
+            ],
+            shortTitle: "AI Review",
+            systemImageName: "person.crop.circle.badge.checkmark"
+        )
+        AppShortcut(
+            intent: OpenReportPreparationIntent(),
+            phrases: [
+                "Prepare reports in \(.applicationName)",
+                "Open report preparation in \(.applicationName)"
+            ],
+            shortTitle: "Prepare Reports",
+            systemImageName: "doc.badge.gearshape"
+        )
     }
 }
 #endif
