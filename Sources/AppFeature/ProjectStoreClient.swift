@@ -39,7 +39,7 @@ public struct ProjectStoreClient: Sendable {
     public var deleteProject: @Sendable (_ id: String) async throws -> [ProjectSummary]
     public var importRosterFile: @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview
     public var importResultsFile: @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview
-    public var importBackup: @Sendable (_ url: URL) async throws -> Project
+    public var importBackup: @Sendable (_ url: URL, _ password: String?) async throws -> Project
     public var prepareBackup: @Sendable (_ project: Project) async throws -> URL
     public var prepareReportExport: @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
 
@@ -52,7 +52,7 @@ public struct ProjectStoreClient: Sendable {
         deleteProject: @escaping @Sendable (_ id: String) async throws -> [ProjectSummary],
         importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
         importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
-        importBackup: @escaping @Sendable (_ url: URL) async throws -> Project,
+        importBackup: @escaping @Sendable (_ url: URL, _ password: String?) async throws -> Project,
         prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL,
         prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
     ) {
@@ -145,9 +145,9 @@ extension ProjectStoreClient: DependencyKey {
                 )
             }
         },
-        importBackup: { url in
+        importBackup: { url, password in
             try withSecurityScopedAccess(to: url) {
-                try loadProjectBackupFile(from: url).project
+                try loadProjectBackupFile(from: url, password: password).project
             }
         },
         prepareBackup: { project in
@@ -192,7 +192,7 @@ extension ProjectStoreClient: DependencyKey {
         importResultsFile: { _, _ in
             throw ImportExportError.unavailable(format: .csv, reason: "Project store test dependency was not provided.")
         },
-        importBackup: { _ in
+        importBackup: { _, _ in
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },
         prepareBackup: { _ in

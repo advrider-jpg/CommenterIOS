@@ -24,6 +24,7 @@ public struct AppFeature: Sendable {
         public var pendingImport: PendingImport?
         public var projectCreationDraft: ProjectCreationDraft?
         public var activeImportKind: ImportWorkflowKind?
+        public var pendingEncryptedBackupURL: URL?
         public var rosterImportState: TabularImportState = .neverImported
         public var resultsImportState: TabularImportState = .neverImported
         public var lastPreparedFiles: [ImportExportFormat: PreparedFileRecord] = [:]
@@ -228,6 +229,9 @@ public struct AppFeature: Sendable {
         case rosterImportPicked(URL)
         case resultsImportPicked(URL)
         case backupImportPicked(URL)
+        case encryptedBackupPasswordRequired(URL)
+        case backupPasswordEntered(URL, String)
+        case backupPasswordCancelled
         case importCancelled
         case importPreviewPrepared(PendingImport)
         case confirmImportTapped

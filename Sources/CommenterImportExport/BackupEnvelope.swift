@@ -209,11 +209,11 @@ public func validateBackupPasswordForImport(_ password: String) -> BackupPasswor
 
 public func getBackupCollisionKind(
     projectId: String,
-    projects: [Project],
-    invalidProjects: [(id: String, reason: String)]
+    existingIds: [String],
+    invalidIds: [String]
 ) -> BackupCollisionKind {
-    if projects.contains(where: { $0.metadata.id == projectId }) { return .valid }
-    if invalidProjects.contains(where: { $0.id == projectId }) { return .invalid }
+    if existingIds.contains(projectId) { return .valid }
+    if invalidIds.contains(projectId) { return .invalid }
     return .none
 }
 

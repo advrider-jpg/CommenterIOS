@@ -1091,7 +1091,7 @@ final class AppFeatureTests: XCTestCase {
                     XCTAssertEqual(reason, .beforeImportReplace)
                     return imported
                 },
-                importBackup: { _ in imported }
+                importBackup: { _, _ in imported }
             )
         }
 
@@ -1370,7 +1370,7 @@ private func testProjectStoreClient(
     deleteProject: @escaping @Sendable (_ id: String) async throws -> [ProjectSummary] = { _ in [] },
     importRosterFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in importPreview(format: .csv, kind: .roster, count: 0, project: project) },
     importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in importPreview(format: .csv, kind: .results, count: 0, project: project) },
-    importBackup: @escaping @Sendable (_ url: URL) async throws -> Project = { _ in project(id: "imported") },
+    importBackup: @escaping @Sendable (_ url: URL, _ password: String?) async throws -> Project = { _, _ in project(id: "imported") },
     prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL = { _ in URL(fileURLWithPath: "/tmp/report-writer-backup.json") },
     prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL = { _, format in URL(fileURLWithPath: "/tmp/report-writer-report.\(format.rawValue)") }
 ) -> ProjectStoreClient {

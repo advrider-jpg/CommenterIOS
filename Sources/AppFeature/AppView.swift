@@ -13,6 +13,7 @@ public struct AppView: View {
     @State private var isExportingFile = false
     @State private var sharePresentation: SharePresentation?
     @State private var projectDeletionCandidate: ProjectDeletionCandidate?
+    @State private var encryptedBackupPassword = ""
 
     public init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -198,6 +199,27 @@ public struct AppView: View {
                 }
             } message: { _ in
                 Text("A recovery snapshot of the verified local project will be created before the project file is removed. Save or reopen first if there are unsaved edits.")
+            }
+            .alert(
+                "Encrypted backup",
+                isPresented: Binding(
+                    get: { viewStore.pendingEncryptedBackupURL != nil },
+                    set: { _ in }
+                ),
+                presenting: viewStore.pendingEncryptedBackupURL
+            ) { url in
+                SecureField("Backup password", text: $encryptedBackupPassword)
+                Button("Import") {
+                    let password = encryptedBackupPassword
+                    encryptedBackupPassword = ""
+                    viewStore.send(.backupPasswordEntered(url, password))
+                }
+                Button("Cancel", role: .cancel) {
+                    encryptedBackupPassword = ""
+                    viewStore.send(.backupPasswordCancelled)
+                }
+            } message: { _ in
+                Text("Enter the password used to encrypt this backup.")
             }
         }
     }
