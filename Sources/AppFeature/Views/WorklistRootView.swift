@@ -89,6 +89,8 @@ struct WorklistRootView: View {
     let onConfirmImport: () -> Void
     let onCancelImportPreview: () -> Void
 
+    @State private var activeStudentEditorRoute: StudentEditorRoute?
+
     var body: some View {
         NavigationStack {
             List {
@@ -138,6 +140,7 @@ struct WorklistRootView: View {
                         onInternalNoteChanged: onStudentInternalNoteChanged,
                         onAttitudeDescriptorChanged: onStudentAttitudeDescriptorChanged,
                         onImportRoster: onImportRoster,
+                        onOpenStudentEditor: { activeStudentEditorRoute = StudentEditorRoute(studentId: $0) },
                         isDisabled: isEditingLocked
                     )
                     .worklistStationerySectionRows()
@@ -258,8 +261,33 @@ struct WorklistRootView: View {
             .navigationTitle(project?.metadata.name ?? "Work list")
             .commenterLargeNavigationTitle()
             .accessibilityIdentifier("worklist-list")
+            .navigationDestination(item: $activeStudentEditorRoute) { route in
+                studentEditorDestination(for: route)
+            }
         }
         .accessibilityIdentifier("worklist-page")
+    }
+
+    @ViewBuilder private func studentEditorDestination(for route: StudentEditorRoute) -> some View {
+        if let student = project?.roster.first(where: { $0.id == route.studentId }) {
+            StudentEditorView(
+                student: student,
+                isDisabled: isEditingLocked,
+                onFirstNameChanged: { onStudentFirstNameChanged(route.studentId, $0) },
+                onLastNameChanged: { onStudentLastNameChanged(route.studentId, $0) },
+                onYearChanged: { onStudentYearChanged(route.studentId, $0) },
+                onGenderChanged: { onStudentGenderChanged(route.studentId, $0) },
+                onPronounsChanged: { onStudentPronounsChanged(route.studentId, $0) },
+                onInternalNoteChanged: { onStudentInternalNoteChanged(route.studentId, $0) },
+                onAttitudeDescriptorChanged: { onStudentAttitudeDescriptorChanged(route.studentId, $0) },
+                onDelete: {
+                    onDeleteStudent(route.studentId)
+                    activeStudentEditorRoute = nil
+                }
+            )
+        } else {
+            StudentEditorUnavailableView(studentId: route.studentId)
+        }
     }
 
     private var workflowStatusSection: some View {

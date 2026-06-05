@@ -51,6 +51,8 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         capture("05-roster-before-student")
         addStudent.tap()
 
+        let newRow = element("student-row-\(screenshotStudentId)")
+        waitForElement(newRow, named: "new student row")
         openStudentEditor(studentId: screenshotStudentId)
 
         let firstName = waitForAny(textFields(identifier: "student-first-name-\(screenshotStudentId)", label: "First name"), timeout: 10)
@@ -188,14 +190,6 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         }
     }
 
-    private func waitForStudentEditor(studentId: String) {
-        if waitForStudentEditorIfPresent(studentId: studentId, timeout: 10) {
-            return
-        }
-        captureFailureContext("student-editor-\(studentId)")
-        XCTFail("Expected student editor for \(studentId) to open after tapping the roster row.")
-    }
-
     private func waitForStudentEditorIfPresent(studentId: String, timeout: TimeInterval) -> Bool {
         let editor = element("student-editor-\(studentId)")
         let firstName = app.textFields["student-first-name-\(studentId)"]
@@ -212,18 +206,60 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     private func openStudentEditor(studentId: String) {
         let rowIdentifier = "student-row-\(studentId)"
         let row = scrollToAnyInWorklist(
-            [app.buttons[rowIdentifier]],
+            [app.buttons[rowIdentifier], element(rowIdentifier)],
             name: "new student row",
-            requireHittable: true
+            requireHittable: false
         )
 
-        tapElement(row, named: "new student row")
+        scrollElementIntoSafeTapZone(row, named: "new student row", container: worklistScrollContainer())
+        guard row.isHittable else {
+            captureFailureContext("student-row-\(studentId)-not-hittable")
+            XCTFail("Expected new student row to be hittable after scrolling it away from the footer.")
+            return
+        }
+        row.tap()
         if waitForStudentEditorIfPresent(studentId: studentId, timeout: 5) {
             return
         }
 
         captureFailureContext("student-editor-\(studentId)")
         XCTFail("Expected student editor for \(studentId) to open after tapping the roster row.")
+    }
+
+    private func scrollElementIntoSafeTapZone(_ element: XCUIElement, named name: String, container: XCUIElement) {
+        waitForElement(element, named: name)
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            let frame = element.frame
+            let safeRange = safeVerticalTapRange()
+            if frame.midY >= safeRange.lowerBound && frame.midY <= safeRange.upperBound && isVisibleOnScreen(element) {
+                return
+            }
+            if frame.midY > safeRange.upperBound {
+                scrollWithin(container, up: true)
+            } else {
+                scrollWithin(container, up: false)
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.15))
+        }
+
+        let frame = element.frame
+        let safeRange = safeVerticalTapRange()
+        if !(frame.midY >= safeRange.lowerBound && frame.midY <= safeRange.upperBound) {
+            captureFailureContext("\(name)-safe-zone")
+            XCTFail("Expected \(name) to be away from the footer before tapping. frame=\(frame), safeY=\(safeRange)")
+        }
+    }
+
+    private func safeVerticalTapRange() -> ClosedRange<CGFloat> {
+        let appFrame = app.frame
+        let tabTop = app.tabBars.firstMatch.exists ? app.tabBars.firstMatch.frame.minY : appFrame.maxY
+        let lower = appFrame.minY + 140
+        let upper = min(tabTop, appFrame.maxY) - 120
+        if upper > lower {
+            return lower...upper
+        }
+        return (appFrame.midY - 40)...(appFrame.midY + 40)
     }
 
     private func waitForEnabledElement(_ element: XCUIElement, named name: String) {

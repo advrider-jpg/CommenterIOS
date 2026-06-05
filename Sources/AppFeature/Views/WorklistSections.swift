@@ -167,9 +167,8 @@ struct RosterSection: View {
     let onInternalNoteChanged: (String, String) -> Void
     let onAttitudeDescriptorChanged: (String, String) -> Void
     let onImportRoster: () -> Void
+    let onOpenStudentEditor: (String) -> Void
     let isDisabled: Bool
-
-    @State private var activeStudentEditorRoute: StudentEditorRoute?
 
     var body: some View {
         Section {
@@ -223,7 +222,7 @@ struct RosterSection: View {
                 WorklistNotebookCard {
                     ForEach(project.roster) { student in
                         Button {
-                            activeStudentEditorRoute = StudentEditorRoute(studentId: student.id)
+                            onOpenStudentEditor(student.id)
                         } label: {
                             WorklistActionRow(
                                 title: fullStudentName(student),
@@ -232,6 +231,7 @@ struct RosterSection: View {
                                 tone: .local,
                                 isEnabled: !isDisabled
                             )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -256,27 +256,6 @@ struct RosterSection: View {
         } header: {
             WorklistTapeHeader("Roster", step: 2, detail: "Students required before results and drafts", tone: .local)
         }
-        .navigationDestination(item: $activeStudentEditorRoute) { route in
-            if let student = project.roster.first(where: { $0.id == route.studentId }) {
-                StudentEditorView(
-                    student: student,
-                    isDisabled: isDisabled,
-                    onFirstNameChanged: { onFirstNameChanged(route.studentId, $0) },
-                    onLastNameChanged: { onLastNameChanged(route.studentId, $0) },
-                    onYearChanged: { onYearChanged(route.studentId, $0) },
-                    onGenderChanged: { onGenderChanged(route.studentId, $0) },
-                    onPronounsChanged: { onPronounsChanged(route.studentId, $0) },
-                    onInternalNoteChanged: { onInternalNoteChanged(route.studentId, $0) },
-                    onAttitudeDescriptorChanged: { onAttitudeDescriptorChanged(route.studentId, $0) },
-                    onDelete: {
-                        onDeleteStudent(route.studentId)
-                        activeStudentEditorRoute = nil
-                    }
-                )
-            } else {
-                StudentEditorUnavailableView(studentId: route.studentId)
-            }
-        }
     }
 
     private var rosterValidationMessages: [String] {
@@ -296,13 +275,13 @@ struct RosterSection: View {
     }
 }
 
-private struct StudentEditorRoute: Identifiable, Hashable {
+struct StudentEditorRoute: Identifiable, Hashable {
     let studentId: String
 
     var id: String { studentId }
 }
 
-private struct StudentEditorUnavailableView: View {
+struct StudentEditorUnavailableView: View {
     let studentId: String
 
     var body: some View {
@@ -324,7 +303,7 @@ private struct StudentEditorUnavailableView: View {
     }
 }
 
-private struct StudentEditorView: View {
+struct StudentEditorView: View {
     let student: Student
     let isDisabled: Bool
     let onFirstNameChanged: (String) -> Void

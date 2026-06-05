@@ -749,3 +749,6 @@ Append material work history here. Keep entries short, dated, and factual.
   state, simplified the screenshot test to one stable row tap, and split stale
   AI regression coverage across polish, tone, evidence-draft, single-accept,
   and bulk-accept paths.
+- Hoisted student-editor route state to `WorklistRootView`, kept roster rows as
+  full-width buttons, and made the screenshot test scroll the new row into a
+  safe central tap zone before activation.
