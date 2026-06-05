@@ -356,8 +356,7 @@ private struct StudentEditorView: View {
     @ViewBuilder private var studentPersonalFields: some View {
         WorklistFormRow(label: "Pronouns") {
             TextField("they/them, she/her, he/him", text: Binding(get: { student.pronouns ?? "" }, set: onPronounsChanged))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+                .commenterUncapitalizedTextInput()
                 .disabled(isDisabled)
                 .accessibilityIdentifier("student-pronouns-\(student.id)")
         }

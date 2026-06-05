@@ -178,7 +178,7 @@ public func aiAvailabilityDescription(_ status: AppFeature.AIAvailabilityStatus)
         return "Not checked"
     case .checking:
         return "Checking local Apple Intelligence availability"
-    case let .checked(.available):
+    case .checked(.available):
         return "Available on this device"
     case let .checked(.unavailable(reason)):
         return "Unavailable - \(reason.rawValue)"
