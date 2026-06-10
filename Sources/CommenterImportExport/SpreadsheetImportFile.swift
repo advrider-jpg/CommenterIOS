@@ -101,23 +101,41 @@ public enum SpreadsheetImportFile {
     public static func parseXLS(_ url: URL, label: String, maxRows: Int = CSVParser.maxImportRows) throws -> CSVParseResult {
         let stream: Data
         let data = try Data(contentsOf: url)
+        let usedFastPath: Bool
         if data.hasOLECompoundFileSignature {
             do {
                 stream = try workbookStreamFromCompoundFile(data)
+                usedFastPath = true
             } catch {
+                usedFastPath = false
                 stream = try readOLEWorkbookStream(url, label: label)
             }
         } else {
+            usedFastPath = false
             stream = try readOLEWorkbookStream(url, label: label)
         }
 
         let rows: [[String]]
         do {
             rows = try parseBIFFRows(stream)
-        } catch let error as CSVParserError {
-            throw error
         } catch {
-            throw SpreadsheetImportFileError.unreadableWorkbook(label)
+            if usedFastPath {
+                do {
+                    rows = try parseBIFFRows(try readOLEWorkbookStream(url, label: label))
+                } catch let fallbackError {
+                    if let parserError = error as? CSVParserError {
+                        throw parserError
+                    }
+                    if let parserError = fallbackError as? CSVParserError {
+                        throw parserError
+                    }
+                    throw SpreadsheetImportFileError.unreadableWorkbook(label)
+                }
+            } else if let parserError = error as? CSVParserError {
+                throw parserError
+            } else {
+                throw SpreadsheetImportFileError.unreadableWorkbook(label)
+            }
         }
         let normalized = try normalizeWorksheetRows(rows, label: label)
         guard !normalized.isEmpty else {
@@ -221,7 +239,6 @@ private func parseOOXMLRows(_ xml: String, sharedStrings: [String], label: Strin
 
 private func workbookStreamFromCompoundFile(_ data: Data) throws -> Data {
     let sectorSize = 512
-    func sectorOffset(_ sector: Int) -> Int { sectorSize + (sector * sectorSize) }
 
     guard data.count >= sectorSize,
           data.prefix(8) == Data([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
@@ -230,31 +247,361 @@ private func workbookStreamFromCompoundFile(_ data: Data) throws -> Data {
         throw LegacyXLSWorkbookError.invalidCompoundFile
     }
 
-    let directoryOffset = sectorOffset(Int(data.uint32LE(at: 48)))
-    guard directoryOffset + sectorSize <= data.count else {
+    let headerMiniSectorShift = Int(data.uint16LE(at: 32))
+    guard headerMiniSectorShift > 0,
+          headerMiniSectorShift < 16
+    else {
         throw LegacyXLSWorkbookError.invalidCompoundFile
     }
 
-    let directory = Data(data[directoryOffset..<directoryOffset + sectorSize])
-    for entryOffset in stride(from: 0, to: directory.count, by: 128) {
-        let entry = Data(directory[entryOffset..<entryOffset + 128])
-        guard directoryEntryName(entry) == "Workbook" || directoryEntryName(entry) == "Book" else { continue }
-        let streamOffset = sectorOffset(Int(entry.uint32LE(at: 116)))
-        let streamSizeRaw = entry.uint64LE(at: 120)
-        guard streamSizeRaw > 0,
-              streamSizeRaw <= UInt64(SpreadsheetImportFile.maxWorkbookUncompressedBytes),
-              streamSizeRaw <= UInt64(Int.max)
-        else {
-            throw LegacyXLSWorkbookError.invalidCompoundFile
-        }
-        let streamSize = Int(streamSizeRaw)
-        guard streamOffset >= 0, streamSize <= data.count - streamOffset else {
-            throw LegacyXLSWorkbookError.invalidCompoundFile
-        }
-        return Data(data[streamOffset..<streamOffset + streamSize])
+    let miniSectorSize = 1 << headerMiniSectorShift
+    let maxFATSectorCount = Int(data.uint32LE(at: 44))
+    guard maxFATSectorCount > 0 else {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+    let fatTable = try readOLEFatTable(
+        data: data,
+        sectorSize: sectorSize,
+        expectedFATSectorCount: maxFATSectorCount
+    )
+
+    let directory = try readOLESectorChain(
+        in: data,
+        startSector: Int(data.uint32LE(at: 48)),
+        sectorSize: sectorSize,
+        fat: fatTable
+    )
+    let directoryEntries = parseOLEDirectoryEntries(Data(directory))
+
+    guard
+        let rootEntry = directoryEntries.first(where: { $0.objectType == 5 }),
+        let workbookEntry = directoryEntries.first(where: {
+            $0.name == "Workbook" || $0.name == "Book"
+        })
+    else {
+        throw LegacyXLSWorkbookError.missingWorkbookStream
     }
 
-    throw LegacyXLSWorkbookError.missingWorkbookStream
+    guard workbookEntry.streamSize > 0,
+          workbookEntry.streamSize <= SpreadsheetImportFile.maxWorkbookUncompressedBytes,
+          workbookEntry.streamSize <= Int.max
+    else {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+
+    let miniStreamCutoff = Int(data.uint32LE(at: 56))
+    let firstMiniFATSector = Int(data.uint32LE(at: 60))
+    let miniFATSectorCount = Int(data.uint32LE(at: 64))
+    if workbookEntry.streamSize <= miniStreamCutoff,
+       firstMiniFATSector != 0xffffffff,
+       miniFATSectorCount > 0,
+       rootEntry.streamSize > 0 {
+        let miniFAT = try readOLEMiniFAT(
+            in: data,
+            sectorSize: sectorSize,
+            fat: fatTable,
+            firstMiniFATSector: firstMiniFATSector,
+            miniFATSectorCount: miniFATSectorCount
+        )
+        let miniStream = try readOLEStream(
+            in: data,
+            sectorSize: sectorSize,
+            startSector: rootEntry.startSector,
+            streamSize: rootEntry.streamSize,
+            fat: fatTable
+        )
+        return try readOLEMiniStream(
+            miniStream: miniStream,
+            miniSectorSize: miniSectorSize,
+            miniFAT: miniFAT,
+            startSector: workbookEntry.startSector,
+            streamSize: workbookEntry.streamSize
+        )
+    }
+
+    return try readOLEStream(
+        in: data,
+        sectorSize: sectorSize,
+        startSector: workbookEntry.startSector,
+        streamSize: workbookEntry.streamSize,
+        fat: fatTable
+    )
+}
+
+private struct OLEDirectoryEntry {
+    let name: String
+    let objectType: UInt8
+    let startSector: Int
+    let streamSize: Int
+}
+
+private func readOLEFatTable(
+    data: Data,
+    sectorSize: Int,
+    expectedFATSectorCount: Int
+) throws -> [UInt32] {
+    let startDIFATSector = Int(data.uint32LE(at: 68))
+    let extraDIFATSectors = Int(data.uint32LE(at: 72))
+    let freeSector: UInt32 = 0xffffffff
+    let endOfChain: UInt32 = 0xfffffffe
+    let noStream: UInt32 = 0xffffffff
+
+    var fatSectorIndices = Array((0..<109).compactMap { index in
+        let sector = data.uint32LE(at: 76 + (index * 4))
+        return sector == freeSector ? nil : sector
+    })
+
+    var nextDIFAT = startDIFATSector
+    var visitedDIFATSectors = Set<Int>()
+    var remainingDIFATSectors = extraDIFATSectors
+    while remainingDIFATSectors > 0 && nextDIFAT != Int(endOfChain) {
+        guard !visitedDIFATSectors.contains(nextDIFAT) else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        visitedDIFATSectors.insert(nextDIFAT)
+        guard nextDIFAT != Int(noStream) else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+
+        let base = sectorOffset(nextDIFAT, sectorSize: sectorSize)
+        let nextBase = base + sectorSize
+        guard base >= sectorSize, nextBase <= data.count else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        for entryOffset in stride(from: base, to: nextBase - 4, by: 4) {
+            fatSectorIndices.append(data.uint32LE(at: entryOffset))
+        }
+        let nextSector = Int(data.uint32LE(at: nextBase - 4))
+        remainingDIFATSectors -= 1
+        nextDIFAT = nextSector
+        if nextSector == Int(endOfChain) {
+            break
+        }
+    }
+    if remainingDIFATSectors > 0 && nextDIFAT != Int(endOfChain) {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+
+    guard expectedFATSectorCount <= fatSectorIndices.count else {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+
+    var fat: [UInt32] = []
+    for fatSector in fatSectorIndices.prefix(expectedFATSectorCount) {
+        if fatSector == freeSector { continue }
+        let sector = Int(fatSector)
+        guard sector >= 0 && sector != Int(freeSector) else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        let base = sectorOffset(sector, sectorSize: sectorSize)
+        let nextBase = base + sectorSize
+        guard base >= sectorSize, nextBase <= data.count else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        for entryOffset in stride(from: base, to: nextBase, by: 4) {
+            fat.append(data.uint32LE(at: entryOffset))
+        }
+    }
+    return fat
+}
+
+private func readOLESectorChain(
+    in data: Data,
+    startSector: Int,
+    sectorSize: Int,
+    fat: [UInt32]
+) throws -> Data {
+    let chain = try readOLESectorIndices(startSector: startSector, sectorCountLimit: nil, sectorSize: sectorSize, fat: fat)
+    var output = Data()
+    for sector in chain {
+        let start = sectorOffset(sector, sectorSize: sectorSize)
+        let end = start + sectorSize
+        guard start >= sectorSize, end <= data.count else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        output.append(contentsOf: data[start..<end])
+    }
+    return output
+}
+
+private func readOLEStream(
+    in data: Data,
+    sectorSize: Int,
+    startSector: Int,
+    streamSize: Int,
+    fat: [UInt32]
+) throws -> Data {
+    let chain = try readOLESectorIndices(startSector: startSector, sectorCountLimit: nil, sectorSize: sectorSize, fat: fat)
+    let neededBytes = (chain.count * sectorSize)
+    guard streamSize > 0, streamSize <= neededBytes else {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+
+    var stream = Data()
+    stream.reserveCapacity(min(neededBytes, SpreadsheetImportFile.maxWorkbookUncompressedBytes))
+    for sector in chain {
+        let start = sectorOffset(sector, sectorSize: sectorSize)
+        let end = start + sectorSize
+        guard start >= sectorSize, end <= data.count else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        stream.append(contentsOf: data[start..<end])
+    }
+    return Data(stream.prefix(streamSize))
+}
+
+private func readOLEMiniFAT(
+    in data: Data,
+    sectorSize: Int,
+    fat: [UInt32],
+    firstMiniFATSector: Int,
+    miniFATSectorCount: Int
+) throws -> [UInt32] {
+    guard miniFATSectorCount > 0 else { throw LegacyXLSWorkbookError.invalidCompoundFile }
+    let chain = try readOLESectorIndices(
+        startSector: firstMiniFATSector,
+        sectorCountLimit: miniFATSectorCount,
+        sectorSize: sectorSize,
+        fat: fat
+    )
+    guard chain.count == miniFATSectorCount else {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+    var entries: [UInt32] = []
+    for sector in chain {
+        let base = sectorOffset(sector, sectorSize: sectorSize)
+        let nextBase = base + sectorSize
+        for offset in stride(from: base, to: nextBase, by: 4) {
+            entries.append(data.uint32LE(at: offset))
+        }
+    }
+    return entries
+}
+
+private func readOLEMiniStream(
+    miniStream: Data,
+    miniSectorSize: Int,
+    miniFAT: [UInt32],
+    startSector: Int,
+    streamSize: Int
+) throws -> Data {
+    let chain = try readOLEMiniFATSectorIndices(
+        startSector: startSector,
+        streamSize: streamSize,
+        sectorSize: miniSectorSize,
+        miniFAT: miniFAT
+    )
+    var output = Data()
+    output.reserveCapacity(min(streamSize, SpreadsheetImportFile.maxWorkbookUncompressedBytes))
+    let maxSectorOffset = miniStream.count - miniSectorSize
+    for miniSector in chain {
+        let start = miniSector * miniSectorSize
+        let end = start + miniSectorSize
+        guard start >= 0, end <= miniStream.count, start <= maxSectorOffset else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        output.append(contentsOf: miniStream[start..<end])
+    }
+    guard output.count >= streamSize else {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+    return Data(output.prefix(streamSize))
+}
+
+private func readOLESectorIndices(
+    startSector: Int,
+    sectorCountLimit: Int?,
+    sectorSize: Int,
+    fat: [UInt32]
+) throws -> [Int] {
+    let endOfChain: UInt32 = 0xfffffffe
+    let freeSector: UInt32 = 0xffffffff
+    let noStream: UInt32 = 0xffffffff
+    let fatSector: UInt32 = 0xfffffffd
+    let miniFatSector: UInt32 = 0xfffffffc
+
+    guard startSector != 0xfffffffe else { return [] }
+    if startSector < 0 || startSector == Int(noStream) {
+        throw LegacyXLSWorkbookError.invalidCompoundFile
+    }
+
+    var chain: [Int] = []
+    var current = UInt32(startSector)
+    var visited = Set<UInt32>()
+    while current != endOfChain {
+        if current == noStream || current == freeSector || current == fatSector || current == miniFatSector {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        if current >= UInt32(fat.count) {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        if !visited.insert(current).inserted {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        chain.append(Int(current))
+
+        if let limit = sectorCountLimit, chain.count > limit {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        current = fat[Int(current)]
+    }
+    return chain
+}
+
+private func readOLEMiniFATSectorIndices(
+    startSector: Int,
+    streamSize: Int,
+    sectorSize: Int,
+    miniFAT: [UInt32]
+) throws -> [Int] {
+    let endOfChain: UInt32 = 0xfffffffe
+    let freeSector: UInt32 = 0xffffffff
+    let noStream: UInt32 = 0xffffffff
+
+    if streamSize == 0 { return [] }
+    if startSector < 0 { throw LegacyXLSWorkbookError.invalidCompoundFile }
+
+    var chain: [Int] = []
+    var current = UInt32(startSector)
+    var visited = Set<UInt32>()
+    let maxNeededSectors = (streamSize + sectorSize - 1) / sectorSize
+    while current != endOfChain {
+        if current == freeSector || current == noStream { throw LegacyXLSWorkbookError.invalidCompoundFile }
+        if current >= UInt32(miniFAT.count) {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        if !visited.insert(current).inserted {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        chain.append(Int(current))
+        if chain.count >= maxNeededSectors { break }
+        current = miniFAT[Int(current)]
+    }
+    return chain
+}
+
+private func parseOLEDirectoryEntries(_ data: Data) -> [OLEDirectoryEntry] {
+    var entries: [OLEDirectoryEntry] = []
+    for entryOffset in stride(from: 0, to: data.count, by: 128) {
+        let entryEnd = entryOffset + 128
+        guard entryEnd <= data.count else { break }
+        let entry = Data(data[entryOffset..<entryEnd])
+        let name = directoryEntryName(entry)
+        if name.isEmpty { continue }
+        let streamSizeRaw = entry.uint64LE(at: 120)
+        guard streamSizeRaw <= UInt64(Int.max) else { continue }
+        entries.append(OLEDirectoryEntry(
+            name: name,
+            objectType: entry[66],
+            startSector: Int(entry.uint32LE(at: 116)),
+            streamSize: Int(streamSizeRaw)
+        ))
+    }
+    return entries
+}
+
+private func sectorOffset(_ sector: Int, sectorSize: Int) -> Int {
+    sectorSize + (sector * sectorSize)
 }
 
 private func readOLEWorkbookStream(_ url: URL, label: String) throws -> Data {

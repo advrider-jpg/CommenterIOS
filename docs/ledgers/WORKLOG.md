@@ -2,6 +2,16 @@
 
 Append material work history here. Keep entries short, dated, and factual.
 
+## 2026-06-10 - Legacy XLS OLE fast-path chain fix
+
+- Updated legacy `.xls` fast-path extraction to follow OLE directory/FAT/DIFAT
+  and mini-FAT chains before slicing the workbook stream.
+- Added OLEKit fallback when the fast-path stream fails BIFF parsing so non-
+  contiguous or mini-stream layout cases continue to parse through authoritative
+  OLEKit behavior.
+- Did not run Swift/Xcode validation locally (Windows environment lacks the
+  required toolchain).
+
 ## 2026-06-10 - Release-hardening patch applied
 
 - Merged the user-provided `commenter-ios-release-hardening.patch` into the repo.
