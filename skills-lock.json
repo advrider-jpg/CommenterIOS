@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "audit-xcode-security-settings": {
+      "source": "wisdom-in-a-nutshell/agents",
+      "sourceType": "github",
+      "skillPath": "skills-source/external/audit-xcode-security-settings/SKILL.md",
+      "computedHash": "ffca62ba2f37b4478cd9a30fce9d3977035ca62efab9eed0cb0d164bbba08ef6"
+    },
+    "c-bounds-safety": {
+      "source": "wisdom-in-a-nutshell/agents",
+      "sourceType": "github",
+      "skillPath": "skills-source/external/c-bounds-safety/SKILL.md",
+      "computedHash": "b4dd0e014b7cb87bbcc499d22f6a3778e22e96d4826e48690807fd80a30f6792"
+    },
+    "device-interaction": {
+      "source": "wisdom-in-a-nutshell/agents",
+      "sourceType": "github",
+      "skillPath": "skills-source/external/device-interaction/SKILL.md",
+      "computedHash": "0c5227ece0491ae5b960a30f38d6416ea9e789aa936147cc671de66537e2c5e4"
+    },
+    "swiftui-specialist": {
+      "source": "wisdom-in-a-nutshell/agents",
+      "sourceType": "github",
+      "skillPath": "skills-source/external/swiftui-specialist/SKILL.md",
+      "computedHash": "cae250bbeed74d8811612bb1389b4474409b985681241e092e30c0fec253d34c"
+    },
+    "swiftui-whats-new-27": {
+      "source": "wisdom-in-a-nutshell/agents",
+      "sourceType": "github",
+      "skillPath": "skills-source/external/swiftui-whats-new-27/SKILL.md",
+      "computedHash": "fcdc4315bce75b10bc2850327c200c6b36960feee268f4b17d97b605d41241c7"
+    },
+    "test-modernizer": {
+      "source": "wisdom-in-a-nutshell/agents",
+      "sourceType": "github",
+      "skillPath": "skills-source/external/test-modernizer/SKILL.md",
+      "computedHash": "d3f20ce87c81690a4d133b5f63e731650fde4b61907e035cbb185ffc83e6ebd7"
+    },
+    "uikit-app-modernization": {
+      "source": "wisdom-in-a-nutshell/agents",
+      "sourceType": "github",
+      "skillPath": "skills-source/external/uikit-app-modernization/SKILL.md",
+      "computedHash": "91bbc8aa9a92540c40d566e4403985feabfa2bd1dd9fdf6416417326fd7562de"
+    }
+  }
+}
