@@ -24,12 +24,12 @@ let package = Package(
         .executable(name: "CommenterIOSApp", targets: ["CommenterIOSApp"])
     ],
     dependencies: [
-        .package(url: "https://github.com/CoreOffice/CoreXLSX.git", .upToNextMinor(from: "0.14.1")),
-        .package(url: "https://github.com/CoreOffice/OLEKit.git", .upToNextMinor(from: "0.2.0")),
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.10.0"),
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        .package(url: "https://github.com/dehesa/CodableCSV.git", from: "0.6.7"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0")
+        .package(url: "https://github.com/CoreOffice/CoreXLSX.git", exact: "0.14.1"),
+        .package(url: "https://github.com/CoreOffice/OLEKit.git", exact: "0.2.0"),
+        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.10.0"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.0"),
+        .package(url: "https://github.com/dehesa/CodableCSV.git", exact: "0.6.7"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", exact: "1.17.0")
     ],
     targets: [
         .target(name: "CommenterDomain"),
@@ -94,7 +94,7 @@ let package = Package(
         .executableTarget(
             name: "CommenterIOSApp",
             dependencies: ["AppFeature"],
-            resources: [.copy("Resources/PrivacyInfo.xcprivacy")]
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "CommenterDomainTests",

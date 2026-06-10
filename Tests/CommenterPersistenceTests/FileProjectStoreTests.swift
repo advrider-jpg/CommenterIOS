@@ -123,6 +123,21 @@ final class FileProjectStoreTests: XCTestCase {
         }
     }
 
+    func testSaveRejectsProjectIDsThatAreNotStorageSafe() async throws {
+        let root = temporaryRoot()
+        let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })
+        _ = try store.saveProject(fixtureProject(id: "p-1", name: "Existing"))
+
+        do {
+            _ = try store.saveProject(fixtureProject(id: "p/1", name: "Unsafe"))
+            XCTFail("Expected unsafe project identifiers to be rejected before filesystem mapping")
+        } catch ProjectStoreError.unsafeProjectIdentifier(let id) {
+            XCTAssertEqual(id, "p/1")
+            let loaded = try await store.loadProject(id: "p-1")
+            XCTAssertEqual(loaded.metadata.name, "Existing")
+        }
+    }
+
     func testTamperedProjectFailsReadVerification() throws {
         let root = temporaryRoot()
         let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })

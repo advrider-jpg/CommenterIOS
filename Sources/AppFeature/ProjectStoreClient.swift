@@ -42,6 +42,8 @@ public struct ProjectStoreClient: Sendable {
     public var importBackup: @Sendable (_ url: URL, _ password: String?) async throws -> Project
     public var prepareBackup: @Sendable (_ project: Project) async throws -> URL
     public var prepareReportExport: @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
+    public var discardPreparedFile: @Sendable (_ url: URL) async -> Void
+    public var purgeStalePreparedFiles: @Sendable () async -> Void
 
     public init(
         listProjects: @escaping @Sendable () async throws -> [ProjectSummary],
@@ -54,7 +56,9 @@ public struct ProjectStoreClient: Sendable {
         importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
         importBackup: @escaping @Sendable (_ url: URL, _ password: String?) async throws -> Project,
         prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL,
-        prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
+        prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL,
+        discardPreparedFile: @escaping @Sendable (_ url: URL) async -> Void = { _ in },
+        purgeStalePreparedFiles: @escaping @Sendable () async -> Void = {}
     ) {
         self.listProjects = listProjects
         self.listProjectDiagnostics = listProjectDiagnostics ?? {
@@ -69,6 +73,8 @@ public struct ProjectStoreClient: Sendable {
         self.importBackup = importBackup
         self.prepareBackup = prepareBackup
         self.prepareReportExport = prepareReportExport
+        self.discardPreparedFile = discardPreparedFile
+        self.purgeStalePreparedFiles = purgeStalePreparedFiles
     }
 }
 
@@ -151,21 +157,30 @@ extension ProjectStoreClient: DependencyKey {
             }
         },
         prepareBackup: { project in
-            let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("ReportWriterExports", isDirectory: true)
-            return try prepareProjectBackupFile(project: project, directory: directory).url
+            let directory = try prepareProtectedTemporaryExportDirectory()
+            let prepared = try prepareProjectBackupFile(project: project, directory: directory).url
+            try? applyTemporaryFileProtection(to: prepared)
+            return prepared
         },
         prepareReportExport: { project, format in
-            let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("ReportWriterExports", isDirectory: true)
+            let directory = try prepareProtectedTemporaryExportDirectory()
+            let prepared: URL
             switch format {
             case .docx:
-                return try prepareReportDocumentFile(project: project, format: format, directory: directory).url
+                prepared = try prepareReportDocumentFile(project: project, format: format, directory: directory).url
             case .xlsx, .xls:
-                return try prepareReviewWorkbookFile(project: project, format: format, directory: directory).url
+                prepared = try prepareReviewWorkbookFile(project: project, format: format, directory: directory).url
             case .csv, .backupJSON:
                 throw ReportExportPreparationError.unsupportedFormat(format)
             }
+            try? applyTemporaryFileProtection(to: prepared)
+            return prepared
+        },
+        discardPreparedFile: { url in
+            discardOwnedTemporaryExport(url)
+        },
+        purgeStalePreparedFiles: {
+            purgeOldTemporaryExports(olderThanSeconds: 60 * 60 * 12)
         }
     )
 
@@ -200,7 +215,9 @@ extension ProjectStoreClient: DependencyKey {
         },
         prepareReportExport: { _, format in
             throw ImportExportError.unavailable(format: format, reason: "Project store test dependency was not provided.")
-        }
+        },
+        discardPreparedFile: { _ in },
+        purgeStalePreparedFiles: {}
     )
 }
 
@@ -209,6 +226,59 @@ public extension DependencyValues {
         get { self[ProjectStoreClient.self] }
         set { self[ProjectStoreClient.self] = newValue }
     }
+}
+
+private func temporaryExportDirectory() -> URL {
+    FileManager.default.temporaryDirectory
+        .appendingPathComponent("ReportWriterExports", isDirectory: true)
+}
+
+private func prepareProtectedTemporaryExportDirectory() throws -> URL {
+    let directory = temporaryExportDirectory()
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try? applyTemporaryFileProtection(to: directory)
+    return directory
+}
+
+private func isOwnedTemporaryExport(_ url: URL) -> Bool {
+    let directoryPath = temporaryExportDirectory().standardizedFileURL.path
+    let candidatePath = url.standardizedFileURL.path
+    return candidatePath == directoryPath || candidatePath.hasPrefix(directoryPath + "/")
+}
+
+private func discardOwnedTemporaryExport(_ url: URL) {
+    guard isOwnedTemporaryExport(url) else { return }
+    try? FileManager.default.removeItem(at: url)
+}
+
+private func purgeOldTemporaryExports(olderThanSeconds: TimeInterval) {
+    let directory = temporaryExportDirectory()
+    guard let urls = try? FileManager.default.contentsOfDirectory(
+        at: directory,
+        includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
+        options: [.skipsHiddenFiles]
+    ) else { return }
+
+    let cutoff = Date().addingTimeInterval(-olderThanSeconds)
+    for url in urls {
+        guard isOwnedTemporaryExport(url) else { continue }
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        if modified < cutoff {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+}
+
+private func applyTemporaryFileProtection(to url: URL) throws {
+    #if os(iOS)
+    guard FileManager.default.fileExists(atPath: url.path) else { return }
+    try FileManager.default.setAttributes(
+        [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+        ofItemAtPath: url.path
+    )
+    #else
+    _ = url
+    #endif
 }
 
 private func milliseconds(_ date: Date) -> Int64 {

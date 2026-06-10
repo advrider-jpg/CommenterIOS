@@ -1,4 +1,5 @@
 import CodableCSV
+import CommenterDomain
 import Foundation
 
 public struct CSVParseResult: Equatable, Sendable {
@@ -42,7 +43,7 @@ public enum CSVParserError: LocalizedError, Equatable {
 }
 
 public enum CSVParser {
-    public static let maxImportRows = 500
+    public static let maxImportRows = ProjectLimits.results
 
     public static func normalizeHeader(_ value: String) -> String {
         value
@@ -65,7 +66,7 @@ public enum CSVParser {
         return (row[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    public static func parseCSV(_ text: String) throws -> CSVParseResult {
+    public static func parseCSV(_ text: String, maxRows: Int = maxImportRows) throws -> CSVParseResult {
         if let error = unquotedRowWidthMismatch(in: text) {
             throw error
         }
@@ -74,18 +75,18 @@ public enum CSVParser {
         do {
             let parsed = try CSVReader.decode(input: normalizedText, configuration: csvReaderConfiguration())
             do {
-                return try parseTabularRows(parsed.rows, sourceLabel: "CSV file")
+                return try parseTabularRows(parsed.rows, sourceLabel: "CSV file", maxRows: maxRows)
             } catch let error as CSVParserError {
-                return try parseFallbackRowsOrThrow(normalizedText, defaultError: error)
+                return try parseFallbackRowsOrThrow(normalizedText, defaultError: error, maxRows: maxRows)
             }
         } catch let error as CSVParserError {
             throw error
         } catch {
-            return try parseFallbackRowsOrThrow(normalizedText, defaultError: .unterminatedQuotedField)
+            return try parseFallbackRowsOrThrow(normalizedText, defaultError: .unterminatedQuotedField, maxRows: maxRows)
         }
     }
 
-    public static func parseTabularRows(_ rows: [[String]], sourceLabel: String = "file") throws -> CSVParseResult {
+    public static func parseTabularRows(_ rows: [[String]], sourceLabel: String = "file", maxRows: Int = maxImportRows) throws -> CSVParseResult {
         let normalizedRows = rows.map { row in
             row.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         }
@@ -116,8 +117,8 @@ public enum CSVParser {
             throw CSVParserError.missingDataRows(sourceLabel: sourceLabel)
         }
 
-        if dataRows.count > maxImportRows {
-            throw CSVParserError.tooManyRows(sourceLabel: sourceLabel, count: dataRows.count, maximum: maxImportRows)
+        if dataRows.count > maxRows {
+            throw CSVParserError.tooManyRows(sourceLabel: sourceLabel, count: dataRows.count, maximum: maxRows)
         }
 
         for (index, cells) in dataRows.enumerated() where cells.count != headers.count {
@@ -133,9 +134,19 @@ public enum CSVParser {
         return CSVParseResult(headers: headers, rows: dictionaries)
     }
 
-    public static func toCSV(rows: [[String: String]]) -> String {
-        guard let first = rows.first else { return "" }
-        let headers = Array(first.keys)
+    public static func toCSV(rows: [[String: String]], headers explicitHeaders: [String]? = nil) -> String {
+        let headers: [String]
+        if let explicitHeaders {
+            headers = explicitHeaders
+        } else {
+            headers = rows.reduce(into: []) { ordered, row in
+                for key in row.keys.sorted() where !ordered.contains(key) {
+                    ordered.append(key)
+                }
+            }
+        }
+        guard !headers.isEmpty else { return "" }
+
         let table = [headers] + rows.map { row in
             headers.map { formulaGuard(row[$0] ?? "") }
         }
@@ -235,13 +246,13 @@ public enum CSVParser {
         return nil
     }
 
-    private static func parseFallbackRowsOrThrow(_ text: String, defaultError: CSVParserError) throws -> CSVParseResult {
+    private static func parseFallbackRowsOrThrow(_ text: String, defaultError: CSVParserError, maxRows: Int = maxImportRows) throws -> CSVParseResult {
         guard !hasUnterminatedQuotedField(text) else {
             throw CSVParserError.unterminatedQuotedField
         }
 
         do {
-            return try parseTabularRows(parseFallbackRows(text), sourceLabel: "CSV file")
+            return try parseTabularRows(parseFallbackRows(text), sourceLabel: "CSV file", maxRows: maxRows)
         } catch let error as CSVParserError {
             if defaultError == .unterminatedQuotedField {
                 throw error

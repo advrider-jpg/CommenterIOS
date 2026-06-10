@@ -4,7 +4,7 @@ import Foundation
 import AppIntents
 
 @available(iOS 17.0, macOS 14.0, *)
-public struct OpenAIReviewQueueIntent: AppIntent {
+public struct OpenOnDeviceAIReviewQueueIntent: AppIntent {
     public static var title: LocalizedStringResource = "Open AI Review Queue"
     public static var description = IntentDescription("Opens Report Writer so the teacher can review pending AI draft previews in the app.")
     public static var openAppWhenRun = true
@@ -33,7 +33,7 @@ public struct OpenReportPreparationIntent: AppIntent {
 public struct CommenterShortcuts: AppShortcutsProvider {
     public static var appShortcuts: [AppShortcut] {
         AppShortcut(
-            intent: OpenAIReviewQueueIntent(),
+            intent: OpenOnDeviceAIReviewQueueIntent(),
             phrases: [
                 "Open AI review in \(.applicationName)",
                 "Review AI drafts in \(.applicationName)"

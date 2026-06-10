@@ -2,6 +2,14 @@
 
 Append material work history here. Keep entries short, dated, and factual.
 
+## 2026-06-10 - Release-hardening patch applied
+
+- Merged the user-provided `commenter-ios-release-hardening.patch` into the repo.
+- Added production hardening for temp export lifecycle, diagnostics redaction, import/export bounds checks, AI request limits/timeouts, safer persistence paths, and DOCX/XLSX/XLS packaging limits.
+- Added app icon assets and iOS privacy-policy link plumbing (with build-setting-based URL lookup).
+- Added new dependency-audit/release checklist updates and expanded hardening tests for oversized payload and identifier safety.
+- Could not run Swift/Xcode validation locally on this Windows host because `swift` is not available on PATH; local checks completed were git state/whitespace/eol validation only.
+
 ## 2026-06-02 - Shared stationery review fix
 
 - Replaced Work list-only stationery drawing primitives with shared

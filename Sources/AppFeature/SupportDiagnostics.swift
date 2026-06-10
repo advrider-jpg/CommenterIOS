@@ -50,17 +50,24 @@ public enum CommenterFormatters {
     }
 }
 
+public enum SupportDiagnosticsRedaction: Equatable, Sendable {
+    case redacted
+    case fullWithUserPermission
+}
+
 public func supportDiagnosticsText(
     state: AppFeature.State,
     buildInfo: AppBuildInfo = .current(),
     locale: Locale = .current,
-    timeZone: TimeZone = .current
+    timeZone: TimeZone = .current,
+    redaction: SupportDiagnosticsRedaction = .redacted
 ) -> String {
     var lines: [String] = []
     lines.append("Report Writer Support Diagnostics")
     lines.append("App: \(buildInfo.displayName)")
     lines.append("App version: \(buildInfo.version)")
     lines.append("Build: \(buildInfo.build)")
+    lines.append("Redaction: \(redaction == .redacted ? "student and project identifiers redacted" : "full diagnostics copied with user permission")")
     lines.append("")
 
     switch state.datasetStatus {
@@ -89,21 +96,21 @@ public func supportDiagnosticsText(
 
     lines.append("")
     lines.append("Project storage status: \(projectStorageStatusDescription(state.projectStorageStatus))")
-    lines.append("Project storage message: \(state.projectStorageMessage)")
+    lines.append("Project storage message: \(diagnosticSupportMessage(state.projectStorageMessage, project: state.selectedProject, redaction: redaction))")
     lines.append("On-device AI status: \(aiAvailabilityDescription(state.aiAvailabilityStatus))")
     lines.append("Projects on device: \(CommenterFormatters.integer(state.projects.count, locale: locale))")
     if !state.invalidProjectRecords.isEmpty {
         lines.append("Invalid local project records:")
         state.invalidProjectRecords.forEach { record in
-            lines.append("- \(record.id): \(record.reason)")
+            lines.append("- \(diagnosticIdentifier(record.id, prefix: "project", redaction: redaction)): \(record.reason)")
         }
     }
 
     if let project = state.selectedProject {
         lines.append("")
-        lines.append("Open project: \(project.metadata.name)")
-        lines.append("Project id: \(project.metadata.id)")
-        lines.append("Term: \(project.metadata.term)")
+        lines.append("Open project: \(diagnosticProjectName(project, redaction: redaction))")
+        lines.append("Project id: \(diagnosticIdentifier(project.metadata.id, prefix: "project", redaction: redaction))")
+        lines.append("Term: \(diagnosticTerm(project.metadata.term, redaction: redaction))")
         lines.append("Year level: \(projectYearLabel(project.metadata.yearLevel))")
         lines.append("Last saved: \(CommenterFormatters.timestamp(project.metadata.persistence?.savedAt, locale: locale, timeZone: timeZone))")
         lines.append("Revision: \(project.metadata.persistence?.revision.map { String($0) } ?? "Not yet recorded")")
@@ -132,7 +139,7 @@ public func supportDiagnosticsText(
         if let readiness = state.selectedProjectReadiness {
             lines.append("Export readiness: \(readiness.ready) of \(readiness.expected)")
             if !readiness.blocked.isEmpty {
-                lines.append("Blocked readiness: \(readiness.blocked.map(\.message).joined(separator: " | "))")
+                lines.append("Blocked readiness: \(readiness.blocked.map { diagnosticReadinessMessage($0.message, project: project, redaction: redaction) }.joined(separator: " | "))")
             }
         }
     } else {
@@ -141,7 +148,7 @@ public func supportDiagnosticsText(
     }
 
     if let pending = state.pendingAIRevision {
-        lines.append("Pending AI preview: \(pending.studentId) / \(pending.subject) / \(pending.validation.status.rawValue)")
+        lines.append("Pending AI preview: \(diagnosticIdentifier(pending.studentId, prefix: "student", redaction: redaction)) / \(pending.subject) / \(pending.validation.status.rawValue)")
     }
     if state.aiReviewQueueCount > 0 {
         lines.append("AI review queue: \(CommenterFormatters.integer(state.aiReviewQueueCount, locale: locale))")
@@ -153,7 +160,7 @@ public func supportDiagnosticsText(
         lines.append("Queued AI previews: \(CommenterFormatters.integer(state.pendingAIRevisions.count, locale: locale))")
     }
     if let check = state.latestReportCheck {
-        lines.append("Latest report check: \(check.studentId) / \(check.subject) / \(check.validation.status.rawValue)")
+        lines.append("Latest report check: \(diagnosticIdentifier(check.studentId, prefix: "student", redaction: redaction)) / \(check.subject) / \(check.validation.status.rawValue)")
     }
 
     if !state.lastPreparedFiles.isEmpty {
@@ -161,15 +168,87 @@ public func supportDiagnosticsText(
         lines.append("Prepared files:")
         ImportExportFormat.preparationDisplayOrder.forEach { format in
             if let record = state.lastPreparedFiles[format] {
-                lines.append("- \(format.supportLabel): \(record.filename), prepared \(CommenterFormatters.timestamp(record.preparedAtMilliseconds, locale: locale, timeZone: timeZone))")
+                lines.append("- \(format.supportLabel): \(diagnosticFilename(record.filename, format: format, redaction: redaction)), prepared \(CommenterFormatters.timestamp(record.preparedAtMilliseconds, locale: locale, timeZone: timeZone))")
             }
         }
     }
 
     lines.append("")
-    lines.append("Privacy: project, roster, results, drafts, backups, and exports stay local unless the user chooses a native export or share destination.")
+    lines.append("Privacy: project, roster, results, drafts, backups, and exports stay local unless the user chooses a native export or share destination. Clipboard diagnostics are redacted by default.")
     lines.append("Backup guidance: prepare Backup JSON before destructive edits, device migration, or support troubleshooting.")
     return lines.joined(separator: "\n")
+}
+
+
+private func diagnosticSupportMessage(_ message: String, project: Project?, redaction: SupportDiagnosticsRedaction) -> String {
+    guard let project else { return message }
+    return diagnosticReadinessMessage(message, project: project, redaction: redaction)
+}
+
+private func diagnosticFilename(_ filename: String, format: ImportExportFormat, redaction: SupportDiagnosticsRedaction) -> String {
+    switch redaction {
+    case .fullWithUserPermission:
+        return filename
+    case .redacted:
+        let extensionPart = filename.split(separator: ".").last.map(String.init) ?? format.rawValue
+        return "prepared-\(stableTextFingerprint(filename).prefix(8)).\(extensionPart)"
+    }
+}
+
+private func diagnosticProjectName(_ project: Project, redaction: SupportDiagnosticsRedaction) -> String {
+    switch redaction {
+    case .fullWithUserPermission:
+        return project.metadata.name
+    case .redacted:
+        return diagnosticIdentifier(project.metadata.id + project.metadata.name, prefix: "project", redaction: redaction)
+    }
+}
+
+private func diagnosticTerm(_ term: String, redaction: SupportDiagnosticsRedaction) -> String {
+    switch redaction {
+    case .fullWithUserPermission:
+        return term
+    case .redacted:
+        return term.isEmpty ? "Not recorded" : "Recorded"
+    }
+}
+
+private func diagnosticIdentifier(_ value: String, prefix: String, redaction: SupportDiagnosticsRedaction) -> String {
+    switch redaction {
+    case .fullWithUserPermission:
+        return value
+    case .redacted:
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "\(prefix)-unknown" }
+        return "\(prefix)-\(stableTextFingerprint(trimmed).prefix(8))"
+    }
+}
+
+private func diagnosticReadinessMessage(_ message: String, project: Project, redaction: SupportDiagnosticsRedaction) -> String {
+    guard redaction == .redacted else { return message }
+    var redacted = message
+    for student in project.roster {
+        let display = getDisplayName(student: student, projectMetadata: project.metadata)
+        if !display.isEmpty {
+            redacted = redacted.replacingOccurrences(
+                of: display,
+                with: diagnosticIdentifier(student.id, prefix: "student", redaction: redaction)
+            )
+        }
+        if !student.firstName.isEmpty {
+            redacted = redacted.replacingOccurrences(
+                of: student.firstName,
+                with: diagnosticIdentifier(student.id, prefix: "student", redaction: redaction)
+            )
+        }
+        if !student.lastName.isEmpty {
+            redacted = redacted.replacingOccurrences(
+                of: student.lastName,
+                with: diagnosticIdentifier(student.id, prefix: "student", redaction: redaction)
+            )
+        }
+    }
+    return redacted
 }
 
 public func aiAvailabilityDescription(_ status: AppFeature.AIAvailabilityStatus) -> String {

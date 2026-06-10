@@ -160,6 +160,52 @@ final class BackupEnvelopeTests: XCTestCase {
         }
     }
 
+
+    func testEncryptedBackupRejectsExcessiveKDFIterationsBeforePasswordPrompt() throws {
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(minimalEncryptedPayload(ciphertext: "AAAA").utf8)) as? [String: Any])
+        var encryption = try XCTUnwrap(payload["encryption"] as? [String: Any])
+        encryption["iterations"] = encryptedBackupMaximumKDFIterations + 1
+        payload["encryption"] = encryption
+        let data = try JSONSerialization.data(withJSONObject: payload)
+
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: data, as: UTF8.self))) { error in
+            XCTAssertEqual(error as? BackupError, .couldNotOpen)
+        }
+    }
+
+    func testEncryptedBackupRejectsMalformedIVAndCiphertextBeforeKeyDerivation() throws {
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(minimalEncryptedPayload(ciphertext: "AAAA").utf8)) as? [String: Any])
+        var encryption = try XCTUnwrap(payload["encryption"] as? [String: Any])
+        encryption["iv"] = Data(repeating: 1, count: encryptedBackupIVBytes - 1).base64EncodedString()
+        payload["encryption"] = encryption
+        payload["ciphertext"] = "AAAA"
+        var checksum = try XCTUnwrap(payload["checksum"] as? [String: Any])
+        checksum["ciphertextHash"] = try sha256Hex("AAAA")
+        payload["checksum"] = checksum
+        let data = try JSONSerialization.data(withJSONObject: payload)
+
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: data, as: UTF8.self), password: "correct horse battery")) { error in
+            XCTAssertEqual(error as? BackupError, .encryptedCouldNotDecrypt)
+        }
+    }
+
+    func testBackupParserRejectsProjectIDsThatWouldCollideAsStoragePaths() throws {
+        var project = fixtureProject()
+        project.metadata.id = "p/1"
+        let payload = ProjectBackupPayload(
+            format: projectBackupFormat,
+            version: 1,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            checksum: nil,
+            project: project
+        )
+        let data = try JSONEncoder().encode(payload)
+
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: data, as: UTF8.self))) { error in
+            XCTAssertEqual(error as? BackupError, .couldNotOpen)
+        }
+    }
+
     func testEncryptedBackupPasswordValidationMatchesV3Policy() {
         XCTAssertEqual(validateBackupPasswordForEncryption("short").ok, false)
         XCTAssertEqual(validateBackupPasswordForEncryption("only spaces     ").ok, true)

@@ -58,7 +58,7 @@ final class CSVParserTests: XCTestCase {
         }
     }
 
-    func testRejectsMissingDataRowsAndMoreThanFiveHundredRows() {
+    func testRejectsMissingDataRowsAndRowsBeyondConfiguredImportLimit() {
         XCTAssertThrowsError(try CSVParser.parseCSV("First Name,Last Name\n\n")) { error in
             XCTAssertEqual(error as? CSVParserError, .missingDataRows(sourceLabel: "CSV file"))
         }
@@ -83,7 +83,8 @@ final class CSVParserTests: XCTestCase {
         XCTAssertEqual(CSVParser.findKey(in: parsed.rows[0], matching: "AchievementLevel"), "Achievement Level")
         XCTAssertEqual(CSVParser.value(in: parsed.rows[0], matching: "notes"), "Ready")
 
-        let csv = CSVParser.toCSV(rows: [["Name": "=SUM(A1:A2)", "Notes": "Line one\nLine two"]])
+        let csv = CSVParser.toCSV(rows: [["Name": "=SUM(A1:A2)", "Notes": "Line one\nLine two"]], headers: ["Name", "Notes"])
+        XCTAssertTrue(csv.hasPrefix("Name,Notes"))
         XCTAssertTrue(csv.contains("'=SUM(A1:A2)"))
         XCTAssertTrue(csv.contains("Line one"))
         XCTAssertTrue(csv.contains("Line two"))

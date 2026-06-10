@@ -54,7 +54,7 @@ public func prepareReportDocumentFile(
     let forbiddenStrings = forbiddenReportExportStrings(project: project)
     let data = try buildReportDocumentDOCX(packet: packet, headerText: headerText)
 
-    try data.write(to: destination, options: [.atomic])
+    try writeDataAtomicallyApplyingDefaultProtection(data, to: destination, fileManager: fileManager)
     do {
         let byteCount = try verifiedDocumentSize(url: destination, fileManager: fileManager)
         let readBack = try Data(contentsOf: destination)
@@ -104,9 +104,10 @@ private func ensureDocumentDirectory(_ directory: URL, fileManager: FileManager)
         guard isDirectory.boolValue else {
             throw ReportDocumentFileError.invalidDirectory(directory.path)
         }
+        try applyDefaultProtectionIfAvailable(to: directory, fileManager: fileManager)
         return
     }
-    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    try createDirectoryApplyingDefaultProtection(directory, fileManager: fileManager)
 }
 
 private func verifiedDocumentSize(url: URL, fileManager: FileManager) throws -> UInt64 {
@@ -125,7 +126,11 @@ private func verifyReportDocumentPackage(
     forbiddenStrings: [String]
 ) throws {
     try OOXMLZipWriter.validateArchive(data, requiredEntries: requiredDOCXEntries)
-    let entries = try OOXMLZipWriter.storedEntries(data)
+    let entries = try OOXMLZipWriter.storedEntries(
+        data,
+        maximumEntryBytes: 64 * 1024 * 1024,
+        maximumTotalUncompressedBytes: 128 * 1024 * 1024
+    )
     guard let document = entries["word/document.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
           let header = entries["word/header1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
           let footer = entries["word/footer1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),

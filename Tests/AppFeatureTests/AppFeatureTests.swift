@@ -444,7 +444,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.activeImportKind = nil
             $0.resultsImportState = .zeroValidRecords("No result rows were accepted for import. Existing project data was left unchanged.")
-            $0.operationStatus = .failed("Import failed. Project data was left unchanged: No result rows were accepted for import. Existing project data was left unchanged.")
+            $0.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: No result rows were accepted for import. Existing project data was left unchanged.")
         }
     }
 
@@ -685,13 +685,22 @@ final class AppFeatureTests: XCTestCase {
         let store = TestStore(initialState: initial) { AppFeature() }
 
         await store.send(.fileExportCancelled) {
-            $0.operationStatus = .cancelled("File export cancelled. No saved-file success was recorded.")
+            $0.preparedFile = nil
+            $0.operationStatus = .cancelled("File export cancelled. Temporary prepared copy was removed.")
         }
-        await store.send(.fileShareCancelled) {
-            $0.operationStatus = .cancelled("Share cancelled. No share success was recorded.")
+
+        initial.preparedFile = AppFeature.PreparedFile(url: preparedURL, label: "DOCX export file is verified and ready.")
+        let shareStore = TestStore(initialState: initial) { AppFeature() }
+        await shareStore.send(.fileShareCancelled) {
+            $0.preparedFile = nil
+            $0.operationStatus = .cancelled("Share cancelled. Temporary prepared copy was removed.")
         }
-        await store.send(.fileShareCompleted(preparedURL)) {
-            $0.operationStatus = .shared("Share completed for reports.docx.")
+
+        initial.preparedFile = AppFeature.PreparedFile(url: preparedURL, label: "DOCX export file is verified and ready.")
+        let completedStore = TestStore(initialState: initial) { AppFeature() }
+        await completedStore.send(.fileShareCompleted(preparedURL)) {
+            $0.preparedFile = nil
+            $0.operationStatus = .shared("Share completed for reports.docx. Temporary prepared copy was removed.")
         }
     }
 
@@ -752,7 +761,11 @@ final class AppFeatureTests: XCTestCase {
         XCTAssertTrue(text.contains("Components: 56,564"))
         XCTAssertTrue(text.contains("Hash verification: verified match"))
         XCTAssertTrue(text.contains("Invalid local project records:"))
-        XCTAssertTrue(text.contains("broken: Stored project fingerprint verification failed."))
+        XCTAssertTrue(text.contains("Stored project fingerprint verification failed."))
+        XCTAssertFalse(text.contains("broken: Stored project fingerprint verification failed."))
+        XCTAssertFalse(text.contains("Ava"))
+        XCTAssertFalse(text.contains("Project id: p1"))
+        XCTAssertTrue(text.contains("Redaction: student and project identifiers redacted"))
         XCTAssertTrue(text.contains("On-device AI status: Not checked"))
         XCTAssertTrue(text.contains("Backup guidance:"))
     }
@@ -2403,7 +2416,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.activeImportKind = nil
             $0.rosterImportState = .failed("Import parse failed for test.")
-            $0.operationStatus = .failed("Import failed. Project data was left unchanged: Import parse failed for test.")
+            $0.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: Import parse failed for test.")
         }
     }
 
@@ -2532,7 +2545,7 @@ final class AppFeatureTests: XCTestCase {
             $0.projectStorageStatus = .loaded
             $0.pendingImport = nil
             $0.activeImportKind = nil
-            $0.operationStatus = .failed("Import failed. Project data was left unchanged: Save failed for test.")
+            $0.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: Save failed for test.")
         }
     }
 
@@ -2560,7 +2573,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.activeImportKind = nil
             $0.rosterImportState = .failed("Save failed for test.")
-            $0.operationStatus = .failed("Import failed. Project data was left unchanged: Save failed for test.")
+            $0.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: Save failed for test.")
         }
     }
 
@@ -2634,7 +2647,7 @@ final class AppFeatureTests: XCTestCase {
             $0.pendingImport = nil
             $0.activeImportKind = nil
             $0.resultsImportState = .failed("Import parse failed for test.")
-            $0.operationStatus = .failed("Import failed. Project data was left unchanged: Import parse failed for test.")
+            $0.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: Import parse failed for test.")
         }
     }
 

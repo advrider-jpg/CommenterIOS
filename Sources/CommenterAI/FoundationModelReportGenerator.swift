@@ -24,11 +24,14 @@ enum FoundationModelReportGenerator {
     ) async throws -> AIReportRevisionResult {
         let startedAt = nowMilliseconds()
         let inputFingerprint = stableTextFingerprint([builtPrompt.instructions, builtPrompt.prompt].joined(separator: "\n"))
+        try validateFoundationPromptBounds(builtPrompt)
         let session = LanguageModelSession(instructions: builtPrompt.instructions)
-        let response = try await session.respond(
-            to: builtPrompt.prompt,
-            generating: FoundationReportRevisionOutput.self
-        )
+        let response = try await withAIGenerationTimeout {
+            try await session.respond(
+                to: builtPrompt.prompt,
+                generating: FoundationReportRevisionOutput.self
+            )
+        }
         let completedAt = nowMilliseconds()
         let output = response.content
         let validation = validateRevision(output.revisedText, request: request, validatedAt: completedAt)
@@ -62,11 +65,14 @@ enum FoundationModelReportGenerator {
         let builtPrompt = AIReportPromptBuilder.draftFromEvidence(request)
         let startedAt = nowMilliseconds()
         let inputFingerprint = stableTextFingerprint([builtPrompt.instructions, builtPrompt.prompt].joined(separator: "\n"))
+        try validateFoundationPromptBounds(builtPrompt)
         let session = LanguageModelSession(instructions: builtPrompt.instructions)
-        let response = try await session.respond(
-            to: builtPrompt.prompt,
-            generating: FoundationReportDraftOutput.self
-        )
+        let response = try await withAIGenerationTimeout {
+            try await session.respond(
+                to: builtPrompt.prompt,
+                generating: FoundationReportDraftOutput.self
+            )
+        }
         let completedAt = nowMilliseconds()
         let output = response.content
         let validation = validateDraft(output.draftText, request: request, validatedAt: completedAt)
@@ -92,11 +98,14 @@ enum FoundationModelReportGenerator {
 
     static func critiqueReport(_ request: AIReportCritiqueRequest) async throws -> AIReportCritiqueResult {
         let builtPrompt = AIReportPromptBuilder.critiqueReport(request)
+        try validateFoundationPromptBounds(builtPrompt)
         let session = LanguageModelSession(instructions: builtPrompt.instructions)
-        let response = try await session.respond(
-            to: builtPrompt.prompt,
-            generating: FoundationReportCritiqueOutput.self
-        )
+        let response = try await withAIGenerationTimeout {
+            try await session.respond(
+                to: builtPrompt.prompt,
+                generating: FoundationReportCritiqueOutput.self
+            )
+        }
         let completedAt = nowMilliseconds()
         let validation = ReportSafetyValidator.validate(
             text: request.text,
@@ -134,6 +143,33 @@ private struct FoundationReportDraftOutput: Equatable {
 private struct FoundationReportCritiqueOutput: Equatable {
     @Guide(description: "Short teacher-facing review notes. Do not rewrite the report text.")
     var reviewNotes: [String]
+}
+
+private let foundationPromptMaximumCharacters = 120_000
+private let foundationGenerationTimeoutNanoseconds: UInt64 = 45_000_000_000
+
+private func validateFoundationPromptBounds(_ builtPrompt: BuiltAIPrompt) throws {
+    let totalCharacters = builtPrompt.instructions.count + builtPrompt.prompt.count
+    guard totalCharacters <= foundationPromptMaximumCharacters else {
+        throw AIClientError.requestTooLarge
+    }
+}
+
+private func withAIGenerationTimeout<T: Sendable>(
+    operation: @escaping @Sendable () async throws -> T
+) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask { try await operation() }
+        group.addTask {
+            try await Task.sleep(nanoseconds: foundationGenerationTimeoutNanoseconds)
+            throw AIClientError.timedOut
+        }
+        guard let result = try await group.next() else {
+            throw AIClientError.timedOut
+        }
+        group.cancelAll()
+        return result
+    }
 }
 
 private func nowMilliseconds() -> Int64 {

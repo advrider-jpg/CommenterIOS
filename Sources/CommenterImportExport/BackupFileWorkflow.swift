@@ -60,7 +60,7 @@ func prepareProjectBackupFile(
         throw BackupError.couldNotOpen
     }
 
-    try data.write(to: destination, options: [.atomic])
+    try writeDataAtomicallyApplyingDefaultProtection(data, to: destination, fileManager: fileManager)
     let byteCount = try verifiedNonEmptySize(url: destination, fileManager: fileManager)
 
     let readBack = try String(contentsOf: destination, encoding: .utf8)
@@ -86,6 +86,9 @@ public func loadProjectBackupFile(
     fileManager: FileManager = .default
 ) throws -> PreparedBackupFile {
     let byteCount = try verifiedNonEmptySize(url: url, fileManager: fileManager)
+    guard byteCount <= UInt64(encryptedBackupBytes) else {
+        throw BackupError.encryptedOversized(maxMegabytes: encryptedBackupBytes / (1024 * 1024))
+    }
     let serialized = try String(contentsOf: url, encoding: .utf8)
     let project = try parseProjectBackup(serialized: serialized, password: password)
     return PreparedBackupFile(url: url, byteCount: byteCount, project: project)
@@ -103,9 +106,10 @@ private func ensureWritableDirectory(_ directory: URL, fileManager: FileManager)
         guard isDirectory.boolValue else {
             throw BackupFileWorkflowError.invalidDirectory(directory.path)
         }
+        try applyDefaultProtectionIfAvailable(to: directory, fileManager: fileManager)
         return
     }
-    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    try createDirectoryApplyingDefaultProtection(directory, fileManager: fileManager)
 }
 
 private func verifiedNonEmptySize(url: URL, fileManager: FileManager) throws -> UInt64 {

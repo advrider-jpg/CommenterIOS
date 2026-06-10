@@ -37,8 +37,8 @@ struct SupportRootView: View {
 
                 Button(action: onCopyDiagnostics) {
                     StationeryActionRow(
-                        title: "Copy diagnostics to clipboard",
-                        subtitle: "Copies app, dataset, storage, project, readiness, and privacy details for a support request.",
+                        title: "Copy redacted diagnostics to clipboard",
+                        subtitle: "Copies redacted app, dataset, storage, readiness, and privacy details for a support request.",
                         systemImage: "doc.on.doc",
                         tone: .local,
                         isEnabled: canCopyDiagnostics,
@@ -195,6 +195,14 @@ struct SupportRootView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SupportBodyText("Project names, roster data, results, draft comments, backups, and report files stay on this device unless you choose a native file export or share destination.")
                 SupportBodyText("Report Writer does not configure accounts, cloud sync, analytics, telemetry, remote AI, or backend project persistence in this MVP.")
+                SupportBodyText("Clipboard diagnostics are redacted by default. Prepared export files are removed after save, share, cancellation, or dismissal.")
+                if let privacyPolicyURL = AppPrivacyPolicy.url() {
+                    Link(destination: privacyPolicyURL) {
+                        Label("Open Privacy Policy", systemImage: "hand.raised")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .accessibilityIdentifier("privacy-policy-link")
+                }
             }
         }
     }
@@ -206,8 +214,8 @@ struct SupportRootView: View {
 
                 Button(action: onCopyDiagnostics) {
                     StationeryActionRow(
-                        title: "Report a bug: copy diagnostics",
-                        subtitle: "Paste the copied diagnostic block into your support email or issue tracker.",
+                        title: "Report a bug: copy redacted diagnostics",
+                        subtitle: "Paste the redacted diagnostic block into your support email or issue tracker.",
                         systemImage: "envelope",
                         tone: .action,
                         isEnabled: canCopyDiagnostics,

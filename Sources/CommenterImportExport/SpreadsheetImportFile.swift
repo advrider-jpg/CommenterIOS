@@ -1,3 +1,4 @@
+import CommenterDomain
 import CoreXLSX
 import Foundation
 import OLEKit
@@ -26,9 +27,17 @@ public enum SpreadsheetImportFileError: LocalizedError, Equatable {
 }
 
 public enum SpreadsheetImportFile {
-    public static let maxImportBytes = 1024 * 1024
+    public static let maxImportBytes = 8 * 1024 * 1024
+    public static let maxWorksheetImportRows = ProjectLimits.results + 1
+    public static let maxWorksheetImportColumns = 64
+    public static let maxWorkbookEntryBytes = 4 * 1024 * 1024
+    public static let maxWorkbookUncompressedBytes = 16 * 1024 * 1024
 
-    public static func parseTabularImportFile(url: URL, label: String) throws -> CSVParseResult {
+    public static func parseTabularImportFile(
+        url: URL,
+        label: String,
+        maxRows: Int = CSVParser.maxImportRows
+    ) throws -> CSVParseResult {
         let format = try importFormat(for: url, label: label)
         let data = try Data(contentsOf: url)
         guard !data.isEmpty else { throw SpreadsheetImportFileError.emptyFile }
@@ -41,11 +50,11 @@ public enum SpreadsheetImportFile {
             guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16) else {
                 throw CSVParserError.empty(sourceLabel: label)
             }
-            return try CSVParser.parseCSV(text)
+            return try CSVParser.parseCSV(text, maxRows: maxRows)
         case .xlsx:
-            return try parseXLSX(data, label: "\(label) workbook")
+            return try parseXLSX(data, label: "\(label) workbook", maxRows: maxRows)
         case .xls:
-            return try parseXLS(url, label: "\(label) workbook")
+            return try parseXLS(url, label: "\(label) workbook", maxRows: maxRows)
         case .docx, .backupJSON:
             throw SpreadsheetImportFileError.unsupportedFormat(label)
         }
@@ -62,20 +71,12 @@ public enum SpreadsheetImportFile {
         throw SpreadsheetImportFileError.unsupportedFormat(label)
     }
 
-    public static func parseXLSX(_ data: Data, label: String) throws -> CSVParseResult {
+    public static func parseXLSX(_ data: Data, label: String, maxRows: Int = CSVParser.maxImportRows) throws -> CSVParseResult {
         let file: XLSXFile
         do {
             file = try XLSXFile(data: data)
         } catch {
-            do {
-                return try parseOOXMLWorksheetRows(data, label: label)
-            } catch let error as CSVParserError {
-                throw error
-            } catch let error as SpreadsheetImportFileError {
-                throw error
-            } catch {
-                throw SpreadsheetImportFileError.unreadableWorkbook(label)
-            }
+            return try parseXLSXFallback(data, label: label, maxRows: maxRows)
         }
 
         do {
@@ -84,28 +85,20 @@ public enum SpreadsheetImportFile {
                 for (_, path) in try file.parseWorksheetPathsAndNames(workbook: workbook) {
                     let worksheet = try file.parseWorksheet(at: path)
                     let rows = try worksheetRows(worksheet, sharedStrings: sharedStrings, label: label)
-                    let normalized = normalizeWorksheetRows(rows)
+                    let normalized = try normalizeWorksheetRows(rows, label: label)
                     if !normalized.isEmpty {
-                        return try CSVParser.parseTabularRows(normalized, sourceLabel: label)
+                        return try CSVParser.parseTabularRows(normalized, sourceLabel: label, maxRows: maxRows)
                     }
                 }
             }
         } catch {
-            do {
-                return try parseOOXMLWorksheetRows(data, label: label)
-            } catch let error as CSVParserError {
-                throw error
-            } catch let error as SpreadsheetImportFileError {
-                throw error
-            } catch {
-                throw SpreadsheetImportFileError.unreadableWorkbook(label)
-            }
+            return try parseXLSXFallback(data, label: label, maxRows: maxRows)
         }
 
         throw SpreadsheetImportFileError.emptyWorkbook(label)
     }
 
-    public static func parseXLS(_ url: URL, label: String) throws -> CSVParseResult {
+    public static func parseXLS(_ url: URL, label: String, maxRows: Int = CSVParser.maxImportRows) throws -> CSVParseResult {
         let stream: Data
         let data = try Data(contentsOf: url)
         if data.hasOLECompoundFileSignature {
@@ -121,19 +114,46 @@ public enum SpreadsheetImportFile {
         let rows: [[String]]
         do {
             rows = try parseBIFFRows(stream)
+        } catch let error as CSVParserError {
+            throw error
         } catch {
             throw SpreadsheetImportFileError.unreadableWorkbook(label)
         }
-        let normalized = normalizeWorksheetRows(rows)
+        let normalized = try normalizeWorksheetRows(rows, label: label)
         guard !normalized.isEmpty else {
             throw SpreadsheetImportFileError.emptyWorkbook(label)
         }
-        return try CSVParser.parseTabularRows(normalized, sourceLabel: label)
+        return try CSVParser.parseTabularRows(normalized, sourceLabel: label, maxRows: maxRows)
     }
 }
 
-private func parseOOXMLWorksheetRows(_ data: Data, label: String) throws -> CSVParseResult {
-    let entries = try OOXMLZipWriter.storedEntries(data)
+private func parseXLSXFallback(_ data: Data, label: String, maxRows: Int) throws -> CSVParseResult {
+    do {
+        return try parseOOXMLWorksheetRows(data, label: label, maxRows: maxRows)
+    } catch let error as CSVParserError {
+        throw error
+    } catch let error as SpreadsheetImportFileError {
+        throw error
+    } catch {
+        throw SpreadsheetImportFileError.unreadableWorkbook(label)
+    }
+}
+
+private func parseOOXMLWorksheetRows(_ data: Data, label: String, maxRows: Int) throws -> CSVParseResult {
+    let entries = try OOXMLZipWriter.storedEntries(
+        data,
+        maximumEntryBytes: SpreadsheetImportFile.maxWorkbookEntryBytes,
+        maximumTotalUncompressedBytes: SpreadsheetImportFile.maxWorkbookUncompressedBytes,
+        maximumEntryCount: 64,
+        allowedPaths: { path in
+            path == "[Content_Types].xml" ||
+                path == "_rels/.rels" ||
+                path == "xl/workbook.xml" ||
+                path == "xl/_rels/workbook.xml.rels" ||
+                path == "xl/sharedStrings.xml" ||
+                (path.hasPrefix("xl/worksheets/") && path.hasSuffix(".xml"))
+        }
+    )
     let sharedStrings = parseOOXMLSharedStrings(entries["xl/sharedStrings.xml"])
     let worksheetPaths = entries.keys
         .filter { $0.hasPrefix("xl/worksheets/") && $0.hasSuffix(".xml") }
@@ -142,9 +162,9 @@ private func parseOOXMLWorksheetRows(_ data: Data, label: String) throws -> CSVP
     for path in worksheetPaths {
         guard let xml = entries[path]?.stringValue else { continue }
         let rows = try parseOOXMLRows(xml, sharedStrings: sharedStrings, label: label)
-        let normalized = normalizeWorksheetRows(rows)
+        let normalized = try normalizeWorksheetRows(rows, label: label)
         if !normalized.isEmpty {
-            return try CSVParser.parseTabularRows(normalized, sourceLabel: label)
+            return try CSVParser.parseTabularRows(normalized, sourceLabel: label, maxRows: maxRows)
         }
     }
     throw SpreadsheetImportFileError.emptyWorkbook(label)
@@ -160,14 +180,23 @@ private func parseOOXMLSharedStrings(_ data: Data?) -> [String] {
 }
 
 private func parseOOXMLRows(_ xml: String, sharedStrings: [String], label: String) throws -> [[String]] {
-    try xml.matches(pattern: #"<row\b[^>]*>(.*?)</row>"#).map { rowXML in
+    let rawRows = xml.matches(pattern: #"<row\b[^>]*>(.*?)</row>"#)
+    guard rawRows.count <= SpreadsheetImportFile.maxWorksheetImportRows else {
+        throw CSVParserError.tooManyRows(
+            sourceLabel: label,
+            count: max(0, rawRows.count - 1),
+            maximum: ProjectLimits.results
+        )
+    }
+
+    return try rawRows.map { rowXML in
         var cellsByIndex: [Int: String] = [:]
         for cellXML in rowXML.matches(pattern: #"<c\b[^>]*>.*?</c>"#) {
             let attributes = cellXML.captured(pattern: #"^<c\b([^>]*)>"#) ?? ""
             let body = cellXML.captured(pattern: #"^<c\b[^>]*>(.*?)</c>$"#) ?? ""
             guard let reference = attributes.captured(pattern: #"\br="([^"]+)""#) else { continue }
-            let column = reference.filter { $0.isLetter }
-            let index = columnIndex(from: column)
+            let column = reference.prefix { $0.isLetter }
+            let index = try columnIndex(from: String(column), label: label)
             let type = attributes.captured(pattern: #"\bt="([^"]+)""#)
             if type == "inlineStr" {
                 cellsByIndex[index] = body.matches(pattern: #"<t\b[^>]*>(.*?)</t>"#).map(xmlUnescape).joined()
@@ -183,6 +212,9 @@ private func parseOOXMLRows(_ xml: String, sharedStrings: [String], label: Strin
             }
         }
         guard let maxColumn = cellsByIndex.keys.max() else { return [] }
+        guard maxColumn < SpreadsheetImportFile.maxWorksheetImportColumns else {
+            throw SpreadsheetImportFileError.unreadableWorkbook(label)
+        }
         return (0...maxColumn).map { cellsByIndex[$0] ?? "" }
     }
 }
@@ -208,8 +240,15 @@ private func workbookStreamFromCompoundFile(_ data: Data) throws -> Data {
         let entry = Data(directory[entryOffset..<entryOffset + 128])
         guard directoryEntryName(entry) == "Workbook" || directoryEntryName(entry) == "Book" else { continue }
         let streamOffset = sectorOffset(Int(entry.uint32LE(at: 116)))
-        let streamSize = Int(entry.uint64LE(at: 120))
-        guard streamSize > 0, streamOffset + streamSize <= data.count else {
+        let streamSizeRaw = entry.uint64LE(at: 120)
+        guard streamSizeRaw > 0,
+              streamSizeRaw <= UInt64(SpreadsheetImportFile.maxWorkbookUncompressedBytes),
+              streamSizeRaw <= UInt64(Int.max)
+        else {
+            throw LegacyXLSWorkbookError.invalidCompoundFile
+        }
+        let streamSize = Int(streamSizeRaw)
+        guard streamOffset >= 0, streamSize <= data.count - streamOffset else {
             throw LegacyXLSWorkbookError.invalidCompoundFile
         }
         return Data(data[streamOffset..<streamOffset + streamSize])
@@ -224,7 +263,13 @@ private func readOLEWorkbookStream(_ url: URL, label: String) throws -> Data {
         guard let workbook = findOLEEntry(named: "Workbook", in: ole.root) ?? findOLEEntry(named: "Book", in: ole.root) else {
             throw LegacyXLSWorkbookError.missingWorkbookStream
         }
-        return try ole.stream(workbook).readDataToEnd()
+        let stream = try ole.stream(workbook).readDataToEnd()
+        guard stream.count <= SpreadsheetImportFile.maxWorkbookUncompressedBytes else {
+            throw LegacyXLSWorkbookError.invalidWorkbookStream
+        }
+        return stream
+    } catch let error as LegacyXLSWorkbookError {
+        throw error
     } catch {
         throw SpreadsheetImportFileError.unreadableWorkbook(label)
     }
@@ -246,9 +291,17 @@ private func xmlUnescape(_ value: String) -> String {
         .replacingOccurrences(of: "&amp;", with: "&")
 }
 
-private func normalizeWorksheetRows(_ rawRows: [[String]]) -> [[String]] {
+private func normalizeWorksheetRows(_ rawRows: [[String]], label: String) throws -> [[String]] {
+    guard rawRows.count <= SpreadsheetImportFile.maxWorksheetImportRows else {
+        throw CSVParserError.tooManyRows(
+            sourceLabel: label,
+            count: max(0, rawRows.count - 1),
+            maximum: ProjectLimits.results
+        )
+    }
+
     let rows = rawRows.map { row -> [String] in
-        var cells = row.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        var cells = Array(row.prefix(SpreadsheetImportFile.maxWorksheetImportColumns)).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         while cells.last == "" {
             cells.removeLast()
         }
@@ -256,19 +309,34 @@ private func normalizeWorksheetRows(_ rawRows: [[String]]) -> [[String]] {
     }
     let nonEmpty = rows.filter { row in row.contains { !$0.isEmpty } }
     guard let headerLength = nonEmpty.first?.count, headerLength > 0 else { return [] }
+    guard headerLength <= SpreadsheetImportFile.maxWorksheetImportColumns else {
+        throw SpreadsheetImportFileError.unreadableWorkbook(label)
+    }
     return nonEmpty.map { row in
-        row.count < headerLength ? row + Array(repeating: "", count: headerLength - row.count) : row
+        row.count < headerLength ? row + Array(repeating: "", count: headerLength - row.count) : Array(row.prefix(headerLength))
     }
 }
 
 private func worksheetRows(_ worksheet: Worksheet, sharedStrings: SharedStrings?, label: String) throws -> [[String]] {
-    try (worksheet.data?.rows ?? []).map { row in
+    let sourceRows = worksheet.data?.rows ?? []
+    guard sourceRows.count <= SpreadsheetImportFile.maxWorksheetImportRows else {
+        throw CSVParserError.tooManyRows(
+            sourceLabel: label,
+            count: max(0, sourceRows.count - 1),
+            maximum: ProjectLimits.results
+        )
+    }
+
+    return try sourceRows.map { row in
         var cellsByIndex: [Int: String] = [:]
         for cell in row.cells {
-            let column = columnIndex(from: cell.reference.column.description)
+            let column = try columnIndex(from: cell.reference.column.description, label: label)
             cellsByIndex[column] = try worksheetCellValue(cell, sharedStrings: sharedStrings, label: label)
         }
         guard let maxColumn = cellsByIndex.keys.max() else { return [] }
+        guard maxColumn < SpreadsheetImportFile.maxWorksheetImportColumns else {
+            throw SpreadsheetImportFileError.unreadableWorkbook(label)
+        }
         return (0...maxColumn).map { cellsByIndex[$0] ?? "" }
     }
 }
@@ -290,13 +358,23 @@ private func worksheetCellValue(_ cell: Cell, sharedStrings: SharedStrings?, lab
     }
 }
 
-private func columnIndex(from column: String) -> Int {
-    var value = 0
-    for scalar in column.uppercased().unicodeScalars {
-        guard (65...90).contains(scalar.value) else { return 0 }
-        value = value * 26 + Int(scalar.value - 64)
+private func columnIndex(from column: String, label: String) throws -> Int {
+    let normalized = column.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    guard !normalized.isEmpty, normalized.count <= 3 else {
+        throw SpreadsheetImportFileError.unreadableWorkbook(label)
     }
-    return max(0, value - 1)
+
+    var value = 0
+    for scalar in normalized.unicodeScalars {
+        guard (65...90).contains(scalar.value) else {
+            throw SpreadsheetImportFileError.unreadableWorkbook(label)
+        }
+        value = value * 26 + Int(scalar.value - 64)
+        guard value <= SpreadsheetImportFile.maxWorksheetImportColumns else {
+            throw SpreadsheetImportFileError.unreadableWorkbook(label)
+        }
+    }
+    return value - 1
 }
 
 private func findOLEEntry(named name: String, in entry: DirectoryEntry) -> DirectoryEntry? {
@@ -328,19 +406,19 @@ private func parseBIFFRows(_ stream: Data) throws -> [[String]] {
             sharedStrings = decodeSST(payload)
         case 0x0204:
             if payload.count >= 9, let value = decodeXLUnicodeString(payload, offset: 6) {
-                cells[Int(payload.uint16LE(at: 0)), default: [:]][Int(payload.uint16LE(at: 2))] = value
+                try storeBIFFCell(value, rowIndex: Int(payload.uint16LE(at: 0)), columnIndex: Int(payload.uint16LE(at: 2)), cells: &cells)
             }
         case 0x00fd:
             if payload.count >= 10 {
                 let index = Int(payload.uint32LE(at: 6))
                 if sharedStrings.indices.contains(index) {
-                    cells[Int(payload.uint16LE(at: 0)), default: [:]][Int(payload.uint16LE(at: 2))] = sharedStrings[index]
+                    try storeBIFFCell(sharedStrings[index], rowIndex: Int(payload.uint16LE(at: 0)), columnIndex: Int(payload.uint16LE(at: 2)), cells: &cells)
                 }
             }
         case 0x0203:
             if payload.count >= 14 {
                 let value = payload.doubleLE(at: 6)
-                cells[Int(payload.uint16LE(at: 0)), default: [:]][Int(payload.uint16LE(at: 2))] = numberString(value)
+                try storeBIFFCell(numberString(value), rowIndex: Int(payload.uint16LE(at: 0)), columnIndex: Int(payload.uint16LE(at: 2)), cells: &cells)
             }
         case 0x000a:
             break
@@ -351,16 +429,40 @@ private func parseBIFFRows(_ stream: Data) throws -> [[String]] {
     }
 
     guard let maxRow = cells.keys.max() else { return [] }
-    return (0...maxRow).map { rowIndex in
+    guard maxRow < SpreadsheetImportFile.maxWorksheetImportRows else {
+        throw CSVParserError.tooManyRows(
+            sourceLabel: "workbook",
+            count: maxRow,
+            maximum: ProjectLimits.results
+        )
+    }
+    return try (0...maxRow).map { rowIndex in
         let row = cells[rowIndex] ?? [:]
         guard let maxColumn = row.keys.max() else { return [] }
+        guard maxColumn < SpreadsheetImportFile.maxWorksheetImportColumns else {
+            throw LegacyXLSWorkbookError.invalidWorkbookStream
+        }
         return (0...maxColumn).map { row[$0] ?? "" }
     }
 }
 
+private func storeBIFFCell(
+    _ value: String,
+    rowIndex: Int,
+    columnIndex: Int,
+    cells: inout [Int: [Int: String]]
+) throws {
+    guard rowIndex >= 0, rowIndex < SpreadsheetImportFile.maxWorksheetImportRows,
+          columnIndex >= 0, columnIndex < SpreadsheetImportFile.maxWorksheetImportColumns
+    else {
+        throw LegacyXLSWorkbookError.invalidWorkbookStream
+    }
+    cells[rowIndex, default: [:]][columnIndex] = value
+}
+
 private func decodeSST(_ payload: Data) -> [String] {
     guard payload.count >= 8 else { return [] }
-    let count = Int(payload.uint32LE(at: 4))
+    let count = min(Int(payload.uint32LE(at: 4)), ProjectLimits.results * SpreadsheetImportFile.maxWorksheetImportColumns)
     var strings: [String] = []
     var offset = 8
     while offset < payload.count, strings.count < count {
@@ -381,16 +483,26 @@ private func decodeXLUnicodeStringWithLength(_ payload: Data, offset: Int) -> (v
     let flags = payload[offset + 2]
     let start = offset + 3
     if flags & 0x01 == 0 {
-        guard start + length <= payload.count else { return nil }
+        guard length <= ProjectLimits.resultFreeTextCharacters,
+              start + length <= payload.count
+        else { return nil }
         return (String(bytes: payload[start..<start + length], encoding: .utf8) ?? "", start + length)
     }
-    guard start + (length * 2) <= payload.count else { return nil }
+    guard length <= ProjectLimits.resultFreeTextCharacters,
+          start + (length * 2) <= payload.count
+    else { return nil }
     let units = stride(from: start, to: start + (length * 2), by: 2).map { payload.uint16LE(at: $0) }
     return (String(decoding: units, as: UTF16.self), start + (length * 2))
 }
 
 private func numberString(_ value: Double) -> String {
-    value.rounded() == value ? String(Int64(value)) : String(value)
+    guard value.isFinite else { return "" }
+    if value.rounded() == value,
+       value >= Double(Int64.min),
+       value <= Double(Int64.max) {
+        return String(Int64(value))
+    }
+    return String(value)
 }
 
 private extension Data {

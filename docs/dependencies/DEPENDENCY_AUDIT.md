@@ -12,14 +12,17 @@ justify the ownership cost.
 
 Current package posture:
 
+Release hardening update:
+The manifest now pins all third-party packages with exact version constraints. A release machine still must run `swift package resolve` and commit the generated `Package.resolved` before public submission, because this audit environment cannot fetch GitHub-hosted package revisions.
+
 | Package | Manifest constraint | License | Current role | Offline/local-first fit |
 | --- | --- | --- | --- | --- |
-| The Composable Architecture (`swift-composable-architecture`) | `from: "1.17.0"` | MIT | App state, effects, dependency boundaries, and reducer tests. | Runs in-process with explicit side effects, helping keep save/import/export/generation states truthful and testable without network or backend services. |
-| CodableCSV | `from: "0.6.7"` | MIT | CSV parsing/writing infrastructure around Commenter-specific import/export validation. | Pure local file/data processing; suitable for offline teacher roster/result files when wrapped by all-or-nothing domain validation. |
-| CoreXLSX | `.upToNextMinor(from: "0.14.1")` | Apache License 2.0 | XLSX parsing infrastructure for Open XML workbook support. | Pure local workbook parsing; appropriate for offline spreadsheet import/export workflows when paired with Commenter validation and explicit unsupported-path errors. |
-| OLEKit | `.upToNextMinor(from: "0.2.0")` | Apache License 2.0, with bundled olefile-derived FreeBSD-style license notice | OLE compound file infrastructure for legacy Office binary containers. | Pure local binary-container handling; appropriate for legacy `.xls` work only as infrastructure, not as a substitute for full BIFF cell semantics. |
-| GRDB.swift | `from: "7.10.0"` | MIT | SQLite project index infrastructure in `CommenterPersistence`. | Pure local SQLite access; replaces direct `sqlite3` wrapper ownership with an approved local persistence dependency. |
-| ZIPFoundation | `from: "0.9.0"` | MIT | ZIP archive infrastructure for OOXML package assembly and verification. | Pure local archive read/write; appropriate as the generic ZIP layer for DOCX/XLSX payloads while higher-level document/workbook ownership remains under audit. |
+| The Composable Architecture (`swift-composable-architecture`) | `exact: "1.17.0"` | MIT | App state, effects, dependency boundaries, and reducer tests. | Runs in-process with explicit side effects, helping keep save/import/export/generation states truthful and testable without network or backend services. |
+| CodableCSV | `exact: "0.6.7"` | MIT | CSV parsing/writing infrastructure around Commenter-specific import/export validation. | Pure local file/data processing; suitable for offline teacher roster/result files when wrapped by all-or-nothing domain validation. |
+| CoreXLSX | `exact: "0.14.1"` | Apache License 2.0 | XLSX parsing infrastructure for Open XML workbook support. | Pure local workbook parsing; appropriate for offline spreadsheet import/export workflows when paired with Commenter validation and explicit unsupported-path errors. |
+| OLEKit | `exact: "0.2.0"` | Apache License 2.0, with bundled olefile-derived FreeBSD-style license notice | OLE compound file infrastructure for legacy Office binary containers. | Pure local binary-container handling; appropriate for legacy `.xls` work only as infrastructure, not as a substitute for full BIFF cell semantics. |
+| GRDB.swift | `exact: "7.10.0"` | MIT | SQLite project index infrastructure in `CommenterPersistence`. | Pure local SQLite access; replaces direct `sqlite3` wrapper ownership with an approved local persistence dependency. |
+| ZIPFoundation | `exact: "0.9.0"` | MIT | ZIP archive infrastructure for OOXML package assembly and verification. | Pure local archive read/write; appropriate as the generic ZIP layer for DOCX/XLSX payloads while higher-level document/workbook ownership remains under audit. |
 
 License references:
 

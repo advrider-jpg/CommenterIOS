@@ -9,6 +9,7 @@ extension AppFeature {
             state.aiAvailabilityStatus = .checking
             state.projectStorageMessage = "Checking local project storage."
             return .run { send in
+                await projectStoreClient.purgeStalePreparedFiles()
                 do {
                     await send(.datasetLoaded(try await datasetClient.load()))
                 } catch {
@@ -66,7 +67,7 @@ extension AppFeature {
             return .none
 
         case .copyDiagnosticsTapped:
-            let diagnostics = supportDiagnosticsText(state: state)
+            let diagnostics = supportDiagnosticsText(state: state, redaction: .redacted)
             state.operationStatus = .busy("Copying support diagnostics.")
             return .run { send in
                 do {

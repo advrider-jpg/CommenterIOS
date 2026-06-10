@@ -30,6 +30,10 @@ struct OOXMLZipEntry: Equatable {
 }
 
 enum OOXMLZipWriter {
+    static let defaultMaximumEntryBytes = 2 * 1024 * 1024
+    static let defaultMaximumTotalUncompressedBytes = 8 * 1024 * 1024
+    static let defaultMaximumEntryCount = 128
+
     static func archive(entries: [OOXMLZipEntry]) throws -> Data {
         var seen: Set<String> = []
         let archive = try Archive(data: Data(), accessMode: .create)
@@ -65,26 +69,72 @@ enum OOXMLZipWriter {
     }
 
     static func validateArchive(_ data: Data, requiredEntries: Set<String>) throws {
-        let entries = try storedEntries(data)
+        let entries = try storedEntries(
+            data,
+            maximumEntryBytes: 64 * 1024 * 1024,
+            maximumTotalUncompressedBytes: 128 * 1024 * 1024,
+            maximumEntryCount: max(requiredEntries.count, 1),
+            allowedPaths: { requiredEntries.contains($0) }
+        )
         let missing = requiredEntries.subtracting(entries.keys)
         if let missing = missing.sorted().first {
             throw OOXMLZipWriterError.missingRequiredEntry(missing)
         }
     }
 
-    static func storedEntries(_ data: Data) throws -> [String: Data] {
+    static func storedEntries(
+        _ data: Data,
+        maximumEntryBytes: Int = defaultMaximumEntryBytes,
+        maximumTotalUncompressedBytes: Int = defaultMaximumTotalUncompressedBytes,
+        maximumEntryCount: Int = defaultMaximumEntryCount,
+        allowedPaths: ((String) -> Bool)? = nil
+    ) throws -> [String: Data] {
+        guard maximumEntryBytes > 0, maximumTotalUncompressedBytes > 0, maximumEntryCount > 0 else {
+            throw OOXMLZipWriterError.archiveTooLarge
+        }
+
         do {
             let archive = try Archive(data: data, accessMode: .read)
             var entries: [String: Data] = [:]
+            var extractedTotalBytes = 0
+            var acceptedEntryCount = 0
+
             for entry in archive {
+                guard allowedPaths?(entry.path) ?? true else { continue }
+                acceptedEntryCount += 1
+                guard acceptedEntryCount <= maximumEntryCount else {
+                    throw OOXMLZipWriterError.archiveTooLarge
+                }
+                guard entries[entry.path] == nil else {
+                    throw OOXMLZipWriterError.duplicateEntry(entry.path)
+                }
+
+                let declaredSize = Int(clamping: entry.uncompressedSize)
+                guard declaredSize <= maximumEntryBytes else {
+                    throw OOXMLZipWriterError.entryTooLarge(entry.path)
+                }
+                guard declaredSize <= maximumTotalUncompressedBytes - extractedTotalBytes else {
+                    throw OOXMLZipWriterError.archiveTooLarge
+                }
+
                 var extracted = Data()
+                extracted.reserveCapacity(declaredSize)
                 _ = try archive.extract(entry, consumer: { chunk in
+                    guard chunk.count <= maximumEntryBytes - extracted.count else {
+                        throw OOXMLZipWriterError.entryTooLarge(entry.path)
+                    }
+                    guard chunk.count <= maximumTotalUncompressedBytes - extractedTotalBytes else {
+                        throw OOXMLZipWriterError.archiveTooLarge
+                    }
                     extracted.append(chunk)
+                    extractedTotalBytes += chunk.count
                 })
                 entries[entry.path] = extracted
             }
 
             return entries
+        } catch let error as OOXMLZipWriterError {
+            throw error
         } catch {
             throw OOXMLZipWriterError.invalidArchive
         }

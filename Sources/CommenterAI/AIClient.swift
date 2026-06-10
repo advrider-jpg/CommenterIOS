@@ -98,6 +98,8 @@ public enum AIClientError: LocalizedError, Equatable {
     case unavailable(AIModelUnavailableReason)
     case generationNotImplemented
     case validationBlocked(ReportValidationSummary)
+    case requestTooLarge
+    case timedOut
 
     public var errorDescription: String? {
         switch self {
@@ -107,6 +109,10 @@ public enum AIClientError: LocalizedError, Equatable {
             return "On-device AI generation is not implemented in this build."
         case .validationBlocked:
             return "The AI result was blocked by report validation."
+        case .requestTooLarge:
+            return "The AI request is too large for safe on-device processing. Shorten the report or instructions and try again."
+        case .timedOut:
+            return "The on-device AI request took too long and was cancelled. Try again with a shorter report or fewer custom instructions."
         }
     }
 }

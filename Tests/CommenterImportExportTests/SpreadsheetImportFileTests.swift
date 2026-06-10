@@ -165,6 +165,45 @@ final class SpreadsheetImportFileTests: XCTestCase {
         }
     }
 
+
+    func testParseXLSXRejectsOutOfBoundsColumnReferencesBeforeAllocation() throws {
+        let data = try workbookData(sheetXML: """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetData>
+            <row r="1">
+              <c r="BM1" t="inlineStr"><is><t>First Name</t></is></c>
+            </row>
+            <row r="2">
+              <c r="BM2" t="inlineStr"><is><t>Ava</t></is></c>
+            </row>
+          </sheetData>
+        </worksheet>
+        """)
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseXLSX(data, label: "Roster workbook")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .unreadableWorkbook("Roster workbook"))
+        }
+    }
+
+    func testBoundedOOXMLExtractionRejectsLargeExpandedEntries() throws {
+        let data = try OOXMLZipWriter.archive(entries: [
+            OOXMLZipEntry(
+                path: "xl/sharedStrings.xml",
+                data: Data(repeating: UInt8(ascii: "x"), count: SpreadsheetImportFile.maxWorkbookEntryBytes + 1)
+            )
+        ])
+
+        XCTAssertThrowsError(try OOXMLZipWriter.storedEntries(
+            data,
+            maximumEntryBytes: SpreadsheetImportFile.maxWorkbookEntryBytes,
+            maximumTotalUncompressedBytes: SpreadsheetImportFile.maxWorkbookUncompressedBytes,
+            allowedPaths: { _ in true }
+        )) { error in
+            XCTAssertEqual(error as? OOXMLZipWriterError, .entryTooLarge("xl/sharedStrings.xml"))
+        }
+    }
+
     func testParseXLSRejectsMalformedOLEOrMissingWorkbookStream() throws {
         let url = try writeTemporaryFile(name: "bad.xls", data: Data("not-xls".utf8))
 

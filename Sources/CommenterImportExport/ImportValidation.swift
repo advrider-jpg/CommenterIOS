@@ -28,7 +28,7 @@ public enum ImportValidation {
         createID: () throws -> String
     ) throws -> [Student] {
         try parseRosterImportRows(
-            CSVParser.parseCSV(text),
+            CSVParser.parseCSV(text, maxRows: ProjectLimits.students),
             existingRoster: existingRoster,
             createID: createID
         )
@@ -126,7 +126,7 @@ public enum ImportValidation {
         selectedSubjects: [String: SelectedSubject]
     ) throws -> [AchievementResult] {
         try parseResultsImportRows(
-            CSVParser.parseCSV(text),
+            CSVParser.parseCSV(text, maxRows: ProjectLimits.results),
             roster: roster,
             selectedSubjects: selectedSubjects
         )

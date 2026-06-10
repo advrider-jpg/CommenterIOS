@@ -3,6 +3,7 @@ import CommenterDomain
 import CommenterImportExport
 import CommenterPersistence
 import ComposableArchitecture
+import Foundation
 
 extension AppFeature {
     func reduceFileWorkflow(_ state: inout State, _ action: Action) -> Effect<Action> {
@@ -252,7 +253,7 @@ extension AppFeature {
                     state.resultsImportState = .failed(message)
                 }
             }
-            state.operationStatus = .failed("Import failed. Project data was left unchanged: \(message)")
+            state.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: \(message)")
             return .none
 
         case .prepareBackupTapped:
@@ -265,11 +266,15 @@ extension AppFeature {
                 state.operationStatus = .failed("Save current changes before preparing Backup JSON so the backup reflects verified local storage.")
                 return .none
             }
+            let previousPreparedURL = state.preparedFile?.url
             state.projectStorageStatus = .preparingFile
             state.preparedFile = nil
             state.operationStatus = .busy("Preparing and verifying backup JSON.")
             let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
+                if let previousPreparedURL {
+                    await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                }
                 do {
                     await send(.filePrepared(try await projectStoreClient.prepareBackup(project), "Verified backup JSON is ready to export or share.", .backupJSON, preparedAt))
                 } catch {
@@ -293,11 +298,15 @@ extension AppFeature {
                 state.operationStatus = .failed("Report exports are not ready. \(ready) of \(expected) draft comments are export-ready.")
                 return .none
             }
+            let previousPreparedURL = state.preparedFile?.url
             state.projectStorageStatus = .preparingFile
             state.preparedFile = nil
             state.operationStatus = .busy("Checking readiness and preparing \(format.rawValue.uppercased()) export.")
             let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
+                if let previousPreparedURL {
+                    await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                }
                 do {
                     await send(.filePrepared(try await projectStoreClient.prepareReportExport(project, format), "\(format.rawValue.uppercased()) export file is verified and ready.", format, preparedAt))
                 } catch {
@@ -324,43 +333,63 @@ extension AppFeature {
             return .none
 
         case let .fileExportSaved(url):
-            state.operationStatus = .saved("File saved to \(url.lastPathComponent).")
-            return .none
+            let preparedURL = state.preparedFile?.url
+            state.preparedFile = nil
+            state.operationStatus = .saved("File saved to \(url.lastPathComponent). Temporary prepared copy was removed.")
+            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
 
         case .fileExportCancelled:
-            state.operationStatus = .cancelled("File export cancelled. No saved-file success was recorded.")
-            return .none
+            let preparedURL = state.preparedFile?.url
+            state.preparedFile = nil
+            state.operationStatus = .cancelled("File export cancelled. Temporary prepared copy was removed.")
+            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
 
         case let .fileExportFailed(message):
-            state.operationStatus = .failed("File export failed: \(message)")
-            return .none
+            let preparedURL = state.preparedFile?.url
+            state.preparedFile = nil
+            state.operationStatus = .failed("File export failed: \(message). Temporary prepared copy was removed.")
+            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
 
         case let .fileShareStarted(url):
             state.operationStatus = .busy("Opening native share sheet for \(url.lastPathComponent).")
             return .none
 
         case let .fileShareCompleted(url):
-            state.operationStatus = .shared("Share completed for \(url.lastPathComponent).")
-            return .none
+            let preparedURL = state.preparedFile?.url ?? url
+            state.preparedFile = nil
+            state.operationStatus = .shared("Share completed for \(url.lastPathComponent). Temporary prepared copy was removed.")
+            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
 
         case .fileShareCancelled:
-            state.operationStatus = .cancelled("Share cancelled. No share success was recorded.")
-            return .none
+            let preparedURL = state.preparedFile?.url
+            state.preparedFile = nil
+            state.operationStatus = .cancelled("Share cancelled. Temporary prepared copy was removed.")
+            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
 
         case let .fileShareFailed(message):
-            state.operationStatus = .failed("Share failed: \(message)")
-            return .none
+            let preparedURL = state.preparedFile?.url
+            state.preparedFile = nil
+            state.operationStatus = .failed("Share failed: \(message). Temporary prepared copy was removed.")
+            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
 
         case .preparedFileDismissed:
+            let preparedURL = state.preparedFile?.url
             state.preparedFile = nil
             if case .prepared = state.operationStatus {
                 state.operationStatus = .idle
             }
-            return .none
+            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
 
         default:
             return .none
         }
+    }
+}
+
+private func discardPreparedFileEffect(_ url: URL?, projectStoreClient: ProjectStoreClient) -> Effect<AppFeature.Action> {
+    guard let url else { return .none }
+    return .run { _ in
+        await projectStoreClient.discardPreparedFile(url)
     }
 }
 

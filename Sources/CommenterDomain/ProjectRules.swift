@@ -1,7 +1,7 @@
 import Foundation
 
 public enum ProjectLimits {
-    public static let backupBytes = 5 * 1024 * 1024
+    public static let backupBytes = 128 * 1024 * 1024
     public static let projectNameCharacters = 120
     public static let termCharacters = 80
     public static let students = 300

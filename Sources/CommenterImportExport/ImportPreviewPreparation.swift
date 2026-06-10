@@ -35,7 +35,8 @@ public func prepareRosterImportPreview(
     let (format, parsed) = try parseTabularImportPreviewFile(
         from: url,
         importLabel: "Roster",
-        acceptedRowLabel: "student"
+        acceptedRowLabel: "student",
+        maxRows: ProjectLimits.students
     )
     let students = try ImportValidation.parseRosterImportRows(
         parsed,
@@ -66,7 +67,8 @@ public func prepareResultsImportPreview(
     let (format, parsed) = try parseTabularImportPreviewFile(
         from: url,
         importLabel: "Results",
-        acceptedRowLabel: "result"
+        acceptedRowLabel: "result",
+        maxRows: ProjectLimits.results
     )
     let results = try ImportValidation.parseResultsImportRows(
         parsed,
@@ -92,11 +94,12 @@ public func prepareResultsImportPreview(
 private func parseTabularImportPreviewFile(
     from url: URL,
     importLabel: String,
-    acceptedRowLabel: String
+    acceptedRowLabel: String,
+    maxRows: Int
 ) throws -> (ImportExportFormat, CSVParseResult) {
     let format = try SpreadsheetImportFile.importFormat(for: url, label: importLabel)
     do {
-        let parsed = try SpreadsheetImportFile.parseTabularImportFile(url: url, label: importLabel)
+        let parsed = try SpreadsheetImportFile.parseTabularImportFile(url: url, label: importLabel, maxRows: maxRows)
         return (format, parsed)
     } catch CSVParserError.missingDataRows(_) {
         throw ImportPreviewPreparationError.noAcceptedRows(acceptedRowLabel)

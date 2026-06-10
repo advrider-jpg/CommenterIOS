@@ -7,6 +7,8 @@ public enum ProjectStoreError: LocalizedError, Equatable {
     case invalidProject([String])
     case revisionConflict
     case verificationFailed
+    case unsafeProjectIdentifier(String)
+    case pathCollision(String)
     case sqlite(String)
 
     public var errorDescription: String? {
@@ -21,6 +23,10 @@ public enum ProjectStoreError: LocalizedError, Equatable {
             return "This project was changed elsewhere. Reopen the project before saving more changes."
         case .verificationFailed:
             return "The project was written, but the saved copy could not be verified. Export a backup and reopen the project."
+        case let .unsafeProjectIdentifier(id):
+            return "Project \(id) cannot be saved because its identifier is not storage-safe."
+        case let .pathCollision(id):
+            return "Project \(id) cannot be saved because its storage path is already used by another local project."
         case let .sqlite(message):
             return "The local project index could not be updated: \(message)"
         }
@@ -175,6 +181,9 @@ public struct FileProjectStore: ProjectStore {
     }
 
     public func loadProject(id: String) async throws -> Project {
+        guard isStorageSafeProjectIdentifier(id) else {
+            throw ProjectStoreError.projectNotFound(id)
+        }
         let url = projectFileURL(projectId: id)
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ProjectStoreError.projectNotFound(id)
@@ -192,9 +201,16 @@ public struct FileProjectStore: ProjectStore {
         var normalized = reconcileProjectForPersistence(project, nowMilliseconds: nowMilliseconds)
         try assertValid(normalized)
 
+        guard isStorageSafeProjectIdentifier(normalized.metadata.id) else {
+            throw ProjectStoreError.unsafeProjectIdentifier(normalized.metadata.id)
+        }
+
         let projectDirectory = projectDirectoryURL(projectId: normalized.metadata.id)
         let projectFile = projectDirectory.appendingPathComponent("project.json")
         let existing = try existingValidProject(at: projectFile)
+        if let existing, existing.metadata.id != normalized.metadata.id {
+            throw ProjectStoreError.pathCollision(normalized.metadata.id)
+        }
         let existingRevision = existing?.metadata.persistence?.revision ?? 0
 
         if let expectedRevision = options.expectedRevision, expectedRevision != existingRevision {
@@ -221,24 +237,26 @@ public struct FileProjectStore: ProjectStore {
         normalized = reconcileProjectForPersistence(normalized, nowMilliseconds: nowMilliseconds)
         normalized.metadata.persistence?.fingerprint = fingerprint
 
-        try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
+        try createProtectedDirectory(at: projectDirectory)
         try writeProjectAtomically(normalized, to: projectFile)
-        try SQLiteProjectIndex(indexURL: indexURL).upsert(project: normalized, projectPath: projectFile, usedVariantIds: reportVariantIds(normalized))
 
-        guard options.verifyReadAfterWrite else {
-            return normalized
+        let saved: Project
+        if options.verifyReadAfterWrite {
+            saved = try verifiedProject(at: projectFile, expectedFingerprint: fingerprint)
+        } else {
+            saved = normalized
         }
 
-        let saved = try readProject(at: projectFile)
-        let readFingerprint = try projectFingerprint(saved)
-        guard readFingerprint == fingerprint, readFingerprint == saved.metadata.persistence?.fingerprint else {
-            throw ProjectStoreError.verificationFailed
-        }
+        try? SQLiteProjectIndex(indexURL: indexURL).upsert(project: saved, projectPath: projectFile, usedVariantIds: reportVariantIds(saved))
+        try? applyFileProtectionToSQLiteStore(at: indexURL)
         return saved
     }
 
     public func deleteProject(id: String) throws {
         try ensureStorageLayout()
+        guard isStorageSafeProjectIdentifier(id) else {
+            throw ProjectStoreError.projectNotFound(id)
+        }
         let directory = projectDirectoryURL(projectId: id)
         let projectFile = directory.appendingPathComponent("project.json")
         guard let existing = try existingValidProject(at: projectFile) else {
@@ -251,15 +269,19 @@ public struct FileProjectStore: ProjectStore {
         guard !FileManager.default.fileExists(atPath: projectFile.path) else {
             throw ProjectStoreError.verificationFailed
         }
-        try SQLiteProjectIndex(indexURL: indexURL).deleteProject(id: id)
+        try? SQLiteProjectIndex(indexURL: indexURL).deleteProject(id: id)
+        try? applyFileProtectionToSQLiteStore(at: indexURL)
     }
 
     public func createRecoverySnapshot(_ project: Project, reason: RecoveryReason) throws {
         try ensureStorageLayout()
         let normalized = reconcileProjectForPersistence(project, nowMilliseconds: project.metadata.updatedAt)
         try assertValid(normalized)
+        guard isStorageSafeProjectIdentifier(normalized.metadata.id) else {
+            throw ProjectStoreError.unsafeProjectIdentifier(normalized.metadata.id)
+        }
         let recoveryDirectory = recoveryDirectoryURL(projectId: normalized.metadata.id)
-        try FileManager.default.createDirectory(at: recoveryDirectory, withIntermediateDirectories: true)
+        try createProtectedDirectory(at: recoveryDirectory)
 
         let createdAt = milliseconds(now())
         let existing = try listRecoverySnapshots(projectId: normalized.metadata.id)
@@ -279,6 +301,7 @@ public struct FileProjectStore: ProjectStore {
         let snapshotURL = recoveryDirectory.appendingPathComponent("\(snapshot.key).json")
         let data = try jsonEncoder().encode(snapshot)
         try data.write(to: snapshotURL, options: [.atomic])
+        try applyFileProtection(to: snapshotURL)
         do {
             let verified = try readRecoverySnapshot(at: snapshotURL)
             guard verified == snapshot else {
@@ -297,6 +320,7 @@ public struct FileProjectStore: ProjectStore {
         try ensureStorageLayout()
         let projectDirectories: [URL]
         if let projectId {
+            guard isStorageSafeProjectIdentifier(projectId) else { return [] }
             projectDirectories = [projectDirectoryURL(projectId: projectId)]
         } else {
             projectDirectories = try FileManager.default.contentsOfDirectory(
@@ -334,10 +358,12 @@ public struct FileProjectStore: ProjectStore {
     }
 
     private func ensureStorageLayout() throws {
-        try FileManager.default.createDirectory(at: projectsURL, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: datasetsURL, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: exportsTempURL, withIntermediateDirectories: true)
-        try SQLiteProjectIndex(indexURL: indexURL).initialize()
+        try createProtectedDirectory(at: rootURL)
+        try createProtectedDirectory(at: projectsURL)
+        try createProtectedDirectory(at: datasetsURL)
+        try createProtectedDirectory(at: exportsTempURL)
+        try? SQLiteProjectIndex(indexURL: indexURL).initialize()
+        try? applyFileProtectionToSQLiteStore(at: indexURL)
     }
 
     private func projectDirectoryURL(projectId: String) -> URL {
@@ -350,6 +376,17 @@ public struct FileProjectStore: ProjectStore {
 
     private func recoveryDirectoryURL(projectId: String) -> URL {
         projectDirectoryURL(projectId: projectId).appendingPathComponent("recovery", isDirectory: true)
+    }
+
+    private func verifiedProject(at url: URL, expectedFingerprint: String) throws -> Project {
+        let saved = try readProject(at: url)
+        let readFingerprint = try projectFingerprint(saved)
+        guard readFingerprint == expectedFingerprint,
+              readFingerprint == saved.metadata.persistence?.fingerprint
+        else {
+            throw ProjectStoreError.verificationFailed
+        }
+        return saved
     }
 
     private func readProject(at url: URL) throws -> Project {
@@ -385,11 +422,35 @@ public struct FileProjectStore: ProjectStore {
     private func writeProjectAtomically(_ project: Project, to url: URL) throws {
         let data = try jsonEncoder().encode(project)
         try data.write(to: url, options: [.atomic])
+        try applyFileProtection(to: url)
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let size = attributes[.size] as? NSNumber
         guard (size?.intValue ?? 0) > 0 else {
             throw ProjectStoreError.verificationFailed
         }
+    }
+
+    private func createProtectedDirectory(at url: URL) throws {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try applyFileProtection(to: url)
+    }
+
+    private func applyFileProtection(to url: URL) throws {
+        #if os(iOS)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
+        #else
+        _ = url
+        #endif
+    }
+
+    private func applyFileProtectionToSQLiteStore(at url: URL) throws {
+        try applyFileProtection(to: url)
+        try applyFileProtection(to: URL(fileURLWithPath: "\(url.path)-wal"))
+        try applyFileProtection(to: URL(fileURLWithPath: "\(url.path)-shm"))
     }
 
     private func assertValid(_ project: Project) throws {
@@ -449,6 +510,18 @@ private extension DecodingError {
         @unknown default:
             return localizedDescription
         }
+    }
+}
+
+
+private func isStorageSafeProjectIdentifier(_ id: String) -> Bool {
+    guard !id.isEmpty, id.count <= 120 else { return false }
+    return id.unicodeScalars.allSatisfy { scalar in
+        (65...90).contains(scalar.value)
+            || (97...122).contains(scalar.value)
+            || (48...57).contains(scalar.value)
+            || scalar.value == 45
+            || scalar.value == 95
     }
 }
 

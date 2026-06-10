@@ -13,9 +13,15 @@ public let projectBackupVersion = 2
 public let encryptedProjectBackupFormat = "commenter-project-backup-encrypted"
 public let encryptedProjectBackupVersion = 2
 public let encryptedBackupKDFIterations = 650_000
+public let encryptedBackupMaximumKDFIterations = 1_500_000
 public let encryptedBackupMinimumPasswordCharacters = 12
 public let encryptedBackupMaximumPasswordCharacters = 1_024
-public let encryptedBackupBytes = 8 * 1024 * 1024
+public let encryptedBackupBytes = 192 * 1024 * 1024
+public let encryptedBackupSaltBytes = 16
+public let encryptedBackupIVBytes = 12
+public let encryptedBackupAuthenticationTagBytes = 16
+public let encryptedBackupMinimumCiphertextAndTagBytes = encryptedBackupAuthenticationTagBytes + 1
+public let backupImportableProjectIDMaximumCharacters = 120
 
 public struct ProjectBackupChecksum: Codable, Equatable, Sendable {
     public var algorithm: String
@@ -217,6 +223,17 @@ public func getBackupCollisionKind(
     return .none
 }
 
+public func isBackupImportableProjectID(_ id: String) -> Bool {
+    guard !id.isEmpty, id.count <= backupImportableProjectIDMaximumCharacters else { return false }
+    return id.unicodeScalars.allSatisfy { scalar in
+        (65...90).contains(scalar.value)
+            || (97...122).contains(scalar.value)
+            || (48...57).contains(scalar.value)
+            || scalar.value == 45
+            || scalar.value == 95
+    }
+}
+
 public func normalizeBackupImportChoice(_ value: String?) -> BackupImportChoice? {
     let normalized = (value ?? "CANCEL").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     if normalized.isEmpty || normalized == "CANCEL" { return .cancel }
@@ -240,6 +257,9 @@ public func serializeProjectBackup(project: Project, createdAt: Date = Date()) t
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     let data = try encoder.encode(payload)
+    guard data.count <= ProjectLimits.backupBytes else {
+        throw BackupError.oversized(maxMegabytes: ProjectLimits.backupBytes / (1024 * 1024))
+    }
     guard let serialized = String(data: data, encoding: .utf8) else {
         throw BackupError.couldNotOpen
     }
@@ -247,8 +267,8 @@ public func serializeProjectBackup(project: Project, createdAt: Date = Date()) t
 }
 
 public func serializeEncryptedProjectBackup(project: Project, password: String, createdAt: Date = Date()) throws -> String {
-    let salt = try secureRandomData(byteCount: 16)
-    let iv = try secureRandomData(byteCount: 12)
+    let salt = try secureRandomData(byteCount: encryptedBackupSaltBytes)
+    let iv = try secureRandomData(byteCount: encryptedBackupIVBytes)
     return try serializeEncryptedProjectBackup(
         project: project,
         password: password,
@@ -267,6 +287,13 @@ func serializeEncryptedProjectBackup(
     salt: Data,
     iv: Data
 ) throws -> String {
+    guard (1...encryptedBackupMaximumKDFIterations).contains(iterations),
+          salt.count == encryptedBackupSaltBytes,
+          iv.count == encryptedBackupIVBytes
+    else {
+        throw BackupError.couldNotOpen
+    }
+
     let passwordValidation = validateBackupPasswordForEncryption(password)
     guard passwordValidation.ok else {
         throw BackupError.invalidPassword(passwordValidation.message ?? "Choose a stronger backup password.")
@@ -372,6 +399,9 @@ private func parsePlainProjectBackup(serialized: String) throws -> Project {
     guard payload.format == projectBackupFormat, payload.version == 1 || payload.version == 2 else {
         throw BackupError.couldNotOpen
     }
+    guard isBackupImportableProjectID(payload.project.metadata.id) else {
+        throw BackupError.couldNotOpen
+    }
 
     let validation = validateStoredProjectShape(payload.project)
     guard validation.ok else {
@@ -414,6 +444,12 @@ private func decryptEncryptedBackupPayload(data: Data, password: String?) throws
     else {
         throw BackupError.encryptedCouldNotDecrypt
     }
+    guard salt.count == encryptedBackupSaltBytes,
+          iv.count == encryptedBackupIVBytes,
+          ciphertext.count >= encryptedBackupMinimumCiphertextAndTagBytes
+    else {
+        throw BackupError.encryptedCouldNotDecrypt
+    }
 
     let aad = payload.version == encryptedProjectBackupVersion
         ? encryptedBackupAssociatedData(payload: payload)
@@ -443,11 +479,11 @@ private func decodeEncryptedPayload(data: Data) throws -> EncryptedProjectBackup
           payload.version == 1 || payload.version == encryptedProjectBackupVersion,
           payload.encryption.algorithm == "AES-GCM",
           payload.encryption.kdf == "PBKDF2-SHA-256",
-          payload.encryption.iterations > 0,
+          (1...encryptedBackupMaximumKDFIterations).contains(payload.encryption.iterations),
           payload.encryption.plaintextFormat == projectBackupFormat,
           payload.encryption.plaintextVersion == projectBackupVersion,
           payload.checksum.algorithm == "sha256",
-          !payload.checksum.ciphertextHash.isEmpty,
+          payload.checksum.ciphertextHash.count == 64,
           !payload.encryption.salt.isEmpty,
           !payload.encryption.iv.isEmpty,
           !payload.ciphertext.isEmpty
@@ -472,14 +508,14 @@ private func encryptAESGCM(plaintext: Data, password: String, salt: Data, iterat
 
 private func decryptAESGCM(ciphertextAndTag: Data, password: String, salt: Data, iterations: Int, iv: Data, aad: Data) throws -> Data {
     #if canImport(CryptoKit)
-    guard ciphertextAndTag.count > 16 else {
+    guard ciphertextAndTag.count >= encryptedBackupMinimumCiphertextAndTagBytes else {
         throw BackupError.encryptedCouldNotDecrypt
     }
     do {
         let key = try deriveAESGCMKey(password: password, salt: salt, iterations: iterations)
         let nonce = try AES.GCM.Nonce(data: iv)
-        let ciphertext = Data(ciphertextAndTag.prefix(ciphertextAndTag.count - 16))
-        let tag = Data(ciphertextAndTag.suffix(16))
+        let ciphertext = Data(ciphertextAndTag.prefix(ciphertextAndTag.count - encryptedBackupAuthenticationTagBytes))
+        let tag = Data(ciphertextAndTag.suffix(encryptedBackupAuthenticationTagBytes))
         let sealedBox = try AES.GCM.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tag)
         return try AES.GCM.open(sealedBox, using: key, authenticating: aad)
     } catch let error as BackupError {
@@ -495,7 +531,9 @@ private func decryptAESGCM(ciphertextAndTag: Data, password: String, salt: Data,
 #if canImport(CryptoKit)
 private func deriveAESGCMKey(password: String, salt: Data, iterations: Int) throws -> SymmetricKey {
     let normalized = normalizeBackupPassword(password)
-    guard normalized.count >= 10,
+    guard normalized.count >= encryptedBackupMinimumPasswordCharacters,
+          (1...encryptedBackupMaximumKDFIterations).contains(iterations),
+          salt.count == encryptedBackupSaltBytes,
           let passwordData = normalized.data(using: .utf8)
     else {
         throw BackupError.encryptedCouldNotDecrypt
@@ -504,7 +542,10 @@ private func deriveAESGCMKey(password: String, salt: Data, iterations: Int) thro
 }
 
 private func pbkdf2SHA256(password: Data, salt: Data, iterations: Int, keyByteCount: Int) throws -> Data {
-    guard iterations > 0, keyByteCount > 0 else {
+    guard (1...encryptedBackupMaximumKDFIterations).contains(iterations),
+          keyByteCount > 0,
+          salt.count == encryptedBackupSaltBytes
+    else {
         throw BackupError.encryptedCouldNotDecrypt
     }
     let key = SymmetricKey(data: password)
@@ -559,9 +600,11 @@ private func encryptedBackupAssociatedData(payload: EncryptedProjectBackupPayloa
 
 private func secureRandomData(byteCount: Int) throws -> Data {
     #if canImport(Security)
+    guard byteCount > 0 else { throw BackupError.encryptedUnsupported }
     var bytes = [UInt8](repeating: 0, count: byteCount)
-    let status = bytes.withUnsafeMutableBytes { buffer in
-        SecRandomCopyBytes(kSecRandomDefault, byteCount, buffer.baseAddress!)
+    let status = bytes.withUnsafeMutableBytes { buffer -> OSStatus in
+        guard let baseAddress = buffer.baseAddress else { return errSecParam }
+        return SecRandomCopyBytes(kSecRandomDefault, byteCount, baseAddress)
     }
     guard status == errSecSuccess else {
         throw BackupError.encryptedUnsupported

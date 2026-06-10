@@ -61,7 +61,7 @@ public func prepareReviewWorkbookFile(
         throw ReviewWorkbookFileError.legacyXLSGenerationFailed(error.localizedDescription)
     }
 
-    try data.write(to: destination, options: [.atomic])
+    try writeDataAtomicallyApplyingDefaultProtection(data, to: destination, fileManager: fileManager)
     do {
         let byteCount = try verifiedWorkbookSize(url: destination, fileManager: fileManager)
         let readBack = try Data(contentsOf: destination)
@@ -105,7 +105,11 @@ private func verifyReviewWorkbook(
     switch format {
     case .xlsx:
         try OOXMLZipWriter.validateArchive(data, requiredEntries: requiredXLSXEntries)
-        let entries = try OOXMLZipWriter.storedEntries(data)
+        let entries = try OOXMLZipWriter.storedEntries(
+            data,
+            maximumEntryBytes: 64 * 1024 * 1024,
+            maximumTotalUncompressedBytes: 128 * 1024 * 1024
+        )
         guard let workbook = entries["xl/workbook.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
               let sheet = entries["xl/worksheets/sheet1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
               workbook.contains(#"name="Reports""#)
@@ -216,9 +220,10 @@ private func ensureWorkbookDirectory(_ directory: URL, fileManager: FileManager)
         guard isDirectory.boolValue else {
             throw ReviewWorkbookFileError.invalidDirectory(directory.path)
         }
+        try applyDefaultProtectionIfAvailable(to: directory, fileManager: fileManager)
         return
     }
-    try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+    try createDirectoryApplyingDefaultProtection(directory, fileManager: fileManager)
 }
 
 private func verifiedWorkbookSize(url: URL, fileManager: FileManager) throws -> UInt64 {
