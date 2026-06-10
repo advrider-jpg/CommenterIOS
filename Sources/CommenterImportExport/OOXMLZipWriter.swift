@@ -36,7 +36,9 @@ enum OOXMLZipWriter {
 
     static func archive(entries: [OOXMLZipEntry]) throws -> Data {
         var seen: Set<String> = []
-        let archive = try Archive(data: Data(), accessMode: .create)
+        guard let archive = Archive(data: Data(), accessMode: .create) else {
+            throw OOXMLZipWriterError.invalidArchive
+        }
 
         for entry in entries {
             guard seen.insert(entry.path).inserted else {
@@ -50,7 +52,7 @@ enum OOXMLZipWriter {
             try archive.addEntry(
                 with: entry.path,
                 type: .file,
-                uncompressedSize: Int64(entry.data.count),
+                uncompressedSize: UInt32(entry.data.count),
                 bufferSize: 32_768,
                 provider: { position, size in
                     let start = Int(position)
@@ -94,7 +96,9 @@ enum OOXMLZipWriter {
         }
 
         do {
-            let archive = try Archive(data: data, accessMode: .read)
+            guard let archive = Archive(data: data, accessMode: .read) else {
+                throw OOXMLZipWriterError.invalidArchive
+            }
             var entries: [String: Data] = [:]
             var extractedTotalBytes = 0
             var acceptedEntryCount = 0
