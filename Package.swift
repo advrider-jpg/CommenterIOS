@@ -27,7 +27,7 @@ let package = Package(
         .package(url: "https://github.com/CoreOffice/CoreXLSX.git", exact: "0.14.1"),
         .package(url: "https://github.com/CoreOffice/OLEKit.git", exact: "0.2.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.10.0"),
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.0"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.11"),
         .package(url: "https://github.com/dehesa/CodableCSV.git", exact: "0.6.7"),
         .package(url: "https://github.com/pointfreeco/swift-composable-architecture", exact: "1.17.0")
     ],
