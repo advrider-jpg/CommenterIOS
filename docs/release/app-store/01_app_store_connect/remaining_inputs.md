@@ -1,0 +1,23 @@
+# Remaining Inputs
+TODO: Public support email
+TODO: Support URL
+TODO: Privacy Policy URL
+TODO: Marketing URL, if any
+TODO: Apple seller/developer name
+TODO: Copyright owner
+TODO: App Review contact name
+TODO: App Review contact email
+TODO: App Review contact phone
+TODO: Price
+TODO: Launch countries/territories
+TODO: EU trader choice
+TODO: Business/legal address if required
+TODO: Final App Store screenshots from actual app UI
+TODO: Final privacy re-check against submitted binary
+TODO: Final age-rating confirmation in App Store Connect
+TODO: Final export compliance answer
+TODO: Public support page hosting
+TODO: Public terms page hosting, if used
+TODO: Final copyright string
+TODO: App Review notes contact details
+TODO: Re-check App Store Connect field requirements before submission

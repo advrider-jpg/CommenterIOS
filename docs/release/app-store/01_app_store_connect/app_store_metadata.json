@@ -1,0 +1,19 @@
+{
+  "app_name": "Report Comment Writer",
+  "home_screen_name": "Report Writer",
+  "subtitle": "For Australian teachers",
+  "tagline": "Start with your notes. Finish with a clear report comment.",
+  "promotional_text": "Turn teacher notes into clear report comment drafts. Works without Wi‑Fi, needs no sign‑in, and every comment is checked by you before export.",
+  "description": "Report Comment Writer helps Australian teachers write Year 5 and Year 6 student report comment drafts without starting from a blank page.\n\nAdd your class, choose the learning areas you are reporting on, enter each student’s achievement level, evidence and next step, then create a draft comment.\n\nEvery comment can be edited. Nothing is final until you have checked it yourself.\n\nDesigned for the language teachers already use:\n\n• achievement and progress  \n• strengths  \n• areas for improvement  \n• next learning steps  \n• evidence from class work  \n• parent-friendly wording\n\nUseful at report time:\n\n• create a class  \n• add students by hand  \n• import class lists and results from CSV, XLSX or XLS files  \n• write comments for English, Mathematics, Science, HASS, Health and Physical Education, The Arts and Technologies  \n• review and edit every comment  \n• prepare DOCX report files  \n• prepare XLSX or XLS review workbooks  \n• back up and restore a class file\n\nNo sign-in. Works without Wi‑Fi. The app does not upload student names or report notes to an online account. You choose when to save, export or share a file.\n\nReport Comment Writer does not replace teacher judgement. It helps you prepare a draft, check the wording, and keep control of the final report comment.",
+  "keywords": "school,student,classroom,grade,parent,primary,assessment,year5,year6",
+  "category": "Education",
+  "bundle_id": "com.commenterios.app",
+  "sku": "report-comment-writer-ios-001",
+  "minimum_ios_version": "17.0",
+  "device_family": "iPhone",
+  "support_url": "TODO",
+  "privacy_policy_url": "TODO",
+  "copyright": "TODO: 2026 <owner name>",
+  "review_notes_summary": "No sign-in. Works without Wi-Fi. Create Room 5, add Ava Ng, choose English, At Standard, add reading comprehension evidence, generate a draft, review it, then prepare DOCX export.",
+  "keyword_note": "Avoided repeating the app name words Report, Comment and Writer; avoided the category word Education."
+}
