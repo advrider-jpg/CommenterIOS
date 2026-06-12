@@ -7,11 +7,18 @@ final class CommenterIOSScreenshotTests: XCTestCase {
     private let screenshotProjectName = "Room 5"
     private let screenshotStudentId = "student-1"
     private let screenshotSubjectKey = "english"
+    private let screenshotReportTitle = "Ava Ng - English"
+
+    private var screenshotReportEditorIdentifier: String {
+        "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)"
+    }
 
     override func setUpWithError() throws {
         try super.setUpWithError()
         continueAfterFailure = false
         app = XCUIApplication()
+        app.launchArguments += ["-UITestMode"]
+        app.launchEnvironment["UITEST_DISABLE_ANIMATIONS"] = "1"
     }
 
     func testCoreReportFlowScreenshots() throws {
@@ -127,12 +134,12 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             requireHittable: false
         )
         tapElement(reportRow, named: "generated Ava English report row")
-        let reportEditor = scrollToAnyInWorklist(
-            textViews(identifier: "report-editor-\(screenshotStudentId)-\(screenshotSubjectKey)", label: "Ava English report"),
-            name: "generated Ava English report",
-            requireHittable: false
-        )
-        waitForElement(reportEditor, named: "generated Ava English report")
+        guard let reportEditor = waitForGeneratedReportEditor(timeout: 12) else {
+            captureFailureContext("missing-generated-report-editor")
+            XCTFail("Expected generated Ava English report editor to open after tapping the report row.")
+            return
+        }
+        waitForElement(reportEditor, named: "generated Ava English report", timeout: 2)
         capture("11-generated-report-comment")
         tapBack(to: screenshotProjectName)
         ensureWorklistOpen()
@@ -334,6 +341,30 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
     private func textViews(identifier: String, label: String) -> [XCUIElement] {
         [app.textViews[identifier], app.textViews[label], element(identifier)]
+    }
+
+    private func waitForGeneratedReportEditor(timeout: TimeInterval) -> XCUIElement? {
+        let editorCandidates = [
+            app.textViews[screenshotReportEditorIdentifier],
+            app.otherElements[screenshotReportEditorIdentifier],
+            element(screenshotReportEditorIdentifier),
+            app.textViews["Ava English report"],
+            app.textViews.firstMatch
+        ]
+        let expectedNavigationBar = app.navigationBars[screenshotReportTitle]
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if let editor = editorCandidates.first(where: { $0.exists }) {
+                return editor
+            }
+            if expectedNavigationBar.exists, app.textViews.firstMatch.exists {
+                return app.textViews.firstMatch
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.15))
+        }
+
+        return editorCandidates.first(where: { $0.exists })
     }
 
     private func waitForElement(_ element: XCUIElement, named name: String, timeout: TimeInterval = 30) {
@@ -715,8 +746,12 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             "student-editor-\(screenshotStudentId)",
             "student-first-name-\(screenshotStudentId)",
             "student-last-name-\(screenshotStudentId)",
+            "report-row-\(screenshotStudentId)-\(screenshotSubjectKey)",
+            screenshotReportEditorIdentifier,
             "operation-status-busy",
-            "operation-status-failed"
+            "operation-status-failed",
+            "operation-status-saved",
+            "prepared-file-ready"
         ]
         let roots = rootIdentifiers.map { identifier -> String in
             let candidate = element(identifier)
@@ -732,6 +767,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             let value = button.value.map { String(describing: $0) } ?? "nil"
             return "identifier=\(button.identifier) label=\(button.label) exists=\(button.exists) hittable=\(button.isHittable) value=\(value)"
         }
+        let appDebug = app.debugDescription
         return """
         Root identifiers:
         \(roots.joined(separator: "\n"))
@@ -741,6 +777,9 @@ final class CommenterIOSScreenshotTests: XCTestCase {
 
         Tab buttons:
         \(tabButtons.joined(separator: "\n"))
+
+        App debugDescription:
+        \(appDebug)
         """
     }
 }

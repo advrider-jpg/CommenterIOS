@@ -788,3 +788,11 @@ Append material work history here. Keep entries short, dated, and factual.
 - Recorded that Swift, Xcode, and `plutil` were unavailable in the Windows
   environment, while the package validator, asset validator, whitespace check,
   and line-ending audit were run.
+
+## 2026-06-12 - Screenshot CI report editor wait repair
+
+- Fixed the screenshot UI test so it waits for the generated report editor
+  after tapping the report row instead of re-opening and scrolling the Work
+  list for an editor that only exists on the pushed report screen.
+- Added UITest launch animation disabling, fuller accessibility diagnostics,
+  and a clean selected-simulator boot step for the screenshot CI lane.
