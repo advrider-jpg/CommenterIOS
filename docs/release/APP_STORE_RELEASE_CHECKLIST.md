@@ -33,3 +33,14 @@ Run these on a clean physical device and at least one simulator before public re
 - Copy redacted diagnostics and verify student/project names are not present.
 - Exercise AI unavailable, AI available, AI timeout, and oversized AI prompt paths.
 - Run VoiceOver and Dynamic Type checks on project, import, export, AI review, and support screens.
+
+## App Store release package
+
+- [Release package README](app-store/README.md)
+- [App Store copy](app-store/01_app_store_connect/app_store_copy_paste.md)
+- [App Privacy answers](app-store/01_app_store_connect/app_privacy_answers.md)
+- [App Review notes](app-store/01_app_store_connect/app_review_notes.md)
+- [Privacy policy draft](app-store/02_legal_and_privacy/privacy_policy_draft.md)
+- [Brand guide](app-store/03_brand_and_marketing/brand_guide.md)
+- [Screenshot plan](app-store/04_screenshots/screenshot_plan.md)
+- [TODO placeholders](app-store/08_after_you_add_contact_details/todo_placeholders_to_replace.txt)

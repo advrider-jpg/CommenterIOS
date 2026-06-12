@@ -773,3 +773,27 @@ Append material work history here. Keep entries short, dated, and factual.
 - Relaxed generated-report screenshot lookups to visible-but-not-necessarily
   hittable elements after generation and added candidate state diagnostics for
   future scroll failures.
+
+## 2026-06-12 - App Store release package integration
+
+- Integrated the Report Comment Writer App Store release package under
+  `docs/release/app-store`, including App Store Connect copy, privacy/legal
+  drafts, brand guidance, screenshot plans, generated asset masters, support
+  site drafts, repo-evidence notes, manifest, and central TODO list.
+- Installed the release app icon and accent colour into the real Xcode asset
+  catalog after backing up the previous icon set.
+- Added root Fastlane draft metadata and a release-package validator covering
+  required files, metadata limits, screenshot/icon dimensions, banned
+  teacher-facing claims, obvious sample-data risks, and secret-file patterns.
+- Recorded that Swift, Xcode, and `plutil` were unavailable in the Windows
+  environment, while the package validator, asset validator, whitespace check,
+  and line-ending audit were run.
+
+## 2026-06-12 - Screenshot CI report editor wait repair
+
+- Fixed the screenshot UI test so it waits for the generated report editor
+  after tapping the report row instead of re-opening and scrolling the Work
+  list for an editor that only exists on the pushed report screen.
+- Tightened generated-report navigation verification, safe report-row tapping,
+  back-button fallback handling, UITest launch animation disabling, fuller
+  accessibility diagnostics, and selected-simulator booting for screenshot CI.

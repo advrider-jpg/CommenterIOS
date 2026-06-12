@@ -1,0 +1,13 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Report Comment Writer logo">
+  <rect width="1200" height="360" fill="#F6EFDF"/>
+  <rect x="64" y="56" width="232" height="248" rx="40" fill="#FFFAEC" stroke="#D7C8AD" stroke-width="8"/>
+  <path d="M244 56 L296 108 L244 108 Z" fill="#F4E8D3" stroke="#D7C8AD" stroke-width="6"/>
+  <line x1="104" y1="138" x2="226" y2="138" stroke="#756D61" stroke-width="12" stroke-linecap="round"/>
+  <line x1="104" y1="178" x2="246" y2="178" stroke="#756D61" stroke-width="12" stroke-linecap="round"/>
+  <line x1="104" y1="218" x2="212" y2="218" stroke="#756D61" stroke-width="12" stroke-linecap="round"/>
+  <rect x="174" y="176" width="180" height="112" rx="34" fill="#256DC8"/>
+  <path d="M226 280 L204 328 L274 286 Z" fill="#256DC8"/>
+  <path d="M222 232 L254 260 L314 206" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="404" y="154" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-weight="700" font-size="64" fill="#171411">Report Comment Writer</text>
+  <text x="408" y="216" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="32" fill="#5F574D">Start with your notes. Finish with a clear report comment.</text>
+</svg>

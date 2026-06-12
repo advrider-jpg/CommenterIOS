@@ -1,0 +1,409 @@
+{
+  "generated_at": "2026-06-12T15:54:16.100132+00:00",
+  "repo_root_name": "CommenterIOS",
+  "source_package_detected": "report_comment_writer_release_package (1).zip",
+  "assets": "copied from package; generation scripts included for regeneration",
+  "files": [
+    {
+      "path": "00_read_me/package_manifest.md",
+      "sha256": "cf49d694200e00e9015030fd37c01fed80acdb99be7595c62fb3d53b30017537"
+    },
+    {
+      "path": "00_read_me/README.md",
+      "sha256": "bb28e3c36f51c83d2bc7945aca9585fe8a6d2a9a0eb979db57058e69dbe17377"
+    },
+    {
+      "path": "01_app_store_connect/age_rating_answers.md",
+      "sha256": "ecd86d4dca63e6a1562104c79b6103fe03ff0c7e3db85c2d5833decaa9c9c1e6"
+    },
+    {
+      "path": "01_app_store_connect/app_information.md",
+      "sha256": "8a6a84a916cae1aa7a87d857b32e55785285541b6f6dea8331eb758789ff0eb2"
+    },
+    {
+      "path": "01_app_store_connect/app_privacy_answers.md",
+      "sha256": "a6c65cc32f8954a6b77787e1ccd98fd397e65bb8efb711d717707a0fdec9da0e"
+    },
+    {
+      "path": "01_app_store_connect/app_review_notes.md",
+      "sha256": "50737ab3ab922b3abc89a110610deef8e3e1130426e6e6967cb9c44621fbeb6d"
+    },
+    {
+      "path": "01_app_store_connect/app_store_copy_paste.md",
+      "sha256": "39026526e5d82432d9b14047aaa340998b65c3e0cebec18f771f3190cc861403"
+    },
+    {
+      "path": "01_app_store_connect/app_store_metadata.json",
+      "sha256": "755f8009f43e1074f4bd9a60ea8bddf2c2b9def05d315ffcfd3c83de3129c368"
+    },
+    {
+      "path": "01_app_store_connect/keyword_note.md",
+      "sha256": "f11faa57632decad3a1f17fcf74f3b265ef98ac4e1f4783f78e632c89c90a1ad"
+    },
+    {
+      "path": "01_app_store_connect/remaining_inputs.md",
+      "sha256": "f3b4c76a355aafcb1b267abddec19654c874442fe8fd8e45dbe6a5e6b265c4d4"
+    },
+    {
+      "path": "01_app_store_connect/submission_checklist.md",
+      "sha256": "78903ced0249aa907bcf89813be30b99128499d81dc0e4732581571d3eda82f2"
+    },
+    {
+      "path": "01_app_store_connect/version_information.md",
+      "sha256": "424b64bbd1f0771127bd580870893f5a45b34a92034c48145b250700a32682e6"
+    },
+    {
+      "path": "02_legal_and_privacy/open_source_notices_draft.md",
+      "sha256": "f6727ae2b2e0e3ac1f3858c7b6b01531e9b750d4b638d139dade117201dc62c9"
+    },
+    {
+      "path": "02_legal_and_privacy/privacy_policy_draft.md",
+      "sha256": "a64721aee4661b63ba49e23b2cfb44c8c999b5b5406bd05b0bdbbc5761575aed"
+    },
+    {
+      "path": "02_legal_and_privacy/school_policy_and_teacher_judgement_note.md",
+      "sha256": "6d3d9f847b0929582a3de5fcd36687ed58fe552b95c1aceec5856c62651525a4"
+    },
+    {
+      "path": "02_legal_and_privacy/terms_page_draft.md",
+      "sha256": "49964e9203551435713f55ec412a0ef01a436b3fed49ea532cc091c772289eda"
+    },
+    {
+      "path": "03_brand_and_marketing/brand_guide.md",
+      "sha256": "585a7857429969b1ccc8f6cd69b60012755999b1b843dd11f296c8b627474119"
+    },
+    {
+      "path": "03_brand_and_marketing/faq.md",
+      "sha256": "9ce3506f6c5e894f435bfd2962d49d37d3f59681b54102d6fe75c39f6de4429f"
+    },
+    {
+      "path": "03_brand_and_marketing/landing_page_copy.md",
+      "sha256": "4b4a20264d85cc5b9546f074926c5ccd32e2f0b895cb02c38135e673a9513b7a"
+    },
+    {
+      "path": "03_brand_and_marketing/launch_messages.md",
+      "sha256": "d7760b6716aa898f5ff562762481631fe67a123e2fa636f98702385c82cd2563"
+    },
+    {
+      "path": "03_brand_and_marketing/press_kit_copy.md",
+      "sha256": "76bd0b67c7fcb4c2dca0aaf8b645d2302bff033ef2114396813a2bc9ebd7fb9b"
+    },
+    {
+      "path": "03_brand_and_marketing/teacher_language_guide.md",
+      "sha256": "744396ff19880c1983f1ac59ba46789e00472b69a76c22139940cc47bab8dbe6"
+    },
+    {
+      "path": "03_brand_and_marketing/trust_boundaries.md",
+      "sha256": "7a9170b58323879b6e324d5ede06f8370266d3d9e259f30f0d9b8606f3311eb2"
+    },
+    {
+      "path": "04_screenshots/app_store_screenshot_captions.txt",
+      "sha256": "d6ae6b4ac6c7d55e2f2e53e289996a5937f4c5cc847077a1cbf52f1762498def"
+    },
+    {
+      "path": "04_screenshots/screenshot_plan.md",
+      "sha256": "41a24382608a4bb4222165d33dc48225b2a30b8d18cb826ec3e92cdb9922914b"
+    },
+    {
+      "path": "04_screenshots/screenshot_source_workflow.md",
+      "sha256": "a323113bb1fa200f494938d3656f7f238c3196ed321cdc7d22e01eea9deefc00"
+    },
+    {
+      "path": "05_assets/_generation_scripts/generate_release_assets.py",
+      "sha256": "0312d208768bade162f82e232e0dd0cd6f99409bf589b3476278de82e7836c51"
+    },
+    {
+      "path": "05_assets/_generation_scripts/validate_release_assets.py",
+      "sha256": "a7de1966e1386ad30b80ef13ba29330aafa45d3a93e82e76f20aeab9cb324b77"
+    },
+    {
+      "path": "05_assets/app_icon/AccentColor.colorset/Contents.json",
+      "sha256": "2de63a98c1df9346a834f17316d442c448257f948bbc4567ea8dc9aee784dbd8"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/Contents.json",
+      "sha256": "fcb7c0a52444459b0e01722ef94d678ce62ea2207053ab17a175d6557238466c"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-1024.png",
+      "sha256": "a1723e91329fe8aa0bf23d179bce827bf326bff58e42aac4c045f13eca66d5df"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-20x20@2x.png",
+      "sha256": "e402b208190a03b4340e4e530ee909f3c64b27546c8044f2164aea607aef3964"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-20x20@3x.png",
+      "sha256": "bbdd3a490a94ebdfb26140a67785c9d82413715fcda560baa2570e55b36353a6"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-29x29@2x.png",
+      "sha256": "83d4442415d074342cc90c3e253981a875b27f8f56145c7ae3e32f81476f0c4b"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-29x29@3x.png",
+      "sha256": "10eafa898e2da73727f0faf7b5ff346609a4a8828415a7d47ead9497acece340"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-40x40@2x.png",
+      "sha256": "ec146043cf310111a2ff1c6afd0aceff2132729c212cd30d00ab39c5cb078b28"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-40x40@3x.png",
+      "sha256": "6b09edd4daba80fc8d67e6368136b932e1903c6165cd8857b1d802543de714c2"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-60x60@2x.png",
+      "sha256": "6b09edd4daba80fc8d67e6368136b932e1903c6165cd8857b1d802543de714c2"
+    },
+    {
+      "path": "05_assets/app_icon/AppIcon.appiconset/icon-60x60@3x.png",
+      "sha256": "642030fd2f284da33bdb18286039de50a7fd73ea93973e514024467a377f8067"
+    },
+    {
+      "path": "05_assets/app_icon/README.md",
+      "sha256": "0ec6caed75d6638d69e1c664cc3660ed0d35326d0ff358590746ba9b68c347a8"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-1024.png",
+      "sha256": "a1723e91329fe8aa0bf23d179bce827bf326bff58e42aac4c045f13eca66d5df"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-120.png",
+      "sha256": "6b09edd4daba80fc8d67e6368136b932e1903c6165cd8857b1d802543de714c2"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-180.png",
+      "sha256": "642030fd2f284da33bdb18286039de50a7fd73ea93973e514024467a377f8067"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-256.png",
+      "sha256": "d1e498e8a1570c3a6f09e2027bf4c84862e85a7fe70d2dbeb17d95ce9dd63416"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-40.png",
+      "sha256": "e402b208190a03b4340e4e530ee909f3c64b27546c8044f2164aea607aef3964"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-512.png",
+      "sha256": "fbcd6a68609b60886877faafc301855b78e6d0b41f47495e9e532df48b5f45ee"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-58.png",
+      "sha256": "83d4442415d074342cc90c3e253981a875b27f8f56145c7ae3e32f81476f0c4b"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-60.png",
+      "sha256": "bbdd3a490a94ebdfb26140a67785c9d82413715fcda560baa2570e55b36353a6"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-80.png",
+      "sha256": "ec146043cf310111a2ff1c6afd0aceff2132729c212cd30d00ab39c5cb078b28"
+    },
+    {
+      "path": "05_assets/app_icon/report-comment-writer-icon-87.png",
+      "sha256": "10eafa898e2da73727f0faf7b5ff346609a4a8828415a7d47ead9497acece340"
+    },
+    {
+      "path": "05_assets/logo/colour-swatches.png",
+      "sha256": "276ae45c20584228ab0bb76116a739a39a00ac9ebce784ec76bbda4d448ec2c4"
+    },
+    {
+      "path": "05_assets/logo/report-comment-writer-logo.png",
+      "sha256": "c9dce56859a4c6476ef9f49cea78c42c55003decf5fbede370d4010373c9ee92"
+    },
+    {
+      "path": "05_assets/logo/report-comment-writer-logo.svg",
+      "sha256": "d6dfdd3cab967ab2270914e646d5735edeafecff0c1aa7a6637f809fd8d0eabe"
+    },
+    {
+      "path": "05_assets/logo/report-comment-writer-wordmark.png",
+      "sha256": "12caa8579c4c9f53a783b6c71441273277c81a68f1032d6e126189006198db45"
+    },
+    {
+      "path": "05_assets/screenshot_drafts_6_9_inch/01-write-report-comments-faster.png",
+      "sha256": "9f6b0edd48993c436396aeae92119556f6cb984321170c634fb08f555e8d9584"
+    },
+    {
+      "path": "05_assets/screenshot_drafts_6_9_inch/02-start-with-your-class-list.png",
+      "sha256": "ec84c6dc953952fb1ebf34216035f5fcd7b58efce2a9b8407831a049819fceba"
+    },
+    {
+      "path": "05_assets/screenshot_drafts_6_9_inch/03-add-achievement-and-evidence.png",
+      "sha256": "25760a8b52f2ae03b6f5f3ac866aad0d9246738067790d8b3e4373ac4d0250bf"
+    },
+    {
+      "path": "05_assets/screenshot_drafts_6_9_inch/04-create-a-draft-from-your-notes.png",
+      "sha256": "4c5d42807228d0bba9021b6bb659453fd263d68ee32835a65cfbac98080c4c55"
+    },
+    {
+      "path": "05_assets/screenshot_drafts_6_9_inch/05-check-every-comment-yourself.png",
+      "sha256": "be4aa1fcfb86c5718268a28fac037950932e58ffa7249ab037513b0e2a83aa08"
+    },
+    {
+      "path": "05_assets/screenshot_drafts_6_9_inch/06-save-or-share-when-ready.png",
+      "sha256": "5710a91c1f453c573a3ca7defc6bf856d48cdb0c3f66afcad2ee613b1e6ad9a4"
+    },
+    {
+      "path": "05_assets/screenshot_drafts_6_9_inch/07-no-sign-in-works-without-wifi.png",
+      "sha256": "8d9fa9a7114af271bc64255e6eea2e9dbdfdcaf1fab117524453ccf37c2fad41"
+    },
+    {
+      "path": "05_assets/social/landing-hero-1600x900.jpg",
+      "sha256": "22c7baad79eee67674bc7d9d2dd526e57bc21df0918bce3b768b4141e14bb187"
+    },
+    {
+      "path": "05_assets/social/landing-hero-1600x900.png",
+      "sha256": "a4512575c406c7c41bd6e1990bd412665197439458ac7995a6920f858fcc17b7"
+    },
+    {
+      "path": "05_assets/social/README.md",
+      "sha256": "9cfcf128aab5a03891a75bd7153e33b3aeae11edf33fd3c689ecb3cff3dea594"
+    },
+    {
+      "path": "05_assets/social/social-card-1200x630.jpg",
+      "sha256": "f98d1f3d0d74506ce668676d07ed97ec26e8c405d6d8d2eae69aa06a9abdb4c6"
+    },
+    {
+      "path": "05_assets/social/social-card-1200x630.png",
+      "sha256": "053e38e240ceac9ab5ea998629c86d8ec252e6a8c1dc349d44f955a61d7caeb0"
+    },
+    {
+      "path": "06_support_site_drafts/index.html",
+      "sha256": "bdfaf7d1744c0a5aeb0e941c6576cb6ada1c646468f88a251689f150d4fcd078"
+    },
+    {
+      "path": "06_support_site_drafts/privacy.html",
+      "sha256": "a418ce19a774c3d400a94042acef35b5abdbb4e4644cb913c6b866862d1a4dca"
+    },
+    {
+      "path": "06_support_site_drafts/support.html",
+      "sha256": "d88b7d7e27c346d5e5e418d19d3f257921ab98aaba48f2163c20c05c347cac6a"
+    },
+    {
+      "path": "06_support_site_drafts/terms.html",
+      "sha256": "428c25e78a669be46d0c813ad7e9ef7908ac7964384db1a30ceb55deadaa359d"
+    },
+    {
+      "path": "07_repo_evidence/release_risks.md",
+      "sha256": "64f5be06af421cdfb99ba04cf6db14f533cb9bbf89b19e7cd9fabd34030dffe1"
+    },
+    {
+      "path": "07_repo_evidence/repo_based_claims.md",
+      "sha256": "67e57d252a06dbd909651703b79083ae17d934fc95348652c71c37edab5f4215"
+    },
+    {
+      "path": "07_repo_evidence/source_and_policy_sources.md",
+      "sha256": "2442824078eb3db9f16c1d43af442cbe336b791344ea0cb2ded837261efa5df1"
+    },
+    {
+      "path": "08_after_you_add_contact_details/finalisation_steps.md",
+      "sha256": "6b837c22a2cc25060b7be35fcf043ccacb988accb32d7cc375e24139efa59b87"
+    },
+    {
+      "path": "08_after_you_add_contact_details/todo_placeholders_to_replace.txt",
+      "sha256": "e9eacadbc4ce0f935930bef7572f7c9fad8e0ecb01cc6fa1f527b037607f3bd6"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/description.txt",
+      "sha256": "2b58c68ad77ef6bcb6370a418c3a7b164c867482f600e66f07c09a98c64c1ef6"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/keywords.txt",
+      "sha256": "e68bf4e5765b9d096947ae81ebcf151296bdbba88804e5377a5f7827d78c37c9"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/marketing_url.txt",
+      "sha256": "56ba36249ea8216ad513b13df3de6c0e490ba214897674d30331f1c7e7edbef3"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/name.txt",
+      "sha256": "3fb7078852f78ceec9865b78496594047fb5ae36133d202ecf846f3b3b1de6b8"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/privacy_url.txt",
+      "sha256": "56ba36249ea8216ad513b13df3de6c0e490ba214897674d30331f1c7e7edbef3"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/promotional_text.txt",
+      "sha256": "a3fd7ff75d3cbcce98e9e9475d67e35097972d09f7f43fde8d04aea32ea7d2dd"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/release_notes.txt",
+      "sha256": "907ef33dcf982240fa8ece6180362adcbcba93ea847b43cabd06c1684a49db21"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/subtitle.txt",
+      "sha256": "2796efcffd3bdb26a8149c6cf64ee6e64e4f311f4e00afdd6d89d928aa6ae497"
+    },
+    {
+      "path": "fastlane/metadata/en-AU/support_url.txt",
+      "sha256": "56ba36249ea8216ad513b13df3de6c0e490ba214897674d30331f1c7e7edbef3"
+    },
+    {
+      "path": "INTEGRATION_NOTES.md",
+      "sha256": "6db91b826be9155c9ec3421bde4a4cabfbf0735628947709f1d89bfa8ba11e17"
+    },
+    {
+      "path": "MANIFEST.json",
+      "sha256": "1214c0d92149e20523aec9816e5e3eb991f65447c9c89e07cb935cf50f6090c5"
+    },
+    {
+      "path": "README.md",
+      "sha256": "59def03227830282b318092433610f85a25c6b60fc46575965dc4bad56c5cfd9"
+    }
+  ],
+  "xcode_asset_catalog_files": [
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-20x20@2x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-20x20@3x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-29x29@2x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-29x29@3x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-40x40@2x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-40x40@3x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-60x60@2x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AppIcon.appiconset/icon-60x60@3x.png",
+    "Sources/CommenterIOSApp/Resources/Assets.xcassets/AccentColor.colorset/Contents.json"
+  ],
+  "validation_commands_run": [
+    {
+      "command": "python scripts/validate_app_store_release_package.py",
+      "result": "passed; plutil skipped because unavailable"
+    },
+    {
+      "command": "python docs/release/app-store/05_assets/_generation_scripts/validate_release_assets.py",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "git ls-files --eol",
+      "result": "run for tracked file line-ending audit"
+    },
+    {
+      "command": "plutil -lint Sources/CommenterIOSApp/Resources/PrivacyInfo.xcprivacy",
+      "result": "not run; plutil unavailable"
+    },
+    {
+      "command": "xcodebuild -list -project CommenterIOS.xcodeproj",
+      "result": "not run; xcodebuild unavailable"
+    },
+    {
+      "command": "swift package describe",
+      "result": "not run; swift unavailable"
+    },
+    {
+      "command": "swift test",
+      "result": "not run; swift unavailable"
+    },
+    {
+      "command": "xcodebuild -scheme CommenterIOS -destination 'platform=iOS Simulator,name=iPhone 16 Pro Max' build",
+      "result": "not run; xcodebuild unavailable"
+    }
+  ],
+  "validation_result_summary": "Release package and asset validators passed. Swift/Xcode/plutil checks were unavailable in this Windows environment.",
+  "unresolved_todo_count": 56
+}
