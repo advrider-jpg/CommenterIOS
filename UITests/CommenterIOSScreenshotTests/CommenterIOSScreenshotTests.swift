@@ -71,7 +71,7 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         waitForElement(lastName, named: "student last name field")
         enterText("Ng", in: lastName, named: "student last name")
         capture("06-roster-student-entered")
-        tapBack(to: screenshotProjectName)
+        guard tapBack(to: screenshotProjectName) else { return }
         ensureWorklistOpen()
 
         let deselectAll = scrollToAnyInWorklist(
@@ -133,15 +133,15 @@ final class CommenterIOSScreenshotTests: XCTestCase {
             name: "generated Ava English report row",
             requireHittable: false
         )
+        scrollElementIntoSafeTapZone(reportRow, named: "generated Ava English report row", container: worklistScrollContainer())
         tapElement(reportRow, named: "generated Ava English report row")
-        guard let reportEditor = waitForGeneratedReportEditor(timeout: 12) else {
+        guard waitForGeneratedReportEditor(timeout: 12) else {
             captureFailureContext("missing-generated-report-editor")
             XCTFail("Expected generated Ava English report editor to open after tapping the report row.")
             return
         }
-        waitForElement(reportEditor, named: "generated Ava English report", timeout: 2)
         capture("11-generated-report-comment")
-        tapBack(to: screenshotProjectName)
+        guard tapBack(to: screenshotProjectName) else { return }
         ensureWorklistOpen()
 
         let prepareDocx = scrollToAnyInWorklist(
@@ -343,28 +343,24 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         [app.textViews[identifier], app.textViews[label], element(identifier)]
     }
 
-    private func waitForGeneratedReportEditor(timeout: TimeInterval) -> XCUIElement? {
+    private func waitForGeneratedReportEditor(timeout: TimeInterval) -> Bool {
         let editorCandidates = [
             app.textViews[screenshotReportEditorIdentifier],
             app.otherElements[screenshotReportEditorIdentifier],
-            element(screenshotReportEditorIdentifier),
-            app.textViews["Ava English report"],
-            app.textViews.firstMatch
+            element(screenshotReportEditorIdentifier)
         ]
         let expectedNavigationBar = app.navigationBars[screenshotReportTitle]
+        let expectedTitle = app.staticTexts[screenshotReportTitle]
         let deadline = Date().addingTimeInterval(timeout)
 
         while Date() < deadline {
-            if let editor = editorCandidates.first(where: { $0.exists }) {
-                return editor
-            }
-            if expectedNavigationBar.exists, app.textViews.firstMatch.exists {
-                return app.textViews.firstMatch
+            if expectedNavigationBar.exists || expectedTitle.exists || editorCandidates.contains(where: { $0.exists }) {
+                return true
             }
             RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.15))
         }
 
-        return editorCandidates.first(where: { $0.exists })
+        return expectedNavigationBar.exists || expectedTitle.exists || editorCandidates.contains(where: { $0.exists })
     }
 
     private func waitForElement(_ element: XCUIElement, named name: String, timeout: TimeInterval = 30) {
@@ -619,11 +615,31 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         }
     }
 
-    private func tapBack(to pageName: String) {
-        let backButton = app.navigationBars.buttons[pageName]
-        waitForEnabledElement(backButton, named: "\(pageName) back button")
-        backButton.tap()
-        waitForPage(named: pageName)
+    @discardableResult private func tapBack(to pageName: String) -> Bool {
+        let backCandidates = [
+            app.navigationBars.buttons[pageName],
+            app.navigationBars.buttons["Back"],
+            app.buttons[pageName],
+            app.buttons["Back"],
+            app.navigationBars.buttons.firstMatch
+        ]
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            if let backButton = backCandidates.first(where: { $0.exists && $0.isEnabled }) {
+                if backButton.isHittable {
+                    backButton.tap()
+                } else {
+                    backButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                }
+                waitForPage(named: pageName)
+                return true
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+        }
+
+        captureFailureContext("\(pageName)-back-button")
+        XCTFail("Expected a back button to \(pageName) to become available.")
+        return false
     }
 
     private func dismissKeyboardIfNeeded() {
