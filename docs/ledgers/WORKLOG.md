@@ -852,6 +852,18 @@ Append material work history here. Keep entries short, dated, and factual.
   proof includes the documented CommenterV3 hash chain and an honest
   English-only localization posture.
 
+## 2026-06-13 - Package lockfile follow-up
+
+- Added the root `Package.resolved` lockfile that was still missing from the
+  close-repo audit follow-up, using the exact direct package pins in
+  `Package.swift`, upstream tag revisions, and the transitive TCA/CoreXLSX
+  package graph. GitHub Actions macOS SwiftPM corrected the lockfile to the
+  active app graph shape. Updated dependency and handoff docs so they no longer
+  claim the lockfile is absent, while keeping release-machine
+  `swift package resolve` verification as a required gate.
+- Tightened CI/release package resolution steps so macOS `swift package
+  resolve` must leave the committed lockfile unchanged.
+
 ## 2026-06-13 - Manual release workflow registration fix
 
 - Added an explicit push registration job to `.github/workflows/ios-release.yml`

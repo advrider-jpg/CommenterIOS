@@ -35,7 +35,9 @@ jobs:
           xcrun simctl list devices available || true
 
       - name: Resolve packages
-        run: swift package resolve
+        run: |
+          swift package resolve
+          git diff --exit-code Package.resolved
 
       - name: Run Swift tests
         run: |
@@ -75,7 +77,9 @@ jobs:
           xcrun simctl list devices available || true
 
       - name: Resolve packages
-        run: swift package resolve
+        run: |
+          swift package resolve
+          git diff --exit-code Package.resolved
 
       - name: Build iOS app target
         run: |

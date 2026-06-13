@@ -13,7 +13,7 @@ justify the ownership cost.
 Current package posture:
 
 Release hardening update:
-The manifest now pins all third-party packages with exact version constraints. A release machine still must run `swift package resolve` and commit the generated `Package.resolved` before public submission, because this audit environment cannot fetch GitHub-hosted package revisions.
+The manifest now pins all third-party packages with exact version constraints, and `Package.resolved` is committed at the repository root from those manifest pins plus the resolved transitive package graph. A release machine still must run `swift package resolve` before public submission to verify the lockfile against the active SwiftPM resolver and network.
 
 | Package | Manifest constraint | License | Current role | Offline/local-first fit |
 | --- | --- | --- | --- | --- |
