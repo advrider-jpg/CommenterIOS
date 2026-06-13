@@ -797,3 +797,57 @@ Append material work history here. Keep entries short, dated, and factual.
 - Tightened generated-report navigation verification, safe report-row tapping,
   back-button fallback handling, UITest launch animation disabling, fuller
   accessibility diagnostics, and selected-simulator booting for screenshot CI.
+
+## 2026-06-12 - Close-repo audit truthfulness hardening pass
+
+- Made SQLite index initialization, save/update, delete, and file-protection
+  failures fail visibly instead of reporting verified project operations with a
+  potentially stale index.
+- Rechecked backup-import replacement revisions against the live project list
+  at preview time, rejected stale AI validation/critique completions, and made
+  prepared-file cleanup produce verified success or a visible cleanup failure.
+- Tightened export privacy verification for short local-only strings, encrypted
+  backup KDF iteration floors, XLSX parser fallback policy, warning-review
+  approval records, report freshness fingerprints, support diagnostics
+  redaction, and user-visible local-path error messages.
+- Added strict release-package validation for TODO placeholders and unskipped
+  privacy-manifest lint, a macOS CI `plutil` privacy-manifest job, dependency
+  doc sync for ZIPFoundation `0.9.11`, support/release copy fixes, and
+  scaffold-stale handoff/backlog updates.
+
+## 2026-06-12 - Close-repo audit CI/accessibility continuation
+
+- Replaced the custom subject-selection button semantics with a native SwiftUI
+  `Toggle`, while preserving the visual row and existing action flow.
+- Removed the fixed 86-point form label width in worklist rows so labels can
+  wrap under larger Dynamic Type and localization.
+- Centralized screenshot extraction and required-name verification in
+  `scripts/extract_core_screenshots.py`, and made both screenshot workflows use
+  that script.
+- Added executable validators and docs for Xcode scheme test scope and CI
+  artifact upload privacy allowlists.
+
+## 2026-06-12 - Close-repo audit release-proof and results-scale continuation
+
+- Added student and subject filters to the Results worklist section so large
+  classes can narrow result entry instead of rendering every roster-by-subject
+  card as the only editing mode.
+- Added a worklist task-focus picker so teachers can view the full workflow or
+  narrow the long screen to setup, results, drafts, or file actions without
+  changing project state.
+- Removed the decorative bottom desk-edge inset from the worklist editing
+  screen so controls are not competing with non-functional chrome.
+- Added `scripts/validate_release_proof_matrix.py` and
+  `docs/validation/RELEASE_PROOF_MATRIX.md` to make `Package.resolved`,
+  archive/TestFlight evidence, Foundation Models compile evidence, and
+  target-app DOCX/XLSX/XLS open-validation evidence hard release gates.
+- Wired the release proof matrix into
+  `scripts/validate_app_store_release_package.py --strict-submission` so a
+  strict submission pass cannot occur without those artifacts.
+- Added a protected manual iOS release archive workflow that requires signing
+  and App Store Connect secrets, validates an archive/privacy manifest, exports
+  an App Store IPA, optionally uploads to TestFlight, and writes release
+  evidence only after the real operations run.
+- Added dataset-source-transform and localization-plan validators so release
+  proof includes the documented CommenterV3 hash chain and an honest
+  English-only localization posture.

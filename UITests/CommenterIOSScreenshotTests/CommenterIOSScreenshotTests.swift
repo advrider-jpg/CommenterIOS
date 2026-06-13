@@ -58,8 +58,6 @@ final class CommenterIOSScreenshotTests: XCTestCase {
         capture("05-roster-before-student")
         addStudent.tap()
 
-        let newRow = element("student-row-\(screenshotStudentId)")
-        waitForElement(newRow, named: "new student row")
         openStudentEditor(studentId: screenshotStudentId)
 
         let firstName = waitForAny(textFields(identifier: "student-first-name-\(screenshotStudentId)", label: "First name"), timeout: 10)

@@ -134,7 +134,9 @@ extension AppFeature {
              .fileShareCompleted(_),
              .fileShareCancelled,
              .fileShareFailed(_),
-             .preparedFileDismissed:
+             .preparedFileDismissed,
+             .preparedFileDiscardCompleted(_),
+             .preparedFileDiscardFailed(_):
             return reduceFileWorkflow(&state, action)
         }
     }

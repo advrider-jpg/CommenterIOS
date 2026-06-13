@@ -16,7 +16,7 @@ struct ProjectsRootView: View {
     var body: some View {
         NavigationStack {
             StationeryScreen(scrollAccessibilityIdentifier: "projects-list") {
-                StationeryPageHeader("Report Writer", subtitle: "Your reporting companion")
+                StationeryPageHeader("Report Writer", subtitle: "Local report projects and verified exports")
 
                 if hasVisibleOperationStatus {
                     NotebookCard(showsPerforation: false) {

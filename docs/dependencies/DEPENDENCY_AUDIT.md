@@ -22,7 +22,7 @@ The manifest now pins all third-party packages with exact version constraints. A
 | CoreXLSX | `exact: "0.14.1"` | Apache License 2.0 | XLSX parsing infrastructure for Open XML workbook support. | Pure local workbook parsing; appropriate for offline spreadsheet import/export workflows when paired with Commenter validation and explicit unsupported-path errors. |
 | OLEKit | `exact: "0.2.0"` | Apache License 2.0, with bundled olefile-derived FreeBSD-style license notice | OLE compound file infrastructure for legacy Office binary containers. | Pure local binary-container handling; appropriate for legacy `.xls` work only as infrastructure, not as a substitute for full BIFF cell semantics. |
 | GRDB.swift | `exact: "7.10.0"` | MIT | SQLite project index infrastructure in `CommenterPersistence`. | Pure local SQLite access; replaces direct `sqlite3` wrapper ownership with an approved local persistence dependency. |
-| ZIPFoundation | `exact: "0.9.0"` | MIT | ZIP archive infrastructure for OOXML package assembly and verification. | Pure local archive read/write; appropriate as the generic ZIP layer for DOCX/XLSX payloads while higher-level document/workbook ownership remains under audit. |
+| ZIPFoundation | `exact: "0.9.11"` | MIT | ZIP archive infrastructure for OOXML package assembly and verification. | Pure local archive read/write; appropriate as the generic ZIP layer for DOCX/XLSX payloads while higher-level document/workbook ownership remains under audit. |
 
 License references:
 

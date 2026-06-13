@@ -13,12 +13,12 @@ extension AppFeature {
                 do {
                     await send(.datasetLoaded(try await datasetClient.load()))
                 } catch {
-                    await send(.datasetFailed(error.localizedDescription))
+                    await send(.datasetFailed(userVisibleErrorMessage(error)))
                 }
                 do {
                     await send(.projectStoreLoaded(try await projectStoreClient.listProjectDiagnostics()))
                 } catch {
-                    await send(.projectStoreFailed(error.localizedDescription))
+                    await send(.projectStoreFailed(userVisibleErrorMessage(error)))
                 }
                 await send(.aiAvailabilityLoaded(await aiClient.availability()))
             }
@@ -74,7 +74,7 @@ extension AppFeature {
                     try await clipboardClient.copy(diagnostics)
                     await send(.copyDiagnosticsSucceeded)
                 } catch {
-                    await send(.copyDiagnosticsFailed(error.localizedDescription))
+                    await send(.copyDiagnosticsFailed(userVisibleErrorMessage(error)))
                 }
             }
 

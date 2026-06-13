@@ -29,6 +29,12 @@ Current copied dataset evidence:
   English, HASS, Health and P.E., Mathematics, Media Arts, Music, Science,
   Visual Arts
 
+The only approved dataset-copy transform is documented in
+`docs/validation/DATASET_SOURCE_TRANSFORM.md` and enforced by
+`scripts/validate_dataset_source_transform.py`: read the live CommenterV3 JSON
+as UTF-8, replace CRLF line endings with LF, and otherwise preserve the JSON
+bytes exactly.
+
 ## Source Behavior Map
 
 The source map for porting behavior is:

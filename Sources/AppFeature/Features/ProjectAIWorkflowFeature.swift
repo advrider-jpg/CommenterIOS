@@ -505,6 +505,11 @@ extension AppFeature {
             return .send(.reportLocalSafetyCheckCompleted(studentId, subject, AIReportCritiqueResult(validation: validation, reviewNotes: notes)))
 
         case let .reportLocalSafetyCheckCompleted(studentId, subject, result):
+            guard validationMatchesCurrentDraft(state, studentId: studentId, subject: subject, validation: result.validation) else {
+                state.latestReportCheck = nil
+                state.operationStatus = .failed(staleValidationCompletionMessage(kind: "local safety check"))
+                return .none
+            }
             updateReport(&state, studentId: studentId, subject: subject) { report in
                 report.currentTextFingerprint = result.validation.textFingerprint
                 report.lastValidation = result.validation
@@ -612,6 +617,11 @@ extension AppFeature {
             }
 
         case let .reportAICritiqueCompleted(studentId, subject, result):
+            guard validationMatchesCurrentDraft(state, studentId: studentId, subject: subject, validation: result.validation) else {
+                state.latestReportCheck = nil
+                state.operationStatus = .failed(staleValidationCompletionMessage(kind: "AI critique"))
+                return .none
+            }
             updateReport(&state, studentId: studentId, subject: subject) { report in
                 report.currentTextFingerprint = result.validation.textFingerprint
                 report.lastValidation = result.validation
@@ -826,6 +836,22 @@ private func isCurrentDraftUnchanged(_ report: GeneratedReport, since originalTe
 
 private func staleAICompletionMessage(kind: String) -> String {
     "The AI \(kind) returned after the draft changed. The stale preview was discarded; request a new preview from the current draft."
+}
+
+private func staleValidationCompletionMessage(kind: String) -> String {
+    "The \(kind) returned after the draft changed. The stale validation was discarded; run a new check on the current draft."
+}
+
+private func validationMatchesCurrentDraft(
+    _ state: AppFeature.State,
+    studentId: String,
+    subject: String,
+    validation: ReportValidationSummary
+) -> Bool {
+    guard let report = state.selectedProject?.reports.first(where: { $0.studentId == studentId && $0.subject == subject }) else {
+        return false
+    }
+    return stableTextFingerprint(report.exportText) == validation.textFingerprint
 }
 
 private func selectedReportAIOptions(

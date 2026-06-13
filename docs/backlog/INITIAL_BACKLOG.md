@@ -18,20 +18,20 @@
 - [ ] Extract invalid roster CSV/XLSX/XLS fixtures.
 - [ ] Extract valid results CSV/XLSX/XLS fixtures.
 - [ ] Extract invalid results CSV/XLSX/XLS fixtures.
-- [ ] Extract backup v1 and v2 fixtures.
-- [ ] Extract expected generated report outputs.
+- [x] Extract backup v1 and v2 fixtures.
+- [x] Extract expected generated report outputs.
 - [ ] Extract expected DOCX/XLSX/XLS export content.
 
 ## Epic 2 - Domain
 
-- [ ] Port project model.
-- [ ] Port student model.
-- [ ] Port achievement result model.
-- [ ] Port generated report model.
+- [x] Port project model.
+- [x] Port student model.
+- [x] Port achievement result model.
+- [x] Port generated report model.
 - [x] Port backup envelope model.
-- [ ] Port validation issue model.
-- [ ] Port project limits.
-- [ ] Add Codable round-trip tests.
+- [x] Port validation issue model.
+- [x] Port project limits.
+- [x] Add Codable round-trip tests.
 
 ## Epic 3 - Dataset and Engine
 
@@ -41,72 +41,72 @@
 - [x] Compute dataset hash.
 - [x] Port subject mapping.
 - [x] Port placeholder detection.
-- [ ] Port deterministic generation.
-- [ ] Add golden parity tests.
+- [x] Port deterministic generation.
+- [x] Add golden parity tests.
 
 ## Epic 4 - Persistence
 
-- [ ] Implement canonical JSON project store.
-- [ ] Implement SQLite metadata index.
-- [ ] Implement atomic write.
-- [ ] Implement read-after-write verification.
-- [ ] Implement fingerprints.
-- [ ] Implement revision conflicts.
-- [ ] Implement recovery snapshots.
-- [ ] Add failure injection tests.
+- [x] Implement canonical JSON project store.
+- [x] Implement SQLite metadata index.
+- [x] Implement atomic write.
+- [x] Implement read-after-write verification.
+- [x] Implement fingerprints.
+- [x] Implement revision conflicts.
+- [x] Implement recovery snapshots.
+- [x] Add failure injection tests.
 
 ## Epic 5 - App Shell
 
-- [ ] Add Projects tab.
-- [ ] Add Worklist tab.
-- [ ] Add Support tab.
-- [ ] Add project creation flow.
-- [ ] Add project home.
-- [ ] Add save status UI.
-- [ ] Add storage warning UI.
+- [x] Add Projects tab.
+- [x] Add Worklist tab.
+- [x] Add Support tab.
+- [x] Add project creation flow.
+- [x] Add project home.
+- [x] Add save status UI.
+- [x] Add storage warning UI.
 
 ## Epic 6 - Teacher Workflow
 
-- [ ] Manual roster entry.
-- [ ] Subject selection.
-- [ ] Manual results entry.
-- [ ] Draft generation.
-- [ ] Report editor.
-- [ ] Report locking.
-- [ ] Readiness blockers.
-- [ ] Project backup screen.
+- [x] Manual roster entry.
+- [x] Subject selection.
+- [x] Manual results entry.
+- [x] Draft generation.
+- [x] Report editor.
+- [x] Report locking.
+- [x] Readiness blockers.
+- [x] Project backup screen.
 
 ## Epic 7 - Import
 
-- [ ] CSV roster import.
-- [ ] XLSX roster import.
-- [ ] XLS roster import.
-- [ ] CSV results import.
-- [ ] XLSX results import.
-- [ ] XLS results import.
-- [ ] Import preview UI.
-- [ ] All-or-nothing import commit.
+- [x] CSV roster import.
+- [x] XLSX roster import.
+- [x] XLS roster import.
+- [x] CSV results import.
+- [x] XLSX results import.
+- [x] XLS results import.
+- [x] Import preview UI.
+- [x] All-or-nothing import commit.
 
 ## Epic 8 - Export
 
-- [ ] Backup JSON export.
-- [ ] Backup JSON import.
-- [ ] DOCX report export.
-- [ ] XLSX report export.
-- [ ] XLS report export.
-- [ ] Share/file export state machine.
-- [ ] Cancellation handling.
+- [x] Backup JSON export.
+- [x] Backup JSON import.
+- [x] DOCX report export.
+- [x] XLSX report export.
+- [x] XLS report export.
+- [x] Share/file export state machine.
+- [x] Cancellation handling.
 - [ ] Target-app open verification.
 
 ## Epic 9 - QA and Release
 
-- [ ] Unit test suite.
-- [ ] TCA reducer tests.
-- [ ] Integration tests.
-- [ ] UI smoke tests.
+- [x] Unit test suite.
+- [x] TCA reducer tests.
+- [x] Integration tests.
+- [x] UI smoke tests.
 - [ ] Simulator matrix.
 - [ ] Physical device matrix.
 - [ ] No-network privacy checks.
-- [ ] App Store metadata.
+- [x] App Store metadata.
 - [ ] TestFlight upload.
-- [ ] Release checklist.
+- [x] Release checklist.

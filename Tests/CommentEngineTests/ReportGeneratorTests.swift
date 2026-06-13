@@ -325,13 +325,19 @@ final class ReportGeneratorTests: XCTestCase {
         )
     }
 
-    func testGenerationFingerprintUsesStableSubjectOrderAndSourceContextNormalization() {
+    func testGenerationFingerprintIgnoresProjectAdminMetadataAndNormalizesSourceContext() {
         var leftMetadata = metadata()
+        leftMetadata.name = "Project A"
+        leftMetadata.term = "Term 1"
+        leftMetadata.yearLevel = .year5
         leftMetadata.selectedSubjects = [
             "Mathematics": SelectedSubject(name: "Mathematics", allStrandsSelected: true),
             "English": SelectedSubject(name: "English", allStrandsSelected: true)
         ]
         var rightMetadata = metadata()
+        rightMetadata.name = "Project B"
+        rightMetadata.term = "Term 2"
+        rightMetadata.yearLevel = .year6
         rightMetadata.selectedSubjects = [
             "English": SelectedSubject(name: "English", allStrandsSelected: true),
             "Mathematics": SelectedSubject(name: "Mathematics", allStrandsSelected: true)
@@ -344,7 +350,9 @@ final class ReportGeneratorTests: XCTestCase {
         let right = buildGenerationFingerprint(projectMetadata: rightMetadata, student: student(), result: sourceResult, concreteSubject: "English")
 
         XCTAssertEqual(left, right)
-        XCTAssertTrue(left.contains(#""selectedSubjectOrder":["English","Mathematics"]"#))
+        XCTAssertFalse(left.contains("Project A"))
+        XCTAssertFalse(left.contains("Term 1"))
+        XCTAssertFalse(left.contains("selectedSubjectOrder"))
         XCTAssertFalse(left.contains("not applicable"))
         XCTAssertTrue(left.contains(#""learningContext":"advertising unit""#))
     }
@@ -359,7 +367,7 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(
             fingerprint,
-            #"{"metadata":{"name":"Project","term":"Term 1","yearLevel":"Year5","useFirstNameOnly":true,"selectedSubjectOrder":["English"],"reportLayout":{"enabled":true,"order":["general","subject","dispositions","nextSteps"],"include":{"general":true,"subject":true,"dispositions":true,"nextSteps":true}}},"student":{"id":"s1","firstName":"Ava","lastName":"Ng","gender":"","pronouns":"","yearLevel":"Year 5","reportEmphasisNote":"","attitudeDescriptor":""},"result":{"studentId":"s1","subject":"English","concreteSubject":"English","achievementLevel":"At Standard","focusStrand":"Writing","evidenceText":"","flags":{},"reportEmphasisNote":"","englishFocusTags":[],"mathProficiencies":[],"mathMindsetToggles":[],"nextStepGoals":[]}}"#
+            #"{"metadata":{"useFirstNameOnly":true,"reportLayout":{"enabled":true,"order":["general","subject","dispositions","nextSteps"],"include":{"general":true,"subject":true,"dispositions":true,"nextSteps":true}}},"student":{"id":"s1","firstName":"Ava","lastName":"Ng","gender":"","pronouns":"","yearLevel":"Year 5","reportEmphasisNote":"","attitudeDescriptor":""},"result":{"studentId":"s1","subject":"English","concreteSubject":"English","achievementLevel":"At Standard","focusStrand":"Writing","evidenceText":"","flags":{},"reportEmphasisNote":"","englishFocusTags":[],"mathProficiencies":[],"mathMindsetToggles":[],"nextStepGoals":[]}}"#
         )
     }
 

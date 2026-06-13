@@ -81,6 +81,43 @@ final class FileProjectStoreTests: XCTestCase {
         }
     }
 
+    func testStorageLayoutReportsIndexInitializationFailure() throws {
+        let root = temporaryRoot()
+        let projectsURL = root.appendingPathComponent("projects", isDirectory: true)
+        let indexURL = projectsURL.appendingPathComponent("index.sqlite", isDirectory: true)
+        try FileManager.default.createDirectory(at: indexURL, withIntermediateDirectories: true)
+        let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })
+
+        do {
+            _ = try store.saveProject(fixtureProject())
+            XCTFail("Expected index initialization failure to block verified save")
+        } catch ProjectStoreError.sqlite(let message) {
+            XCTAssertFalse(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: projectFileURL(root: root, projectId: "p1").path))
+        }
+    }
+
+    func testSaveFailsWhenSQLiteIndexCannotBeUpdated() throws {
+        try testStorageLayoutReportsIndexInitializationFailure()
+    }
+
+    func testDeleteReportsSQLiteIndexCleanupFailure() throws {
+        let root = temporaryRoot()
+        let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })
+        _ = try store.saveProject(fixtureProject())
+        let indexURL = projectIndexURL(root: root)
+        try FileManager.default.removeItem(at: indexURL)
+        try FileManager.default.createDirectory(at: indexURL, withIntermediateDirectories: false)
+
+        do {
+            try store.deleteProject(id: "p1")
+            XCTFail("Expected index cleanup failure to block delete success")
+        } catch ProjectStoreError.sqlite(let message) {
+            XCTAssertFalse(message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: projectFileURL(root: root, projectId: "p1").path))
+        }
+    }
+
     func testRecoverySnapshotListingRejectsMismatchedSnapshotMetadata() throws {
         let root = temporaryRoot()
         let store = FileProjectStore(rootURL: root, now: { Date(timeIntervalSince1970: 1) })

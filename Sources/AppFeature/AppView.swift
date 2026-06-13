@@ -131,7 +131,7 @@ public struct AppView: View {
                             exportDocument = try PreparedExportDocument(url: preparedFile.url)
                             isExportingFile = true
                         } catch {
-                            viewStore.send(.fileExportFailed(error.localizedDescription))
+                            viewStore.send(.fileExportFailed(userVisibleErrorMessage(error)))
                         }
                     },
                     onSharePreparedFile: {
@@ -283,7 +283,7 @@ public struct AppView: View {
             if isCancellation(error) {
                 viewStore.send(.importCancelled)
             } else {
-                viewStore.send(.importFailed(error.localizedDescription))
+                viewStore.send(.importFailed(userVisibleErrorMessage(error)))
             }
         }
     }
@@ -299,7 +299,7 @@ public struct AppView: View {
             if isCancellation(error) {
                 viewStore.send(.fileExportCancelled)
             } else {
-                viewStore.send(.fileExportFailed(error.localizedDescription))
+                viewStore.send(.fileExportFailed(userVisibleErrorMessage(error)))
             }
         }
     }
@@ -321,7 +321,7 @@ public struct AppView: View {
             if isCancellation(error) {
                 viewStore.send(.fileShareCancelled)
             } else {
-                viewStore.send(.fileShareFailed(error.localizedDescription))
+                viewStore.send(.fileShareFailed(userVisibleErrorMessage(error)))
             }
         }
     }

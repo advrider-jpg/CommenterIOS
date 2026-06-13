@@ -1,0 +1,219 @@
+name: iOS Release Archive
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: Upload the exported IPA to TestFlight after archive validation
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  archive:
+    name: Archive and optional TestFlight upload
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: app-store-release
+    env:
+      ARCHIVE_PATH: ${{ github.workspace }}/build/CommenterIOS.xcarchive
+      EXPORT_PATH: ${{ github.workspace }}/build/export
+      KEYCHAIN_PATH: ${{ runner.temp }}/commenter-ios-release.keychain-db
+      PROVISIONING_PROFILE_PATH: ${{ runner.temp }}/CommenterIOS_AppStore.mobileprovision
+      RESULT_BUNDLE_PATH: ${{ github.workspace }}/build/CommenterIOSReleaseArchive.xcresult
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require release signing and App Store Connect secrets
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          ASC_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            APPLE_TEAM_ID \
+            ASC_API_KEY_ID \
+            ASC_API_ISSUER_ID \
+            ASC_API_KEY_BASE64 \
+            IOS_DISTRIBUTION_CERTIFICATE_BASE64 \
+            IOS_DISTRIBUTION_CERTIFICATE_PASSWORD \
+            IOS_PROVISIONING_PROFILE_BASE64
+          do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing required release secret(s): %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Print release toolchain
+        run: |
+          set -euo pipefail
+          swift --version
+          xcodebuild -version
+          xcrun --version
+
+      - name: Install signing assets
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_RELEASE_KEYCHAIN_PASSWORD }}
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          password="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
+          certificate_path="$RUNNER_TEMP/commenter-ios-distribution.p12"
+          profile_plist="$RUNNER_TEMP/profile.plist"
+          echo "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROVISIONING_PROFILE_PATH"
+
+          security create-keychain -p "$password" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$password" "$KEYCHAIN_PATH"
+          security import "$certificate_path" \
+            -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$KEYCHAIN_PATH"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          security cms -D -i "$PROVISIONING_PROFILE_PATH" > "$profile_plist"
+          uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$profile_plist")"
+          cp "$PROVISIONING_PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$uuid.mobileprovision"
+          echo "Installed provisioning profile $uuid"
+
+      - name: Resolve packages and verify lockfile generation
+        run: |
+          set -euo pipefail
+          swift package resolve
+          test -f Package.resolved
+
+      - name: Archive release app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild archive \
+            -project CommenterIOS.xcodeproj \
+            -scheme CommenterIOS \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -resultBundlePath "$RESULT_BUNDLE_PATH" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual | tee build/release-archive-xcodebuild.log
+
+      - name: Validate archive and privacy manifest
+        run: |
+          set -euo pipefail
+          xcodebuild -archivePath "$ARCHIVE_PATH" -validate-app
+          plutil -lint Sources/CommenterIOSApp/Resources/PrivacyInfo.xcprivacy
+
+      - name: Export App Store IPA
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$EXPORT_PATH" | tee build/release-export-xcodebuild.log
+          test -f "$EXPORT_PATH/CommenterIOS.ipa"
+
+      - name: Upload to TestFlight
+        if: ${{ inputs.upload_to_testflight == 'true' }}
+        env:
+          ASC_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          ASC_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/private_keys"
+          echo "$ASC_API_KEY_BASE64" | base64 --decode > "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$EXPORT_PATH/CommenterIOS.ipa" \
+            --apiKey "$ASC_API_KEY_ID" \
+            --apiIssuer "$ASC_API_ISSUER_ID" | tee build/testflight-upload.log
+
+      - name: Write release evidence
+        if: always()
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          UPLOAD_TO_TESTFLIGHT: ${{ inputs.upload_to_testflight }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          uploaded_at=""
+          if [ "$UPLOAD_TO_TESTFLIGHT" = "true" ] && [ -f build/testflight-upload.log ]; then
+            uploaded_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          fi
+          export UPLOADED_AT="$uploaded_at"
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          evidence = {
+              "commit": os.environ["GITHUB_SHA"],
+              "xcode_version": subprocess.check_output(["xcodebuild", "-version"], text=True).strip(),
+              "archive_path": os.environ["ARCHIVE_PATH"],
+              "export_method": "app-store-connect",
+              "team_id": os.environ.get("APPLE_TEAM_ID", ""),
+              "archive_validation": "passed" if pathlib.Path(os.environ["ARCHIVE_PATH"]).exists() else "missing",
+              "uploaded_to_testflight_at": os.environ.get("UPLOADED_AT", ""),
+          }
+          pathlib.Path("build/archive-testflight-evidence.json").write_text(
+              json.dumps(evidence, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload release diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commenter-ios-release-diagnostics
+          path: |
+            build/release-archive-xcodebuild.log
+            build/release-export-xcodebuild.log
+            build/testflight-upload.log
+            build/archive-testflight-evidence.json
+            build/CommenterIOSReleaseArchive.xcresult
+          if-no-files-found: warn

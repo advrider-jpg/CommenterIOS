@@ -4,13 +4,13 @@ No sign-in is required. No account is required. No demo account is
 needed.
 
 Core report-comment work does not require internet access. Reviewers can
-test with fake sample data.
+test with sample or non-identifying data.
 
 Suggested test path:
 
 1. Open the app.
 2. Create a class named `Room 5`.
-3. Add a fake student named `Ava Ng` in Year 5.
+3. Add a sample student named `Ava Ng` in Year 5.
 4. Select English.
 5. Add achievement information: `At Standard`.
 6. Add evidence: `Uses evidence from the text to explain ideas.`

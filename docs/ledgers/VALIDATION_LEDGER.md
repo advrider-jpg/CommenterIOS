@@ -731,3 +731,67 @@ Do not claim these gates exist until they are implemented.
 Release requires all gates listed in `docs/PRODUCTION_MVP_PLAN.md`, including
 device validation, TestFlight readiness, privacy manifest accuracy, and App
 Store package readiness.
+
+## 2026-06-12 - Close-repo audit hardening validation
+
+- Windows validation after the close-repo audit hardening pass:
+  `python scripts\validate_app_store_release_package.py` passed with the
+  expected warning that `plutil` is unavailable on this host, `python -m
+  py_compile scripts\validate_app_store_release_package.py
+  .agents\skills\audit-xcode-security-settings\scripts\filter_build_settings.py`
+  passed, `git diff --check` passed, and
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed|i/crlf'`
+  returned no output.
+- Strict submission validation now fails honestly on this Windows host:
+  `python scripts\validate_app_store_release_package.py --strict-submission`
+  reported TODO placeholders in the Fastlane URLs and App Store input docs, and
+  reported that strict privacy-manifest lint cannot be skipped without
+  `plutil`.
+- Swift/Xcode validation remains unavailable in this environment:
+  `Get-Command swift,xcodebuild,xcrun -ErrorAction SilentlyContinue` returned
+  no tools; XcodeBuildMCP scheme discovery for
+  `C:\CommenterIOS\CommenterIOS.xcodeproj` failed with `spawn xcodebuild
+  ENOENT`. The Swift code changes, Foundation Models/App Intents compile
+  proof, simulator UI proof, archive/TestFlight lane, target-app document open
+  validation, and `Package.resolved` generation still need a macOS/Xcode
+  release machine.
+
+## 2026-06-12 - Close-repo audit continuation validation
+
+- Windows validation after the CI/accessibility continuation pass:
+  `python scripts\validate_xcode_scheme_scope.py` passed,
+  `python scripts\validate_ci_artifact_privacy.py` passed,
+  `python -m py_compile scripts\validate_app_store_release_package.py
+  scripts\extract_core_screenshots.py scripts\validate_xcode_scheme_scope.py
+  scripts\validate_ci_artifact_privacy.py
+  .agents\skills\audit-xcode-security-settings\scripts\filter_build_settings.py`
+  passed, `git diff --check` passed, and
+  `git ls-files --eol | Select-String -Pattern 'w/crlf|w/mixed|i/crlf'`
+  returned no output.
+- `scripts\extract_core_screenshots.py` was also invoked without arguments and
+  correctly returned usage text; CI calls it with the attachment and screenshot
+  output directories after `xcresulttool export attachments`.
+- Swift/Xcode/simulator validation is still unavailable on this Windows host,
+  so the native toggle/layout changes and workflow changes still require a
+  macOS CI or local Xcode run for compile, screenshot, and accessibility proof.
+
+## 2026-06-12 - Close-repo audit release-proof validation
+
+- Windows validation after the release-proof and results-scale continuation:
+  `python scripts\validate_dataset_source_transform.py` passed,
+  `python scripts\validate_localization_plan.py` passed,
+  `python scripts\validate_release_proof_matrix.py` failed honestly because
+  `Package.resolved`, archive/TestFlight evidence, Foundation Models compile
+  evidence, and target-app open-validation evidence are still absent, and
+  `python scripts\validate_app_store_release_package.py` passed with the
+  expected warning that `plutil` is unavailable on this host.
+- Strict submission validation now includes the release proof matrix, dataset
+  transform proof, and localization-plan proof. On this Windows host,
+  `python scripts\validate_app_store_release_package.py --strict-submission`
+  still fails because public metadata TODOs remain, `plutil` is unavailable,
+  and Apple release evidence still has to be generated on a macOS/Xcode release
+  machine.
+- Added `.github/workflows/ios-release.yml` as a protected manual archive lane.
+  It fails openly when required signing/App Store Connect secrets are missing;
+  archive, privacy-manifest, IPA export, and optional TestFlight upload proof
+  remain unrun until that workflow is executed with real credentials.

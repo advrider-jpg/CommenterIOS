@@ -87,7 +87,7 @@ final class BackupEnvelopeTests: XCTestCase {
             project: fixtureProject(),
             password: password,
             createdAt: Date(timeIntervalSince1970: 0),
-            iterations: 2,
+            iterations: encryptedBackupMinimumKDFIterations,
             salt: Data((0..<16).map { UInt8($0) }),
             iv: Data((16..<28).map { UInt8($0) })
         )
@@ -99,7 +99,7 @@ final class BackupEnvelopeTests: XCTestCase {
         XCTAssertEqual(payload["version"] as? Int, encryptedProjectBackupVersion)
         XCTAssertEqual(encryption["algorithm"] as? String, "AES-GCM")
         XCTAssertEqual(encryption["kdf"] as? String, "PBKDF2-SHA-256")
-        XCTAssertEqual(encryption["iterations"] as? Int, 2)
+        XCTAssertEqual(encryption["iterations"] as? Int, encryptedBackupMinimumKDFIterations)
         XCTAssertEqual(encryption["plaintextFormat"] as? String, projectBackupFormat)
         XCTAssertEqual(encryption["plaintextVersion"] as? Int, projectBackupVersion)
         XCTAssertEqual(encryption["aad"] as? String, "backup-envelope-v2")
@@ -112,13 +112,10 @@ final class BackupEnvelopeTests: XCTestCase {
         XCTAssertEqual(try projectFingerprint(restored), try projectFingerprint(expected))
     }
 
-    func testParsesV3WebCryptoEncryptedBackupFixture() throws {
-        let restored = try parseProjectBackup(serialized: v3WebCryptoEncryptedFixture(), password: "correct horse battery")
-
-        XCTAssertEqual(restored.metadata.id, "web-v3-project")
-        XCTAssertEqual(restored.metadata.name, "Web V3 Project")
-        XCTAssertEqual(restored.roster.first?.firstName, "Ava")
-        XCTAssertEqual(restored.results.first?.learningContext, "advertising unit")
+    func testEncryptedBackupRejectsWeakLegacyKDFIterationsBeforePasswordPrompt() throws {
+        XCTAssertThrowsError(try parseProjectBackup(serialized: v3WebCryptoEncryptedFixture())) { error in
+            XCTAssertEqual(error as? BackupError, .couldNotOpen)
+        }
     }
 
     func testEncryptedBackupRejectsWrongPasswordAndVerifiedCiphertextTampering() throws {
@@ -127,7 +124,7 @@ final class BackupEnvelopeTests: XCTestCase {
             project: fixtureProject(),
             password: password,
             createdAt: Date(timeIntervalSince1970: 0),
-            iterations: 2,
+            iterations: encryptedBackupMinimumKDFIterations,
             salt: Data((0..<16).map { UInt8($0) }),
             iv: Data((16..<28).map { UInt8($0) })
         )
@@ -147,7 +144,7 @@ final class BackupEnvelopeTests: XCTestCase {
             project: fixtureProject(),
             password: "correct horse battery",
             createdAt: Date(timeIntervalSince1970: 0),
-            iterations: 2,
+            iterations: encryptedBackupMinimumKDFIterations,
             salt: Data((0..<16).map { UInt8($0) }),
             iv: Data((16..<28).map { UInt8($0) })
         )
@@ -258,7 +255,7 @@ final class BackupEnvelopeTests: XCTestCase {
           "encryption": {
             "algorithm": "AES-GCM",
             "kdf": "PBKDF2-SHA-256",
-            "iterations": 2,
+            "iterations": \(encryptedBackupMinimumKDFIterations),
             "salt": "AAECAwQFBgcICQoLDA0ODw==",
             "iv": "EBESExQVFhcYGRob",
             "plaintextFormat": "\(projectBackupFormat)",

@@ -25,7 +25,7 @@ public struct CommentGenerationResult: Equatable, Sendable {
 
 extension CommentEngineClient: DependencyKey {
     public static let liveValue = CommentEngineClient { project in
-        let engine = try ProductionCommentDataset.loadBundled()
+        let engine = try await productionDatasetCache.load()
         var generator = try ReportGenerator(
             data: engine.data,
             projectMetadata: project.metadata,
@@ -76,6 +76,19 @@ public extension DependencyValues {
     var commentEngineClient: CommentEngineClient {
         get { self[CommentEngineClient.self] }
         set { self[CommentEngineClient.self] = newValue }
+    }
+}
+
+private let productionDatasetCache = ProductionDatasetCache()
+
+private actor ProductionDatasetCache {
+    private var cached: ValidatedCommentEngine?
+
+    func load() throws -> ValidatedCommentEngine {
+        if let cached { return cached }
+        let loaded = try ProductionCommentDataset.loadBundled()
+        cached = loaded
+        return loaded
     }
 }
 

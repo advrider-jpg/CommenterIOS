@@ -13,6 +13,7 @@ public let projectBackupVersion = 2
 public let encryptedProjectBackupFormat = "commenter-project-backup-encrypted"
 public let encryptedProjectBackupVersion = 2
 public let encryptedBackupKDFIterations = 650_000
+public let encryptedBackupMinimumKDFIterations = 100_000
 public let encryptedBackupMaximumKDFIterations = 1_500_000
 public let encryptedBackupMinimumPasswordCharacters = 12
 public let encryptedBackupMaximumPasswordCharacters = 1_024
@@ -287,7 +288,7 @@ func serializeEncryptedProjectBackup(
     salt: Data,
     iv: Data
 ) throws -> String {
-    guard (1...encryptedBackupMaximumKDFIterations).contains(iterations),
+    guard (encryptedBackupMinimumKDFIterations...encryptedBackupMaximumKDFIterations).contains(iterations),
           salt.count == encryptedBackupSaltBytes,
           iv.count == encryptedBackupIVBytes
     else {
@@ -479,7 +480,7 @@ private func decodeEncryptedPayload(data: Data) throws -> EncryptedProjectBackup
           payload.version == 1 || payload.version == encryptedProjectBackupVersion,
           payload.encryption.algorithm == "AES-GCM",
           payload.encryption.kdf == "PBKDF2-SHA-256",
-          (1...encryptedBackupMaximumKDFIterations).contains(payload.encryption.iterations),
+          (encryptedBackupMinimumKDFIterations...encryptedBackupMaximumKDFIterations).contains(payload.encryption.iterations),
           payload.encryption.plaintextFormat == projectBackupFormat,
           payload.encryption.plaintextVersion == projectBackupVersion,
           payload.checksum.algorithm == "sha256",
@@ -532,7 +533,7 @@ private func decryptAESGCM(ciphertextAndTag: Data, password: String, salt: Data,
 private func deriveAESGCMKey(password: String, salt: Data, iterations: Int) throws -> SymmetricKey {
     let normalized = normalizeBackupPassword(password)
     guard normalized.count >= encryptedBackupMinimumPasswordCharacters,
-          (1...encryptedBackupMaximumKDFIterations).contains(iterations),
+          (encryptedBackupMinimumKDFIterations...encryptedBackupMaximumKDFIterations).contains(iterations),
           salt.count == encryptedBackupSaltBytes,
           let passwordData = normalized.data(using: .utf8)
     else {
@@ -542,7 +543,7 @@ private func deriveAESGCMKey(password: String, salt: Data, iterations: Int) thro
 }
 
 private func pbkdf2SHA256(password: Data, salt: Data, iterations: Int, keyByteCount: Int) throws -> Data {
-    guard (1...encryptedBackupMaximumKDFIterations).contains(iterations),
+    guard (encryptedBackupMinimumKDFIterations...encryptedBackupMaximumKDFIterations).contains(iterations),
           keyByteCount > 0,
           salt.count == encryptedBackupSaltBytes
     else {

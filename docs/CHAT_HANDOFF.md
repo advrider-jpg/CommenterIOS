@@ -96,11 +96,15 @@ Six subagents contributed planning lanes:
 
 ## Current Repo State
 
-This repo now contains planning and handoff files, an initial Swift package
-scaffold for the SwiftUI/TCA app, and a minimal `CommenterIOS.xcodeproj` app
-host with a shared `CommenterIOS` scheme.
+This repo now contains the SwiftUI/TCA app host, domain models, production
+dataset validation, deterministic generation, durable local project
+persistence, CSV/XLSX/XLS import, DOCX/XLSX/XLS/report backup export paths,
+backup import, local AI review gates, support diagnostics, release-package
+drafts, and macOS CI scaffolding.
 
-The next implementation step is to continue from the scaffold into source-truth
-parity slices: full dataset validation, generation parity, durable local
-persistence, import/export, and XcodeBuildMCP build/run validation on a machine
-with Xcode and simulator support.
+Remaining release work is not scaffold work: it is validation and hardening.
+`Package.resolved` still must be generated on a machine with SwiftPM network
+access, Foundation Models/App Intents still need current Xcode SDK compile
+proof, custom DOCX/XLSX/XLS output still needs target-app open validation, and
+TestFlight/App Store archive lanes still need signing credentials and device or
+CI evidence.

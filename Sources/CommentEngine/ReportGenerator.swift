@@ -687,11 +687,7 @@ public func buildGenerationFingerprint(
 
 private func stableMetadata(_ metadata: ProjectMetadata) -> String {
     jsonObject([
-        ("name", jsonString(metadata.name)),
-        ("term", jsonString(metadata.term)),
-        ("yearLevel", jsonString(metadata.yearLevel.rawValue)),
         ("useFirstNameOnly", jsonBool(metadata.useFirstNameOnly)),
-        ("selectedSubjectOrder", jsonStringArray(selectedSubjectKeys(metadata.selectedSubjects))),
         ("reportLayout", stableReportLayout(metadata.reportLayout))
     ])
 }
