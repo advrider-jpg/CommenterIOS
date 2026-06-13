@@ -795,3 +795,12 @@ Store package readiness.
   It fails openly when required signing/App Store Connect secrets are missing;
   archive, privacy-manifest, IPA export, and optional TestFlight upload proof
   remain unrun until that workflow is executed with real credentials.
+
+## 2026-06-13 - Manual release workflow registration validation
+
+- GitHub reported a zero-job "workflow file issue" for the
+  `workflow_dispatch`-only release workflow on push. Added an explicit
+  push-only registration job that succeeds when `.github/workflows/ios-release.yml`
+  changes on `main`.
+- The release archive job remains `workflow_dispatch`-only. A successful
+  registration job is not archive, IPA export, or TestFlight evidence.

@@ -11,10 +11,27 @@ on:
         options:
           - "false"
           - "true"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ios-release.yml"
 
 jobs:
+  register:
+    name: Register manual release workflow
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm manual release workflow registration
+        run: |
+          echo "Manual iOS release archive workflow registered on main."
+          echo "Archive and TestFlight upload remain workflow_dispatch-only."
+
   archive:
     name: Archive and optional TestFlight upload
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: macos-15
     timeout-minutes: 60
     environment: app-store-release

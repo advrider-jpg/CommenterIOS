@@ -851,3 +851,12 @@ Append material work history here. Keep entries short, dated, and factual.
 - Added dataset-source-transform and localization-plan validators so release
   proof includes the documented CommenterV3 hash chain and an honest
   English-only localization posture.
+
+## 2026-06-13 - Manual release workflow registration fix
+
+- Added an explicit push registration job to `.github/workflows/ios-release.yml`
+  so GitHub records a successful workflow-file registration when the manual
+  release workflow changes on `main`.
+- Kept the archive/TestFlight lane gated to `workflow_dispatch` so release
+  archives, IPA export, and TestFlight upload still only report success after a
+  real manual run with required signing and App Store Connect credentials.
