@@ -42,7 +42,7 @@ public struct ProjectStoreClient: Sendable {
     public var importBackup: @Sendable (_ url: URL, _ password: String?) async throws -> Project
     public var prepareBackup: @Sendable (_ project: Project) async throws -> URL
     public var prepareReportExport: @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
-    public var discardPreparedFile: @Sendable (_ url: URL) async -> Void
+    public var discardPreparedFile: @Sendable (_ url: URL) async throws -> Void
     public var purgeStalePreparedFiles: @Sendable () async -> Void
 
     public init(
@@ -57,7 +57,7 @@ public struct ProjectStoreClient: Sendable {
         importBackup: @escaping @Sendable (_ url: URL, _ password: String?) async throws -> Project,
         prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL,
         prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL,
-        discardPreparedFile: @escaping @Sendable (_ url: URL) async -> Void = { _ in },
+        discardPreparedFile: @escaping @Sendable (_ url: URL) async throws -> Void = { _ in },
         purgeStalePreparedFiles: @escaping @Sendable () async -> Void = {}
     ) {
         self.listProjects = listProjects
@@ -177,7 +177,7 @@ extension ProjectStoreClient: DependencyKey {
             return prepared
         },
         discardPreparedFile: { url in
-            discardOwnedTemporaryExport(url)
+            try discardOwnedTemporaryExport(url)
         },
         purgeStalePreparedFiles: {
             purgeOldTemporaryExports(olderThanSeconds: 60 * 60 * 12)
@@ -246,9 +246,14 @@ private func isOwnedTemporaryExport(_ url: URL) -> Bool {
     return candidatePath == directoryPath || candidatePath.hasPrefix(directoryPath + "/")
 }
 
-private func discardOwnedTemporaryExport(_ url: URL) {
+private func discardOwnedTemporaryExport(_ url: URL) throws {
     guard isOwnedTemporaryExport(url) else { return }
-    try? FileManager.default.removeItem(at: url)
+    if FileManager.default.fileExists(atPath: url.path) {
+        try FileManager.default.removeItem(at: url)
+    }
+    guard !FileManager.default.fileExists(atPath: url.path) else {
+        throw CocoaError(.fileWriteUnknown)
+    }
 }
 
 private func purgeOldTemporaryExports(olderThanSeconds: TimeInterval) {

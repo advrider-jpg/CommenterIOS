@@ -480,18 +480,11 @@ private struct SubjectSelectionButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Toggle(isOn: Binding(get: { isSelected }, set: { _ in action() })) {
             HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .stroke(isSelected ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.secondaryInk.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: isSelected ? [] : [5, 4]))
-                        .frame(width: 22, height: 22)
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(CommenterStationeryTheme.Colors.localGreen)
-                    }
-                }
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(isSelected ? CommenterStationeryTheme.Colors.localGreen : CommenterStationeryTheme.Colors.secondaryInk.opacity(0.65))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
@@ -507,7 +500,7 @@ private struct SubjectSelectionButton: View {
             .contentShape(Rectangle())
             .padding(.vertical, 8)
         }
-        .buttonStyle(.plain)
+        .toggleStyle(.button)
         .disabled(isDisabled)
         .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(title)
@@ -516,6 +509,8 @@ private struct SubjectSelectionButton: View {
 }
 
 struct ResultsSection: View {
+    private static let allFilter = "__all__"
+
     let project: Project
     let readiness: ProjectReadiness?
     let importState: AppFeature.TabularImportState
@@ -532,6 +527,9 @@ struct ResultsSection: View {
     let onNextStepGoalsChanged: (String, String, [String]) -> Void
     let onImportResults: () -> Void
     let isDisabled: Bool
+
+    @State private var studentFilter = Self.allFilter
+    @State private var subjectFilter = Self.allFilter
 
     var body: some View {
         Section {
@@ -572,8 +570,36 @@ struct ResultsSection: View {
                 .worklistSectionRow()
             }
 
-            ForEach(project.roster) { student in
-                ForEach(selectedSubjects, id: \.self) { subject in
+            if project.roster.isEmpty == false && selectedSubjects.isEmpty == false {
+                WorklistNotebookCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Focused result entry")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(CommenterStationeryTheme.Colors.ink)
+                        Picker("Student", selection: $studentFilter) {
+                            Text("All students").tag(Self.allFilter)
+                            ForEach(project.roster) { student in
+                                Text(fullStudentName(student)).tag(student.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("results-student-filter")
+                        Picker("Subject", selection: $subjectFilter) {
+                            Text("All subjects").tag(Self.allFilter)
+                            ForEach(selectedSubjects, id: \.self) { subject in
+                                Text(displaySubjectName(subject)).tag(subject)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("results-subject-filter")
+                        WorklistNote(visibleResultSummary, tone: .neutral)
+                    }
+                }
+                .worklistSectionRow()
+            }
+
+            ForEach(filteredStudents) { student in
+                ForEach(filteredSubjects, id: \.self) { subject in
                     let result = project.results.first { $0.studentId == student.id && $0.subject == subject }
                     WorklistNotebookCard {
                         WorklistTapeInlineTitle("\(fullStudentName(student)) - \(displaySubjectName(subject))")
@@ -684,6 +710,25 @@ struct ResultsSection: View {
 
     private var selectedSubjects: [String] {
         selectedSubjectKeys(project.metadata.selectedSubjects)
+    }
+
+    private var filteredStudents: [Student] {
+        guard studentFilter != Self.allFilter else { return project.roster }
+        return project.roster.filter { $0.id == studentFilter }
+    }
+
+    private var filteredSubjects: [String] {
+        guard subjectFilter != Self.allFilter else { return selectedSubjects }
+        return selectedSubjects.filter { $0 == subjectFilter }
+    }
+
+    private var visibleResultSummary: String {
+        let visibleCount = filteredStudents.count * filteredSubjects.count
+        let totalCount = project.roster.count * selectedSubjects.count
+        if visibleCount == totalCount {
+            return "\(visibleCount) result \(visibleCount == 1 ? "card" : "cards") visible."
+        }
+        return "\(visibleCount) of \(totalCount) result \(totalCount == 1 ? "card" : "cards") visible. Change filters to return to the full class."
     }
 
     private var canImportResults: Bool {
@@ -2640,7 +2685,8 @@ private struct WorklistFormRow<Content: View>: View {
                 Text(label)
                     .font(.caption)
                     .foregroundStyle(CommenterStationeryTheme.Colors.mutedInk)
-                    .frame(width: 86, alignment: .leading)
+                    .frame(maxWidth: 120, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             content
                 .font(.body)

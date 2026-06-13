@@ -1,4 +1,4 @@
-import AppFeature
+@testable import AppFeature
 import ComposableArchitecture
 import CommenterAI
 import CommenterAITestSupport
@@ -686,6 +686,9 @@ final class AppFeatureTests: XCTestCase {
 
         await store.send(.fileExportCancelled) {
             $0.preparedFile = nil
+            $0.operationStatus = .busy("File export cancelled. Removing temporary prepared copy.")
+        }
+        await store.receive(.preparedFileDiscardCompleted(.cancelled("File export cancelled. Temporary prepared copy was removed."))) {
             $0.operationStatus = .cancelled("File export cancelled. Temporary prepared copy was removed.")
         }
 
@@ -693,6 +696,9 @@ final class AppFeatureTests: XCTestCase {
         let shareStore = TestStore(initialState: initial) { AppFeature() }
         await shareStore.send(.fileShareCancelled) {
             $0.preparedFile = nil
+            $0.operationStatus = .busy("Share cancelled. Removing temporary prepared copy.")
+        }
+        await shareStore.receive(.preparedFileDiscardCompleted(.cancelled("Share cancelled. Temporary prepared copy was removed."))) {
             $0.operationStatus = .cancelled("Share cancelled. Temporary prepared copy was removed.")
         }
 
@@ -700,7 +706,32 @@ final class AppFeatureTests: XCTestCase {
         let completedStore = TestStore(initialState: initial) { AppFeature() }
         await completedStore.send(.fileShareCompleted(preparedURL)) {
             $0.preparedFile = nil
+            $0.operationStatus = .busy("Share completed for reports.docx. Removing temporary prepared copy.")
+        }
+        await completedStore.receive(.preparedFileDiscardCompleted(.shared("Share completed for reports.docx. Temporary prepared copy was removed."))) {
             $0.operationStatus = .shared("Share completed for reports.docx. Temporary prepared copy was removed.")
+        }
+    }
+
+    func testPreparedFileDiscardFailureShowsCleanupWarning() async {
+        let preparedURL = URL(fileURLWithPath: "/tmp/reports.docx")
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.preparedFile = AppFeature.PreparedFile(url: preparedURL, label: "DOCX export file is verified and ready.")
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(discardPreparedFile: { _ in
+                throw TestPreparedFileDiscardFailure()
+            })
+        }
+
+        await store.send(.fileExportSaved(URL(fileURLWithPath: "/tmp/saved/reports.docx"))) {
+            $0.preparedFile = nil
+            $0.operationStatus = .busy("File saved to reports.docx. Removing temporary prepared copy.")
+        }
+        await store.receive(.preparedFileDiscardFailed("File saved to reports.docx, but the temporary prepared copy could not be removed: Prepared file discard failed for test.")) {
+            $0.operationStatus = .failed("File saved to reports.docx, but the temporary prepared copy could not be removed: Prepared file discard failed for test.")
         }
     }
 
@@ -770,6 +801,16 @@ final class AppFeatureTests: XCTestCase {
         XCTAssertTrue(text.contains("Backup guidance:"))
     }
 
+    func testUserVisibleErrorMessagesRedactLocalPaths() {
+        XCTAssertEqual(
+            sanitizedUserVisibleMessage("Could not open C:\\Users\\Teacher\\Room5\\project.json"),
+            "Could not open [local file]"
+        )
+        XCTAssertEqual(
+            sanitizedUserVisibleMessage("Could not write /private/var/mobile/project.json."),
+            "Could not write [local file]."
+        )
+    }
 
     func testCreateProjectOnlyReportsSuccessAfterStoreReturnsSavedProject() async {
         await testProjectCreationRequiresNamingFlowAndOpensSavedProjectOnlyAfterStoreReturns()
@@ -1063,6 +1104,55 @@ final class AppFeatureTests: XCTestCase {
                 findings: [],
                 validatedAt: 10_000,
                 textFingerprint: fingerprint
+            )
+            $0.selectedProject?.reports[0].reviewState = ReportReviewState(
+                status: .approved,
+                reviewedAt: 10_000,
+                approvedAt: 10_000,
+                reviewerDisplayName: "Local teacher",
+                approvalFingerprint: fingerprint
+            )
+            $0.selectedProjectReadiness = getProjectReadiness($0.selectedProject!)
+            $0.hasUnsavedProjectChanges = true
+            $0.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+        }
+    }
+
+    func testAIReportApprovalRecordsWarningReviewForCurrentValidation() async {
+        var original = readyProject()
+        let text = "This learner reads with confidence and explains ideas using evidence."
+        original.reports[0].text = text
+        original.reports[0].generationMode = .aiPolishedDeterministic
+        original.reports[0].currentTextFingerprint = stableTextFingerprint(text)
+        original.reports[0].reviewState = ReportReviewState(status: .needsTeacherReview)
+        let store = TestStore(initialState: loadedState(project: original)) {
+            AppFeature()
+        } withDependencies: {
+            $0.dateClient = DateClient(nowMilliseconds: { 10_000 })
+        }
+
+        await store.send(.reportApprovedForExport("s1", "English")) {
+            let fingerprint = stableTextFingerprint(text)
+            let finding = ReportValidationFinding(
+                id: "name-1-\(stableTextFingerprint("The report may not name the selected student."))",
+                severity: .warning,
+                category: .name,
+                message: "The report may not name the selected student.",
+                suggestedFix: "Confirm the final text clearly refers to the selected student."
+            )
+            $0.selectedProject?.reports[0].currentTextFingerprint = fingerprint
+            $0.selectedProject?.reports[0].approvedTextFingerprint = fingerprint
+            $0.selectedProject?.reports[0].lastValidation = ReportValidationSummary(
+                status: .passedWithWarnings,
+                findings: [finding],
+                validatedAt: 10_000,
+                textFingerprint: fingerprint
+            )
+            $0.selectedProject?.reports[0].validationWarningReview = ReportWarningReviewRecord(
+                validationFingerprint: fingerprint,
+                reviewedAt: 10_000,
+                reviewerDisplayName: "Local teacher",
+                notes: finding.message
             )
             $0.selectedProject?.reports[0].reviewState = ReportReviewState(
                 status: .approved,
@@ -2326,6 +2416,30 @@ final class AppFeatureTests: XCTestCase {
         await XCTAssertProbeValues(probe, ["critique-requested"])
     }
 
+    func testAICritiqueResultIsDiscardedWhenDraftChangesBeforeCompletion() async {
+        var project = readyProject()
+        let originalText = project.reports[0].exportText
+        project.reports[0].manualEdit = "Ava now has a different draft that was edited while AI was reviewing."
+        let staleValidation = ReportValidationSummary(
+            status: .passed,
+            findings: [],
+            validatedAt: 20_000,
+            textFingerprint: stableTextFingerprint(originalText)
+        )
+        let staleCritique = AIReportCritiqueResult(
+            validation: staleValidation,
+            reviewNotes: ["This note belongs to the previous draft."]
+        )
+        let store = TestStore(initialState: loadedState(project: project)) {
+            AppFeature()
+        }
+
+        await store.send(.reportAICritiqueCompleted("s1", "English", staleCritique)) {
+            $0.latestReportCheck = nil
+            $0.operationStatus = .failed("The AI critique returned after the draft changed. The stale validation was discarded; run a new check on the current draft.")
+        }
+    }
+
     func testValidationWarningsCanBeMarkedReviewedForCurrentDraft() async {
         var original = readyProject()
         let fingerprint = stableTextFingerprint(original.reports[0].text)
@@ -2520,6 +2634,66 @@ final class AppFeatureTests: XCTestCase {
             $0.operationStatus = .saved(pending.successMessage)
             $0.workflowMessage = pending.successMessage
             $0.projects = [projectSummary(imported)]
+        }
+    }
+
+    func testBackupImportReplaceFailsWhenExistingProjectRevisionChangesAfterPreview() async {
+        let existingSummary = ProjectSummary(id: "p1", name: "Room 5", term: "Term 1", updatedAt: 1, revision: 4)
+        let imported = project(id: "p1", name: "Imported Room", subjects: ["English"], roster: [student()])
+        var initial = AppFeature.State()
+        initial.projectStorageStatus = .loaded
+        initial.projects = [existingSummary]
+        let store = TestStore(initialState: initial) {
+            AppFeature()
+        } withDependencies: {
+            $0.projectStoreClient = testProjectStoreClient(
+                saveProject: { project, expectedRevision, createRecoverySnapshot, reason in
+                    XCTAssertEqual(project, imported)
+                    XCTAssertEqual(expectedRevision, 4)
+                    XCTAssertTrue(createRecoverySnapshot)
+                    XCTAssertEqual(reason, .beforeImportReplace)
+                    throw ProjectStoreError.revisionConflict
+                },
+                importBackup: { _, _ in imported }
+            )
+        }
+
+        await store.send(.backupImportPicked(URL(fileURLWithPath: "/tmp/backup.json"))) {
+            $0.projectStorageStatus = .importing
+            $0.activeImportKind = .backup
+            $0.operationStatus = .busy("Validating backup JSON before saving it locally.")
+        }
+        let rawPending = AppFeature.PendingImport(
+            project: imported,
+            title: "Review backup import",
+            detail: "Imported Room was validated from backup JSON. Confirm to save it locally; any matching project id will be snapshotted before replacement.",
+            successMessage: "Backup imported, saved, and verified. A matching local project id was replaced only after a recovery snapshot was prepared.",
+            expectedRevision: nil,
+            recoveryReason: .beforeImportReplace,
+            kind: .backup,
+            acceptedRows: 1,
+            sourceFormat: .backupJSON
+        )
+        var revisionBoundPending = rawPending
+        revisionBoundPending.expectedRevision = 4
+        await store.receive(.importPreviewPrepared(rawPending)) {
+            $0.projectStorageStatus = .loaded
+            $0.pendingImport = revisionBoundPending
+            $0.selectedTab = .worklist
+            $0.activeImportKind = nil
+            $0.operationStatus = .prepared(rawPending.detail)
+            $0.workflowMessage = rawPending.detail
+        }
+        await store.send(.confirmImportTapped) {
+            $0.projectStorageStatus = .importing
+            $0.activeImportKind = .backup
+            $0.operationStatus = .busy("Saving confirmed import and verifying local storage.")
+        }
+        await store.receive(.importFailed(ProjectStoreError.revisionConflict.localizedDescription)) {
+            $0.projectStorageStatus = .loaded
+            $0.pendingImport = nil
+            $0.activeImportKind = nil
+            $0.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: \(ProjectStoreError.revisionConflict.localizedDescription)")
         }
     }
 
@@ -2719,6 +2893,10 @@ private struct TestImportFailure: LocalizedError {
     var errorDescription: String? { "Import parse failed for test." }
 }
 
+private struct TestPreparedFileDiscardFailure: LocalizedError {
+    var errorDescription: String? { "Prepared file discard failed for test." }
+}
+
 private struct TestUnexpectedSave: LocalizedError {
     var errorDescription: String? { "Unexpected save call." }
 }
@@ -2758,7 +2936,8 @@ private func testProjectStoreClient(
     importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview = { _, project in importPreview(format: .csv, kind: .results, count: 0, project: project) },
     importBackup: @escaping @Sendable (_ url: URL, _ password: String?) async throws -> Project = { _, _ in project(id: "imported") },
     prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL = { _ in URL(fileURLWithPath: "/tmp/report-writer-backup.json") },
-    prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL = { _, format in URL(fileURLWithPath: "/tmp/report-writer-report.\(format.rawValue)") }
+    prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL = { _, format in URL(fileURLWithPath: "/tmp/report-writer-report.\(format.rawValue)") },
+    discardPreparedFile: @escaping @Sendable (_ url: URL) async throws -> Void = { _ in }
 ) -> ProjectStoreClient {
     ProjectStoreClient(
         listProjects: listProjects,
@@ -2771,7 +2950,8 @@ private func testProjectStoreClient(
         importResultsFile: importResultsFile,
         importBackup: importBackup,
         prepareBackup: prepareBackup,
-        prepareReportExport: prepareReportExport
+        prepareReportExport: prepareReportExport,
+        discardPreparedFile: discardPreparedFile
     )
 }
 

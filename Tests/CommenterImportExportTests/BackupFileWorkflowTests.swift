@@ -63,7 +63,7 @@ final class BackupFileWorkflowTests: XCTestCase {
             project: fixtureProject(),
             password: password,
             createdAt: Date(timeIntervalSince1970: 0),
-            iterations: 2,
+            iterations: encryptedBackupMinimumKDFIterations,
             salt: Data((0..<16).map { UInt8($0) }),
             iv: Data((16..<28).map { UInt8($0) })
         )

@@ -185,7 +185,7 @@ private func diagnosticSupportMessage(_ message: String, project: Project?, reda
     return diagnosticReadinessMessage(message, project: project, redaction: redaction)
 }
 
-private func diagnosticFilename(_ filename: String, format: ImportExportFormat, redaction: SupportDiagnosticsRedaction) -> String {
+func diagnosticFilename(_ filename: String, format: ImportExportFormat, redaction: SupportDiagnosticsRedaction) -> String {
     switch redaction {
     case .fullWithUserPermission:
         return filename
@@ -195,7 +195,7 @@ private func diagnosticFilename(_ filename: String, format: ImportExportFormat, 
     }
 }
 
-private func diagnosticProjectName(_ project: Project, redaction: SupportDiagnosticsRedaction) -> String {
+func diagnosticProjectName(_ project: Project, redaction: SupportDiagnosticsRedaction) -> String {
     switch redaction {
     case .fullWithUserPermission:
         return project.metadata.name
@@ -204,7 +204,7 @@ private func diagnosticProjectName(_ project: Project, redaction: SupportDiagnos
     }
 }
 
-private func diagnosticTerm(_ term: String, redaction: SupportDiagnosticsRedaction) -> String {
+func diagnosticTerm(_ term: String, redaction: SupportDiagnosticsRedaction) -> String {
     switch redaction {
     case .fullWithUserPermission:
         return term
@@ -213,7 +213,7 @@ private func diagnosticTerm(_ term: String, redaction: SupportDiagnosticsRedacti
     }
 }
 
-private func diagnosticIdentifier(_ value: String, prefix: String, redaction: SupportDiagnosticsRedaction) -> String {
+func diagnosticIdentifier(_ value: String, prefix: String, redaction: SupportDiagnosticsRedaction) -> String {
     switch redaction {
     case .fullWithUserPermission:
         return value
@@ -224,7 +224,7 @@ private func diagnosticIdentifier(_ value: String, prefix: String, redaction: Su
     }
 }
 
-private func diagnosticReadinessMessage(_ message: String, project: Project, redaction: SupportDiagnosticsRedaction) -> String {
+func diagnosticReadinessMessage(_ message: String, project: Project, redaction: SupportDiagnosticsRedaction) -> String {
     guard redaction == .redacted else { return message }
     var redacted = message
     for student in project.roster {

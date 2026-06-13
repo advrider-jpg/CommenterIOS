@@ -34,10 +34,11 @@ Also read:
 
 ## Repository Snapshot
 
-CommenterIOS is the fresh native iPhone-first SwiftUI/TCA port of CommenterV3.
-The repo currently contains planning/ledger guardrails, an initial Swift package
-scaffold, and a minimal native iOS Xcode app host project. The production source
-of truth for behavior is still the live `C:\Commenterv3` checkout.
+CommenterIOS is the native iPhone-first SwiftUI/TCA port of CommenterV3. The
+repo now contains the app host, domain, deterministic generation, local
+persistence, import/export, AI review gates, support diagnostics, release docs,
+and CI scaffolding. The production source of truth for unported or disputed
+behavior is still the live `C:\Commenterv3` checkout.
 
 CommenterIOS must preserve CommenterV3's core product posture:
 
@@ -57,8 +58,8 @@ privacy, TestFlight, and App Store readiness. These are not deferred.
 
 ## Commands
 
-An initial Swift package scaffold and `CommenterIOS.xcodeproj` exist. On a
-machine with Swift/Xcode available, run:
+`CommenterIOS.xcodeproj` and the Swift package targets exist. On a machine with
+Swift/Xcode available, run:
 
 - Resolve packages: `swift package resolve`
 - Run Swift package tests: `swift test`

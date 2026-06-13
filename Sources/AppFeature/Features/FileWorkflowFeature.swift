@@ -35,7 +35,7 @@ extension AppFeature {
                         sourceFormat: preview.sourceFormat
                     )))
                 } catch {
-                    await send(.importFailed(error.localizedDescription))
+                    await send(.importFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -72,7 +72,7 @@ extension AppFeature {
                         sourceFormat: preview.sourceFormat
                     )))
                 } catch {
-                    await send(.importFailed(error.localizedDescription))
+                    await send(.importFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -98,7 +98,7 @@ extension AppFeature {
                 } catch BackupError.encryptedPasswordRequired {
                     await send(.encryptedBackupPasswordRequired(url))
                 } catch {
-                    await send(.importFailed(error.localizedDescription))
+                    await send(.importFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -133,7 +133,7 @@ extension AppFeature {
                 } catch BackupError.encryptedCouldNotDecrypt, BackupError.encryptedPasswordRequired {
                     await send(.importFailed("The encrypted backup could not be opened. Check the backup password and try again."))
                 } catch {
-                    await send(.importFailed(error.localizedDescription))
+                    await send(.importFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -157,6 +157,7 @@ extension AppFeature {
             return .none
 
         case let .importPreviewPrepared(preview):
+            let preview = previewWithCurrentExpectedRevision(preview, summaries: state.projects)
             state.projectStorageStatus = .loaded
             state.pendingImport = preview
             state.selectedTab = .worklist
@@ -202,7 +203,7 @@ extension AppFeature {
                     )
                     await send(.importCommitted(saved, preview.successMessage))
                 } catch {
-                    await send(.importFailed(error.localizedDescription))
+                    await send(.importFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -273,12 +274,12 @@ extension AppFeature {
             let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
                 if let previousPreparedURL {
-                    await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    try? await projectStoreClient.discardPreparedFile(previousPreparedURL)
                 }
                 do {
                     await send(.filePrepared(try await projectStoreClient.prepareBackup(project), "Verified backup JSON is ready to export or share.", .backupJSON, preparedAt))
                 } catch {
-                    await send(.filePreparationFailed(error.localizedDescription))
+                    await send(.filePreparationFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -305,12 +306,12 @@ extension AppFeature {
             let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
                 if let previousPreparedURL {
-                    await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    try? await projectStoreClient.discardPreparedFile(previousPreparedURL)
                 }
                 do {
                     await send(.filePrepared(try await projectStoreClient.prepareReportExport(project, format), "\(format.rawValue.uppercased()) export file is verified and ready.", format, preparedAt))
                 } catch {
-                    await send(.filePreparationFailed(error.localizedDescription))
+                    await send(.filePreparationFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -335,20 +336,35 @@ extension AppFeature {
         case let .fileExportSaved(url):
             let preparedURL = state.preparedFile?.url
             state.preparedFile = nil
-            state.operationStatus = .saved("File saved to \(url.lastPathComponent). Temporary prepared copy was removed.")
-            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
+            state.operationStatus = .busy("File saved to \(url.lastPathComponent). Removing temporary prepared copy.")
+            return discardPreparedFileEffect(
+                preparedURL,
+                successStatus: .saved("File saved to \(url.lastPathComponent). Temporary prepared copy was removed."),
+                failurePrefix: "File saved to \(url.lastPathComponent), but the temporary prepared copy could not be removed",
+                projectStoreClient: projectStoreClient
+            )
 
         case .fileExportCancelled:
             let preparedURL = state.preparedFile?.url
             state.preparedFile = nil
-            state.operationStatus = .cancelled("File export cancelled. Temporary prepared copy was removed.")
-            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
+            state.operationStatus = .busy("File export cancelled. Removing temporary prepared copy.")
+            return discardPreparedFileEffect(
+                preparedURL,
+                successStatus: .cancelled("File export cancelled. Temporary prepared copy was removed."),
+                failurePrefix: "File export cancelled, but the temporary prepared copy could not be removed",
+                projectStoreClient: projectStoreClient
+            )
 
         case let .fileExportFailed(message):
             let preparedURL = state.preparedFile?.url
             state.preparedFile = nil
-            state.operationStatus = .failed("File export failed: \(message). Temporary prepared copy was removed.")
-            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
+            state.operationStatus = .busy("File export failed: \(message). Removing temporary prepared copy.")
+            return discardPreparedFileEffect(
+                preparedURL,
+                successStatus: .failed("File export failed: \(message). Temporary prepared copy was removed."),
+                failurePrefix: "File export failed: \(message). The temporary prepared copy could not be removed",
+                projectStoreClient: projectStoreClient
+            )
 
         case let .fileShareStarted(url):
             state.operationStatus = .busy("Opening native share sheet for \(url.lastPathComponent).")
@@ -357,20 +373,35 @@ extension AppFeature {
         case let .fileShareCompleted(url):
             let preparedURL = state.preparedFile?.url ?? url
             state.preparedFile = nil
-            state.operationStatus = .shared("Share completed for \(url.lastPathComponent). Temporary prepared copy was removed.")
-            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
+            state.operationStatus = .busy("Share completed for \(url.lastPathComponent). Removing temporary prepared copy.")
+            return discardPreparedFileEffect(
+                preparedURL,
+                successStatus: .shared("Share completed for \(url.lastPathComponent). Temporary prepared copy was removed."),
+                failurePrefix: "Share completed for \(url.lastPathComponent), but the temporary prepared copy could not be removed",
+                projectStoreClient: projectStoreClient
+            )
 
         case .fileShareCancelled:
             let preparedURL = state.preparedFile?.url
             state.preparedFile = nil
-            state.operationStatus = .cancelled("Share cancelled. Temporary prepared copy was removed.")
-            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
+            state.operationStatus = .busy("Share cancelled. Removing temporary prepared copy.")
+            return discardPreparedFileEffect(
+                preparedURL,
+                successStatus: .cancelled("Share cancelled. Temporary prepared copy was removed."),
+                failurePrefix: "Share cancelled, but the temporary prepared copy could not be removed",
+                projectStoreClient: projectStoreClient
+            )
 
         case let .fileShareFailed(message):
             let preparedURL = state.preparedFile?.url
             state.preparedFile = nil
-            state.operationStatus = .failed("Share failed: \(message). Temporary prepared copy was removed.")
-            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
+            state.operationStatus = .busy("Share failed: \(message). Removing temporary prepared copy.")
+            return discardPreparedFileEffect(
+                preparedURL,
+                successStatus: .failed("Share failed: \(message). Temporary prepared copy was removed."),
+                failurePrefix: "Share failed: \(message). The temporary prepared copy could not be removed",
+                projectStoreClient: projectStoreClient
+            )
 
         case .preparedFileDismissed:
             let preparedURL = state.preparedFile?.url
@@ -378,7 +409,20 @@ extension AppFeature {
             if case .prepared = state.operationStatus {
                 state.operationStatus = .idle
             }
-            return discardPreparedFileEffect(preparedURL, projectStoreClient: projectStoreClient)
+            return discardPreparedFileEffect(
+                preparedURL,
+                successStatus: state.operationStatus,
+                failurePrefix: "The dismissed prepared file could not be removed",
+                projectStoreClient: projectStoreClient
+            )
+
+        case let .preparedFileDiscardCompleted(status):
+            state.operationStatus = status
+            return .none
+
+        case let .preparedFileDiscardFailed(message):
+            state.operationStatus = .failed(message)
+            return .none
 
         default:
             return .none
@@ -386,10 +430,20 @@ extension AppFeature {
     }
 }
 
-private func discardPreparedFileEffect(_ url: URL?, projectStoreClient: ProjectStoreClient) -> Effect<AppFeature.Action> {
-    guard let url else { return .none }
-    return .run { _ in
-        await projectStoreClient.discardPreparedFile(url)
+private func discardPreparedFileEffect(
+    _ url: URL?,
+    successStatus: AppFeature.OperationStatus,
+    failurePrefix: String,
+    projectStoreClient: ProjectStoreClient
+) -> Effect<AppFeature.Action> {
+    guard let url else { return .send(.preparedFileDiscardCompleted(successStatus)) }
+    return .run { send in
+        do {
+            try await projectStoreClient.discardPreparedFile(url)
+            await send(.preparedFileDiscardCompleted(successStatus))
+        } catch {
+            await send(.preparedFileDiscardFailed("\(failurePrefix): \(userVisibleErrorMessage(error))"))
+        }
     }
 }
 
@@ -423,4 +477,14 @@ private func canStartFileWorkflow(state: inout AppFeature.State, label: String) 
         return false
     }
     return true
+}
+
+private func previewWithCurrentExpectedRevision(
+    _ preview: AppFeature.PendingImport,
+    summaries: [ProjectSummary]
+) -> AppFeature.PendingImport {
+    guard preview.kind == .backup else { return preview }
+    var preview = preview
+    preview.expectedRevision = summaries.first { $0.id == preview.project.metadata.id }?.revision
+    return preview
 }

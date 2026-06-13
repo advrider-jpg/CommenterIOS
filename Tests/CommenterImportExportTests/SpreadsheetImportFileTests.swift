@@ -165,6 +165,30 @@ final class SpreadsheetImportFileTests: XCTestCase {
         }
     }
 
+    func testParseXLSXRejectsBrokenWorkbookRelationshipsInsteadOfFallbackImportingSheets() throws {
+        let data = try workbookData(
+            sheetXML: """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <sheetData>
+                <row r="1">
+                  <c r="A1" t="inlineStr"><is><t>First Name</t></is></c>
+                  <c r="B1" t="inlineStr"><is><t>Last Name</t></is></c>
+                </row>
+                <row r="2">
+                  <c r="A2" t="inlineStr"><is><t>Ava</t></is></c>
+                  <c r="B2" t="inlineStr"><is><t>Ng</t></is></c>
+                </row>
+              </sheetData>
+            </worksheet>
+            """,
+            includeWorkbookRelationships: false
+        )
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseXLSX(data, label: "Roster workbook")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .unreadableWorkbook("Roster workbook"))
+        }
+    }
 
     func testParseXLSXRejectsOutOfBoundsColumnReferencesBeforeAllocation() throws {
         let data = try workbookData(sheetXML: """
@@ -237,7 +261,11 @@ final class SpreadsheetImportFileTests: XCTestCase {
         return url
     }
 
-    private func workbookData(sheetXML: String, sharedStringsXML: String? = nil) throws -> Data {
+    private func workbookData(
+        sheetXML: String,
+        sharedStringsXML: String? = nil,
+        includeWorkbookRelationships: Bool = true
+    ) throws -> Data {
         var entries = [
             OOXMLZipEntry(path: "[Content_Types].xml", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -246,6 +274,7 @@ final class SpreadsheetImportFileTests: XCTestCase {
               <Default Extension="xml" ContentType="application/xml"/>
               <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
               <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+              \(includeWorkbookRelationships ? "" : #"<Override PartName="/xl/_rels/workbook.xml.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>"#)
               \(sharedStringsXML == nil ? "" : #"<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>"#)
             </Types>
             """.utf8)),
@@ -262,15 +291,17 @@ final class SpreadsheetImportFileTests: XCTestCase {
                 <sheet name="Sheet1" sheetId="1" r:id="rId1"/>
               </sheets>
             </workbook>
-            """.utf8)),
-            OOXMLZipEntry(path: "xl/_rels/workbook.xml.rels", data: Data("""
+            """.utf8))
+        ]
+        if includeWorkbookRelationships {
+            entries.append(OOXMLZipEntry(path: "xl/_rels/workbook.xml.rels", data: Data("""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
               <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
             </Relationships>
-            """.utf8)),
-            OOXMLZipEntry(path: "xl/worksheets/sheet1.xml", data: Data(sheetXML.utf8))
-        ]
+            """.utf8)))
+        }
+        entries.append(OOXMLZipEntry(path: "xl/worksheets/sheet1.xml", data: Data(sheetXML.utf8)))
         if let sharedStringsXML {
             entries.append(OOXMLZipEntry(path: "xl/sharedStrings.xml", data: Data(sharedStringsXML.utf8)))
         }

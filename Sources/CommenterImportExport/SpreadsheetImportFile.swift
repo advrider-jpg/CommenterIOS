@@ -91,8 +91,12 @@ public enum SpreadsheetImportFile {
                     }
                 }
             }
+        } catch let error as CSVParserError {
+            throw error
+        } catch let error as SpreadsheetImportFileError {
+            throw error
         } catch {
-            return try parseXLSXFallback(data, label: label, maxRows: maxRows)
+            throw SpreadsheetImportFileError.unreadableWorkbook(label)
         }
 
         throw SpreadsheetImportFileError.emptyWorkbook(label)

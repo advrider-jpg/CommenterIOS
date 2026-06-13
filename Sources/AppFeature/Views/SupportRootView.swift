@@ -100,7 +100,7 @@ struct SupportRootView: View {
                     DisclosureGroup("Invalid record details") {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(state.invalidProjectRecords, id: \.id) { record in
-                                SupportBodyText("\(record.id): \(record.reason)")
+                                SupportBodyText("\(diagnosticIdentifier(record.id, prefix: "project", redaction: .redacted)): \(record.reason)")
                             }
                         }
                         .padding(.top, 8)
@@ -119,9 +119,9 @@ struct SupportRootView: View {
         supportSection("Open project diagnostics", clipped: state.selectedProject != nil) {
             VStack(alignment: .leading, spacing: 0) {
                 if let project = state.selectedProject {
-                    SupportDiagnosticRow("Project", value: project.metadata.name, valueTone: .local)
-                    SupportDiagnosticRow("Project ID", value: project.metadata.id, valueTone: .local)
-                    SupportDiagnosticRow("Term", value: project.metadata.term)
+                    SupportDiagnosticRow("Project", value: diagnosticProjectName(project, redaction: .redacted), valueTone: .local)
+                    SupportDiagnosticRow("Project ID", value: diagnosticIdentifier(project.metadata.id, prefix: "project", redaction: .redacted), valueTone: .local)
+                    SupportDiagnosticRow("Term", value: diagnosticTerm(project.metadata.term, redaction: .redacted))
                     SupportDiagnosticRow("Year level", value: projectYearLabel(project.metadata.yearLevel))
                     SupportDiagnosticRow("Last saved", value: CommenterFormatters.timestamp(project.metadata.persistence?.savedAt))
                     SupportDiagnosticRow("Revision", value: project.metadata.persistence?.revision.map { String($0) } ?? "Not yet recorded")
@@ -145,7 +145,7 @@ struct SupportRootView: View {
                             DisclosureGroup("Blocked readiness details") {
                                 VStack(alignment: .leading, spacing: 8) {
                                     ForEach(readiness.blocked.map(\.message), id: \.self) { message in
-                                        SupportBodyText(message)
+                                        SupportBodyText(diagnosticReadinessMessage(message, project: project, redaction: .redacted))
                                     }
                                 }
                                 .padding(.top, 8)

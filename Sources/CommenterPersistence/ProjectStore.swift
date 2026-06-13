@@ -247,8 +247,8 @@ public struct FileProjectStore: ProjectStore {
             saved = normalized
         }
 
-        try? SQLiteProjectIndex(indexURL: indexURL).upsert(project: saved, projectPath: projectFile, usedVariantIds: reportVariantIds(saved))
-        try? applyFileProtectionToSQLiteStore(at: indexURL)
+        try SQLiteProjectIndex(indexURL: indexURL).upsert(project: saved, projectPath: projectFile, usedVariantIds: reportVariantIds(saved))
+        try applyFileProtectionToSQLiteStore(at: indexURL)
         return saved
     }
 
@@ -269,8 +269,8 @@ public struct FileProjectStore: ProjectStore {
         guard !FileManager.default.fileExists(atPath: projectFile.path) else {
             throw ProjectStoreError.verificationFailed
         }
-        try? SQLiteProjectIndex(indexURL: indexURL).deleteProject(id: id)
-        try? applyFileProtectionToSQLiteStore(at: indexURL)
+        try SQLiteProjectIndex(indexURL: indexURL).deleteProject(id: id)
+        try applyFileProtectionToSQLiteStore(at: indexURL)
     }
 
     public func createRecoverySnapshot(_ project: Project, reason: RecoveryReason) throws {
@@ -362,8 +362,8 @@ public struct FileProjectStore: ProjectStore {
         try createProtectedDirectory(at: projectsURL)
         try createProtectedDirectory(at: datasetsURL)
         try createProtectedDirectory(at: exportsTempURL)
-        try? SQLiteProjectIndex(indexURL: indexURL).initialize()
-        try? applyFileProtectionToSQLiteStore(at: indexURL)
+        try SQLiteProjectIndex(indexURL: indexURL).initialize()
+        try applyFileProtectionToSQLiteStore(at: indexURL)
     }
 
     private func projectDirectoryURL(projectId: String) -> URL {

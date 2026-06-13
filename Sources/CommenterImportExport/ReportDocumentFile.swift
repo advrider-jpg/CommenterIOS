@@ -219,7 +219,7 @@ private func uniqueForbiddenStrings(_ values: [String?]) -> [String] {
     var seen: Set<String> = []
     return values.compactMap { value in
         let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard trimmed.count >= 4, seen.insert(trimmed).inserted else { return nil }
+        guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return nil }
         return trimmed
     }
 }

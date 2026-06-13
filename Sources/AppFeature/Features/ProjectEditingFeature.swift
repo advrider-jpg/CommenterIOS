@@ -195,15 +195,23 @@ extension AppFeature {
                 return .none
             }
             updateReport(&state, studentId: studentId, subject: subject) { report in
+                let reviewedAt = dateClient.nowMilliseconds()
                 let currentFingerprint = stableTextFingerprint(report.exportText)
                 report.currentTextFingerprint = currentFingerprint
                 report.approvedTextFingerprint = currentFingerprint
                 report.lastValidation = validation
-                report.validationWarningReview = nil
+                report.validationWarningReview = validation.status == .passedWithWarnings
+                    ? ReportWarningReviewRecord(
+                        validationFingerprint: currentFingerprint,
+                        reviewedAt: reviewedAt,
+                        reviewerDisplayName: "Local teacher",
+                        notes: validation.findings.map(\.message).joined(separator: " ")
+                    )
+                    : nil
                 report.reviewState = ReportReviewState(
                     status: .approved,
-                    reviewedAt: dateClient.nowMilliseconds(),
-                    approvedAt: dateClient.nowMilliseconds(),
+                    reviewedAt: reviewedAt,
+                    approvedAt: reviewedAt,
                     reviewerDisplayName: "Local teacher",
                     approvalFingerprint: currentFingerprint
                 )

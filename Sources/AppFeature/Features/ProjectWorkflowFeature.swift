@@ -61,7 +61,7 @@ extension AppFeature {
                 do {
                     await send(.projectCreateSaved(try await projectStoreClient.createProject(draft)))
                 } catch {
-                    await send(.projectCreateFailed(error.localizedDescription))
+                    await send(.projectCreateFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -96,7 +96,7 @@ extension AppFeature {
                 do {
                     await send(.projectLoaded(try await projectStoreClient.loadProject(id)))
                 } catch {
-                    await send(.projectLoadFailed(error.localizedDescription))
+                    await send(.projectLoadFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -175,7 +175,7 @@ extension AppFeature {
                     let saved = try await projectStoreClient.saveProject(generated.project, expectedRevision, true, .beforeSave)
                     await send(.reportsGeneratedAndSaved(saved, generationSuccessMessage(generated)))
                 } catch {
-                    await send(.reportsGenerationFailed(error.localizedDescription))
+                    await send(.reportsGenerationFailed(userVisibleErrorMessage(error)))
                 }
             }
 
@@ -239,7 +239,7 @@ extension AppFeature {
                 let saved = try await projectStoreClient.saveProject(project, expectedRevision, true, recoveryReason)
                 await send(.projectSaved(saved, successMessage))
             } catch {
-                await send(.projectSaveFailed(error.localizedDescription))
+                await send(.projectSaveFailed(userVisibleErrorMessage(error)))
             }
         }
     }
@@ -273,7 +273,7 @@ extension AppFeature {
                 let projects = try await projectStoreClient.deleteProject(id)
                 await send(.projectDeleted(id, projects, "\(projectName) was deleted after a verified recovery snapshot was created."))
             } catch {
-                await send(.projectDeleteFailed(error.localizedDescription))
+                await send(.projectDeleteFailed(userVisibleErrorMessage(error)))
             }
         }
     }

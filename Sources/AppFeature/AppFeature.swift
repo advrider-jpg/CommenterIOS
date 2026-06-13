@@ -386,6 +386,8 @@ public struct AppFeature: Sendable {
         case fileShareCancelled
         case fileShareFailed(String)
         case preparedFileDismissed
+        case preparedFileDiscardCompleted(OperationStatus)
+        case preparedFileDiscardFailed(String)
         case operationStatusDismissed
         case copyDiagnosticsTapped
         case copyDiagnosticsSucceeded

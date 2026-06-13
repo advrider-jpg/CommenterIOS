@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import argparse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,7 +139,42 @@ def add_error(errors: list[str], message: str) -> None:
     print(f"ERROR: {message}")
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Validate the App Store release package.")
+    parser.add_argument(
+        "--strict-submission",
+        action="store_true",
+        help="Fail draft placeholders and skipped submission checks. Use before App Store Connect upload.",
+    )
+    return parser.parse_args()
+
+
+def contains_todo_placeholder(text: str) -> bool:
+    return bool(re.search(r"\bTODO\b|TODO_", text, re.IGNORECASE))
+
+
+def run_strict_validator(errors: list[str], script_name: str, label: str) -> None:
+    script = ROOT / "scripts" / script_name
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return
+    output = result.stdout.splitlines() + result.stderr.splitlines()
+    if not output:
+        add_error(errors, f"{label}: {script_name} failed without output")
+        return
+    for line in output:
+        if line.strip():
+            add_error(errors, f"{label}: {line}")
+
+
 def main() -> int:
+    args = parse_args()
     errors: list[str] = []
 
     for rel in REQUIRED_FILES:
@@ -184,8 +220,21 @@ def main() -> int:
 
     for url_file in ["support_url.txt", "privacy_url.txt", "marketing_url.txt"]:
         value = (root_metadata / url_file).read_text(encoding="utf-8").strip()
-        if value != "TODO" and not re.match(r"^https://[^\s]+$", value):
+        if args.strict_submission and contains_todo_placeholder(value):
+            add_error(errors, f"{url_file} still contains a TODO placeholder")
+        elif value != "TODO" and not re.match(r"^https://[^\s]+$", value):
             add_error(errors, f"{url_file} must be TODO or a full https URL")
+
+    if args.strict_submission:
+        for rel in [
+            "01_app_store_connect/app_store_metadata.json",
+            "01_app_store_connect/app_information.md",
+            "01_app_store_connect/remaining_inputs.md",
+            "08_after_you_add_contact_details/todo_placeholders_to_replace.txt",
+        ]:
+            path = PACKAGE / rel
+            if path.exists() and contains_todo_placeholder(path.read_text(encoding="utf-8", errors="ignore")):
+                add_error(errors, f"strict submission blocked by TODO placeholder in {rel}")
 
     for screenshot in SCREENSHOTS:
         path = PACKAGE / "05_assets" / "screenshot_drafts_6_9_inch" / screenshot
@@ -251,7 +300,20 @@ def main() -> int:
         if result.returncode != 0:
             add_error(errors, f"plutil failed: {result.stdout}{result.stderr}")
     elif privacy.exists():
-        print("WARN: plutil unavailable; privacy manifest lint skipped")
+        if args.strict_submission:
+            add_error(errors, "plutil unavailable; strict submission cannot skip privacy manifest lint")
+        else:
+            print("WARN: plutil unavailable; privacy manifest lint skipped")
+
+    if args.strict_submission:
+        proof_validator = ROOT / "scripts" / "validate_release_proof_matrix.py"
+        result = subprocess.run([sys.executable, str(proof_validator)], text=True, capture_output=True)
+        if result.returncode != 0:
+            for line in (result.stdout + result.stderr).splitlines():
+                if line.strip():
+                    add_error(errors, f"release proof matrix: {line}")
+        run_strict_validator(errors, "validate_dataset_source_transform.py", "dataset source transform")
+        run_strict_validator(errors, "validate_localization_plan.py", "localization plan")
 
     if errors:
         print(f"Validation failed with {len(errors)} error(s).")

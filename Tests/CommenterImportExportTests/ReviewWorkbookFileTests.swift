@@ -181,6 +181,33 @@ final class ReviewWorkbookFileTests: XCTestCase {
         }
     }
 
+    func testPrepareReviewWorkbookFileRejectsReadbackContainingShortPrivateFields() throws {
+        for format in [ImportExportFormat.xlsx, .xls] {
+            let root = temporaryRoot()
+            let privateNote = "504"
+            var project = fixtureProject()
+            project.results[0].internalTeacherNote = privateNote
+            project.reports = [
+                readyReport(
+                    project: project,
+                    result: project.results[0],
+                    text: "Generated text should not be exported.",
+                    manualEdit: "Manual workbook edit leaked: \(privateNote)",
+                    generatedAt: 1
+                )
+            ]
+
+            XCTAssertThrowsError(try prepareReviewWorkbookFile(project: project, format: format, directory: root)) { error in
+                guard case .verificationFailed = error as? ReviewWorkbookFileError else {
+                    return XCTFail("Expected verificationFailed for \(format), got \(error)")
+                }
+            }
+
+            let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            XCTAssertEqual(files, [])
+        }
+    }
+
     func testPrepareReviewWorkbookFileRejectsNonDirectoryDestination() throws {
         let root = temporaryRoot()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

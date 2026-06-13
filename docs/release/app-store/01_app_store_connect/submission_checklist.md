@@ -30,7 +30,7 @@
 ## Screenshots
 
 - [ ] Real simulator/device screenshots captured from the release build.
-- [ ] Screenshots use fake student data only.
+- [ ] Screenshots use sample or non-identifying student data only.
 - [ ] Screenshots do not include third-party logos, real student names, prices, unsupported claims or misleading UI.
 - [ ] At least one and no more than ten screenshots uploaded for the required iPhone size.
 - [ ] Captions match the real screen shown.

@@ -90,6 +90,7 @@ struct WorklistRootView: View {
     let onCancelImportPreview: () -> Void
 
     @State private var activeStudentEditorRoute: StudentEditorRoute?
+    @State private var taskFocus: WorklistTaskFocus = .all
 
     var body: some View {
         NavigationStack {
@@ -115,6 +116,8 @@ struct WorklistRootView: View {
                 }
 
                 if let project {
+                    taskFocusSection
+                    if taskFocus.showsSetup {
                     ProjectMetadataSection(
                         project: project,
                         onNameChanged: onProjectNameChanged,
@@ -152,6 +155,8 @@ struct WorklistRootView: View {
                         isDisabled: isEditingLocked
                     )
                     .worklistStationerySectionRows()
+                    }
+                    if taskFocus.showsResults {
                     ResultsSection(
                         project: project,
                         readiness: readiness,
@@ -171,6 +176,8 @@ struct WorklistRootView: View {
                         isDisabled: isEditingLocked
                     )
                     .worklistStationerySectionRows()
+                    }
+                    if taskFocus.showsDrafts {
                     ReportsSection(
                         project: project,
                         readiness: readiness,
@@ -212,6 +219,8 @@ struct WorklistRootView: View {
                         isDisabled: isEditingLocked
                     )
                     .worklistStationerySectionRows()
+                    }
+                    if taskFocus.showsFiles {
                     ReportExportsSection(
                         readiness: readiness,
                         records: lastPreparedFiles,
@@ -236,6 +245,7 @@ struct WorklistRootView: View {
                         isDisabled: isEditingLocked
                     )
                     .worklistStationerySectionRows()
+                    }
                 } else if pendingImport == nil {
                     Section {
                         StationeryEmptyState(
@@ -253,11 +263,6 @@ struct WorklistRootView: View {
             .scrollIndicators(.visible)
             .scrollContentBackground(.hidden)
             .background(worklistStationeryBackground)
-            .safeAreaInset(edge: .bottom) {
-                DeskEdgeDecoration()
-                    .frame(height: 76)
-                    .accessibilityHidden(true)
-            }
             .navigationTitle(project?.metadata.name ?? "Work list")
             .commenterLargeNavigationTitle()
             .accessibilityIdentifier("worklist-list")
@@ -333,11 +338,40 @@ struct WorklistRootView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        Button(action: onSave) {
+                            Label("Save Project", systemImage: "square.and.arrow.down")
+                                .font(.body.weight(.semibold))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isEditingLocked)
                     }
                 }
             }
         } header: {
             CommenterSectionHeader("Workflow", detail: "Local state, progress, and recovery prompts")
+        }
+        .worklistStationeryChromeRow()
+    }
+
+    private var taskFocusSection: some View {
+        Section {
+            NotebookCard {
+                Picker("Task focus", selection: $taskFocus) {
+                    ForEach(WorklistTaskFocus.allCases) { focus in
+                        Label(focus.title, systemImage: focus.systemImage).tag(focus)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(isEditingLocked)
+                .accessibilityIdentifier("worklist-task-focus-picker")
+                Text(taskFocus.detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } header: {
+            CommenterSectionHeader("Task focus", detail: "Show all workflow areas or narrow the list to the current job")
         }
         .worklistStationeryChromeRow()
     }
@@ -409,6 +443,56 @@ struct WorklistRootView: View {
         }
         return nil
     }
+}
+
+private enum WorklistTaskFocus: String, CaseIterable, Identifiable {
+    case all
+    case setup
+    case results
+    case drafts
+    case files
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .setup: return "Setup"
+        case .results: return "Results"
+        case .drafts: return "Drafts"
+        case .files: return "Files"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .all: return "rectangle.grid.1x2"
+        case .setup: return "person.2"
+        case .results: return "checklist"
+        case .drafts: return "doc.text"
+        case .files: return "square.and.arrow.up"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .all:
+            return "Showing setup, results, drafts, exports, backup, and prepared files."
+        case .setup:
+            return "Showing project details, roster, and subjects."
+        case .results:
+            return "Showing result import and focused result entry."
+        case .drafts:
+            return "Showing deterministic draft generation, review, and AI review tools."
+        case .files:
+            return "Showing verified report export, backup, and prepared-file actions."
+        }
+    }
+
+    var showsSetup: Bool { self == .all || self == .setup }
+    var showsResults: Bool { self == .all || self == .results }
+    var showsDrafts: Bool { self == .all || self == .drafts }
+    var showsFiles: Bool { self == .all || self == .files }
 }
 
 private extension View {
