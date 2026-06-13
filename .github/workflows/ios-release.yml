@@ -114,6 +114,7 @@ jobs:
           set -euo pipefail
           swift package resolve
           test -f Package.resolved
+          git diff --exit-code Package.resolved
 
       - name: Archive release app
         env:

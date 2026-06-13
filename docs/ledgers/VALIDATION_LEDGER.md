@@ -796,6 +796,20 @@ Store package readiness.
   archive, privacy-manifest, IPA export, and optional TestFlight upload proof
   remain unrun until that workflow is executed with real credentials.
 
+## 2026-06-13 - Package lockfile validation
+
+- `Package.resolved` is now present at the repository root. Its direct pins were
+  checked against upstream tag revisions with `git ls-remote`, and the
+  transitive TCA graph was first reconciled against the upstream
+  `pointfreeco/swift-composable-architecture` 1.17.0 `Package.resolved`, then
+  corrected from GitHub Actions macOS SwiftPM output to the active app graph
+  shape: lockfile version 3, the resolver origin hash, and no docc/macro-testing
+  pins that are unused by this package's product graph.
+  The iOS CI and release archive workflows now run `git diff --exit-code
+  Package.resolved` after `swift package resolve`.
+  Local `swift package resolve` remains unavailable on this Windows host and
+  must be verified by hosted macOS CI or a release Mac.
+
 ## 2026-06-13 - Manual release workflow registration validation
 
 - GitHub reported a zero-job "workflow file issue" for the
