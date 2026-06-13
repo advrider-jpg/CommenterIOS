@@ -173,7 +173,7 @@ jobs:
           test -f "$EXPORT_PATH/CommenterIOS.ipa"
 
       - name: Upload to TestFlight
-        if: ${{ inputs.upload_to_testflight == 'true' }}
+        if: ${{ github.event.inputs.upload_to_testflight == 'true' }}
         env:
           ASC_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           ASC_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
@@ -192,7 +192,7 @@ jobs:
         if: always()
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          UPLOAD_TO_TESTFLIGHT: ${{ inputs.upload_to_testflight }}
+          UPLOAD_TO_TESTFLIGHT: ${{ github.event.inputs.upload_to_testflight }}
         run: |
           set -euo pipefail
           mkdir -p build
