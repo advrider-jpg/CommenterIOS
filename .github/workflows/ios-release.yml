@@ -34,8 +34,6 @@ jobs:
     env:
       ARCHIVE_PATH: ${{ github.workspace }}/build/CommenterIOS.xcarchive
       EXPORT_PATH: ${{ github.workspace }}/build/export
-      KEYCHAIN_PATH: ${{ runner.temp }}/commenter-ios-release.keychain-db
-      PROVISIONING_PROFILE_PATH: ${{ runner.temp }}/CommenterIOS_AppStore.mobileprovision
       RESULT_BUNDLE_PATH: ${{ github.workspace }}/build/CommenterIOSReleaseArchive.xcresult
     steps:
       - uses: actions/checkout@v4
@@ -79,10 +77,12 @@ jobs:
 
       - name: Install signing assets
         env:
+          KEYCHAIN_PATH: ${{ runner.temp }}/commenter-ios-release.keychain-db
           KEYCHAIN_PASSWORD: ${{ secrets.IOS_RELEASE_KEYCHAIN_PASSWORD }}
           IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
           IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
           IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          PROVISIONING_PROFILE_PATH: ${{ runner.temp }}/CommenterIOS_AppStore.mobileprovision
         run: |
           set -euo pipefail
           password="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
