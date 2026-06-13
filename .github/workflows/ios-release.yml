@@ -7,10 +7,6 @@ on:
         description: Upload the exported IPA to TestFlight after archive validation
         required: true
         default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
   push:
     branches:
       - main
