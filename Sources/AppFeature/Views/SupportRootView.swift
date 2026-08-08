@@ -1,12 +1,18 @@
 import CommentEngine
 import CommenterDomain
 import CommenterImportExport
+import CommenterPersistence
 import DesignSystem
 import SwiftUI
 
 struct SupportRootView: View {
     let state: AppFeature.State
     let onCopyDiagnostics: () -> Void
+    let onPrepareInvalidProjectSupportCopy: (String) -> Void
+    let onRequestInvalidProjectRemoval: (InvalidProjectRecord) -> Void
+    let onSavePreparedFile: () -> Void
+    let onSharePreparedFile: () -> Void
+    let onDismissPreparedFile: () -> Void
     let onDismissStatus: () -> Void
 
     private let buildInfo = AppBuildInfo.current()
@@ -99,8 +105,45 @@ struct SupportRootView: View {
                 if !state.invalidProjectRecords.isEmpty {
                     DisclosureGroup("Invalid record details") {
                         VStack(alignment: .leading, spacing: 8) {
-                            ForEach(state.invalidProjectRecords, id: \.id) { record in
-                                SupportBodyText("\(diagnosticIdentifier(record.id, prefix: "project", redaction: .redacted)): \(record.reason)")
+                            ForEach(state.invalidProjectRecords.indices, id: \.self) { index in
+                                let record = state.invalidProjectRecords[index]
+                                VStack(alignment: .leading, spacing: 10) {
+                                    SupportBodyText("\(diagnosticIdentifier(record.id, prefix: "project", redaction: .redacted)): \(record.reason)")
+                                    if let recordID = record.recordID {
+                                        Button {
+                                            onPrepareInvalidProjectSupportCopy(recordID)
+                                        } label: {
+                                            StationeryActionRow(
+                                                title: "Prepare raw support copy",
+                                                subtitle: "Creates an exact copy for support or manual recovery work. It is not a restorable backup.",
+                                                systemImage: "doc.badge.gearshape",
+                                                tone: .warning,
+                                                isEnabled: canPrepareInvalidSupportCopy,
+                                                showsChevron: false
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(!canPrepareInvalidSupportCopy)
+
+                                        Button(role: .destructive) {
+                                            onRequestInvalidProjectRemoval(record)
+                                        } label: {
+                                            StationeryActionRow(
+                                                title: "Remove damaged saved work",
+                                                subtitle: "Moves it out of active projects while retaining its local recovery material in app-owned quarantine.",
+                                                systemImage: "archivebox",
+                                                tone: .warning,
+                                                isEnabled: canRemoveInvalidProject,
+                                                showsChevron: false
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(!canRemoveInvalidProject)
+                                    } else {
+                                        SupportBodyText("This diagnostic does not have a safe exact record reference, so Report Writer will not copy or remove it. Copy the redacted diagnostics for support instead.")
+                                    }
+                                }
+                                .padding(.vertical, 4)
                             }
                         }
                         .padding(.top, 8)
@@ -165,11 +208,128 @@ struct SupportRootView: View {
     }
 
     private var preparedFilesSection: some View {
-        supportSection("Prepared files", tone: state.lastPreparedFiles.isEmpty ? .neutral : .prepared) {
+        let activePreparedFile = state.preparedFile
+        let rawSupportCopy = activePreparedFile.flatMap { $0.purpose == .damagedRecordSupportCopy ? $0 : nil }
+        return supportSection("Prepared files", tone: state.lastPreparedFiles.isEmpty && activePreparedFile == nil ? .neutral : .prepared) {
             VStack(alignment: .leading, spacing: 0) {
-                if state.lastPreparedFiles.isEmpty {
+                if let rawSupportCopy {
+                    StationeryStatusChip("Raw support copy ready — not a backup", systemImage: "exclamationmark.triangle", tone: .warning)
+                        .padding(.vertical, 10)
+                    SupportBodyText(rawSupportCopy.label)
+                        .padding(.bottom, 10)
+                    SupportDiagnosticRow("Temporary file", value: rawSupportCopy.url.lastPathComponent, valueTone: .warning)
+                    if let preparedAt = rawSupportCopy.preparedAtMilliseconds {
+                        SupportDiagnosticRow("Prepared", value: CommenterFormatters.timestamp(preparedAt))
+                    }
+                    Button(action: onSavePreparedFile) {
+                        StationeryActionRow(
+                            title: "Save raw support copy",
+                            subtitle: "Use the native file picker to save an exact copy outside Report Writer.",
+                            systemImage: "square.and.arrow.down",
+                            tone: .local,
+                            isEnabled: canUsePreparedSupportCopy,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canUsePreparedSupportCopy)
+                    .supportRuledDivider()
+
+                    Button(action: onSharePreparedFile) {
+                        StationeryActionRow(
+                            title: "Share raw support copy",
+                            subtitle: "Share only with a trusted support or recovery destination; the file may contain private project data.",
+                            systemImage: "square.and.arrow.up",
+                            tone: .action,
+                            isEnabled: canUsePreparedSupportCopy,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canUsePreparedSupportCopy)
+                    .supportRuledDivider()
+
+                    Button(action: onDismissPreparedFile) {
+                        StationeryActionRow(
+                            title: "Dismiss raw support copy",
+                            subtitle: "Removes the temporary copy. The original damaged saved-work record is unchanged.",
+                            systemImage: "xmark",
+                            tone: .neutral,
+                            isEnabled: canDismissPreparedFile,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canDismissPreparedFile)
+                    .supportRuledDivider()
+                } else if let activePreparedFile {
+                    StationeryStatusChip(
+                        activePreparedFile.isStale
+                            ? "Prepared project file is stale"
+                            : (activePreparedFile.purpose == .importTemplate
+                                ? "Verified import template is ready"
+                                : "Verified prepared project file is ready"),
+                        systemImage: activePreparedFile.isStale ? "exclamationmark.triangle" : "checkmark.seal",
+                        tone: activePreparedFile.isStale ? .warning : .prepared
+                    )
+                    .padding(.vertical, 10)
+                    SupportBodyText(
+                        activePreparedFile.isStale
+                            ? "The project changed or was closed after this file was prepared. It cannot be saved or shared; dismiss it to remove the temporary copy."
+                            : activePreparedFile.label
+                    )
+                    .padding(.bottom, 10)
+                    SupportDiagnosticRow("Temporary file", value: activePreparedFile.url.lastPathComponent, valueTone: activePreparedFile.isStale ? .warning : .prepared)
+                    if let preparedAt = activePreparedFile.preparedAtMilliseconds {
+                        SupportDiagnosticRow("Prepared", value: CommenterFormatters.timestamp(preparedAt))
+                    }
+                    if !activePreparedFile.isStale {
+                        Button(action: onSavePreparedFile) {
+                            StationeryActionRow(
+                                title: "Save prepared file",
+                                subtitle: "Use the native file picker to save a copy outside Report Writer.",
+                                systemImage: "square.and.arrow.down",
+                                tone: .local,
+                                isEnabled: canUsePreparedNonSupportFile,
+                                showsChevron: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canUsePreparedNonSupportFile)
+                        .supportRuledDivider()
+
+                        Button(action: onSharePreparedFile) {
+                            StationeryActionRow(
+                                title: "Share prepared file",
+                                subtitle: "Open the native share sheet for the verified temporary file.",
+                                systemImage: "square.and.arrow.up",
+                                tone: .action,
+                                isEnabled: canUsePreparedNonSupportFile,
+                                showsChevron: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canUsePreparedNonSupportFile)
+                        .supportRuledDivider()
+                    }
+                    Button(action: onDismissPreparedFile) {
+                        StationeryActionRow(
+                            title: activePreparedFile.isStale ? "Remove stale prepared file" : "Dismiss prepared file",
+                            subtitle: "Removes Report Writer's temporary copy.",
+                            systemImage: "xmark",
+                            tone: activePreparedFile.isStale ? .warning : .neutral,
+                            isEnabled: canDismissPreparedFile,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canDismissPreparedFile)
+                    .supportRuledDivider()
+                }
+
+                if state.lastPreparedFiles.isEmpty, activePreparedFile == nil {
                     SupportDiagnosticRow("Prepared files", value: "None yet")
-                } else {
+                } else if !state.lastPreparedFiles.isEmpty {
                     ForEach(ImportExportFormat.preparationDisplayOrder, id: \.self) { format in
                         if let record = state.lastPreparedFiles[format] {
                             VStack(alignment: .leading, spacing: 6) {
@@ -195,7 +355,7 @@ struct SupportRootView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SupportBodyText("Project names, roster data, results, draft comments, backups, and report files stay on this device unless you choose a native file export or share destination.")
                 SupportBodyText("Report Writer does not configure accounts, cloud sync, analytics, telemetry, remote AI, or backend project persistence in this MVP.")
-                SupportBodyText("Clipboard diagnostics are redacted by default. Prepared export files are removed after save, share, cancellation, or dismissal.")
+                SupportBodyText("Clipboard diagnostics are redacted by default. Report Writer removes prepared temporary files after save, share, cancellation, or dismissal, and shows a cleanup error if removal does not succeed.")
                 if let privacyPolicyURL = AppPrivacyPolicy.url() {
                     Link(destination: privacyPolicyURL) {
                         Label("Open Privacy Policy", systemImage: "hand.raised")
@@ -324,6 +484,53 @@ struct SupportRootView: View {
     }
 
     private var canCopyDiagnostics: Bool {
+        if case .busy = state.operationStatus { return false }
+        return true
+    }
+
+    private var canPrepareInvalidSupportCopy: Bool {
+        guard case .loaded = state.projectStorageStatus,
+              state.preparedFile == nil,
+              state.pendingImport == nil,
+              state.activeAIRequest == nil,
+              !state.isBulkAIRevisionRunning
+        else { return false }
+        if case .busy = state.operationStatus { return false }
+        return true
+    }
+
+    private var canRemoveInvalidProject: Bool {
+        guard case .loaded = state.projectStorageStatus,
+              state.pendingImport == nil,
+              state.activeAIRequest == nil,
+              !state.isBulkAIRevisionRunning
+        else { return false }
+        if case .busy = state.operationStatus { return false }
+        return true
+    }
+
+    private var canUsePreparedSupportCopy: Bool {
+        guard case .loaded = state.projectStorageStatus,
+              state.preparedFile?.purpose == .damagedRecordSupportCopy,
+              state.preparedFile?.isStale == false
+        else { return false }
+        if case .busy = state.operationStatus { return false }
+        return true
+    }
+
+    private var canUsePreparedNonSupportFile: Bool {
+        guard case .loaded = state.projectStorageStatus,
+              let preparedFile = state.preparedFile,
+              preparedFile.purpose != .damagedRecordSupportCopy,
+              !preparedFile.isStale,
+              preparedFile.purpose != .projectOutput || preparedFile.projectID == state.selectedProject?.metadata.id
+        else { return false }
+        if case .busy = state.operationStatus { return false }
+        return true
+    }
+
+    private var canDismissPreparedFile: Bool {
+        guard case .loaded = state.projectStorageStatus, state.preparedFile != nil else { return false }
         if case .busy = state.operationStatus { return false }
         return true
     }

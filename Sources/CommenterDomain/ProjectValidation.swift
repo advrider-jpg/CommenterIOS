@@ -3,8 +3,8 @@ import Foundation
 private let maxReportContextFieldLength = 120
 private let leadingPronounPattern = #"^(he|she|they|i|we)\b"#
 private let subordinateClausePattern = #"^(because|when|while|although|if|as)\b"#
-private let finiteVerbPattern = #"\b(am|are|is|was|were|be|being|been|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|read|reads|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
-private let leadingFinitePattern = #"^(am|are|is|was|were|has|have|had|do|does|did|can|could|will|would|should|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
+private let finiteVerbPattern = #"\b(am|are|is|was|were|be|being|been|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|described|describes|describe|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|read|reads|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
+private let leadingFinitePattern = #"^(am|are|is|was|were|has|have|had|do|does|did|can|could|will|would|should|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|described|describes|describe|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
 
 public struct StoredProjectValidation: Equatable, Sendable {
     public var ok: Bool
@@ -28,6 +28,14 @@ public func validateStoredProjectShape(_ project: Project) -> StoredProjectValid
     if project.metadata.term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         issues.append("Project term is required.")
     }
+    if let persistence = project.metadata.persistence {
+        if let revision = persistence.revision, revision < 0 || revision == Int.max {
+            issues.append("Project revision metadata is invalid.")
+        }
+        if let fingerprint = persistence.fingerprint, fingerprint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append("Project fingerprint metadata is invalid.")
+        }
+    }
 
     project.metadata.selectedSubjects.forEach { key, subject in
         if key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
@@ -40,8 +48,10 @@ public func validateStoredProjectShape(_ project: Project) -> StoredProjectValid
     if rosterIds.count != project.roster.count {
         issues.append("Student ids must be unique.")
     }
-    if hasUnresolvedDuplicateStudents(roster: project.roster) {
-        issues.append("Duplicate student identities must be resolved.")
+    project.roster.forEach { student in
+        if student.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append("Student ids are required.")
+        }
     }
 
     let selectedSubjects = Set(project.metadata.selectedSubjects.keys)
@@ -78,6 +88,21 @@ public func validateStoredProjectShape(_ project: Project) -> StoredProjectValid
             issues.append("Reports must be unique per student and subject.")
         }
         seenReportKeys.insert(key)
+        if let reviewedAt = report.reviewedAt, reviewedAt < 0 {
+            issues.append("A report's teacher-review timestamp is invalid.")
+        }
+        let currentText = report.manualEdit ?? report.text
+        if let currentFingerprint = report.currentTextFingerprint,
+           currentFingerprint != stableTextFingerprint(currentText) {
+            issues.append("A report's current-text fingerprint does not match its saved text.")
+        }
+        if report.reviewState?.status == .approved {
+            let currentFingerprint = stableTextFingerprint(currentText)
+            if report.reviewState?.approvalFingerprint != currentFingerprint ||
+                report.approvedTextFingerprint != currentFingerprint {
+                issues.append("An approved report does not match its teacher approval fingerprint.")
+            }
+        }
     }
 
     issues.append(contentsOf: validateProjectSizeLimits(project).map(\.message))
@@ -96,7 +121,7 @@ private func validateReportContextField(_ value: String?, label: String) -> Stri
     if containsTemplateToken(value) {
         return "\(label) must not contain template placeholders such as [context] or {Name}."
     }
-    if normalized.count > maxReportContextFieldLength {
+    if normalized.utf16.count > maxReportContextFieldLength {
         return "\(label) must be \(maxReportContextFieldLength) characters or fewer."
     }
     if matches(leadingPronounPattern, normalized) {

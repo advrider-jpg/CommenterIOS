@@ -41,6 +41,71 @@ private let subjectSynonyms: [String: [String]] = [
 
 private let ambiguousAggregateSubjects: Set<String> = ["the arts", "technologies"]
 
+private let componentStrandsByLearningFocus: [String: [String]] = [
+    "english::language": [
+        "Language for interacting with others",
+        "Text structure and organisation",
+        "Language for expressing and developing ideas",
+        "Phonic and word knowledge"
+    ],
+    "english::literature": [
+        "Literature and contexts",
+        "Engaging with and responding to literature",
+        "Examining literature",
+        "Creating literature"
+    ],
+    "english::literacy": [
+        "Texts in context",
+        "Interacting with others",
+        "Analysing, interpreting and evaluating",
+        "Creating texts"
+    ],
+    "english::reading": [
+        "Literature and contexts",
+        "Engaging with and responding to literature",
+        "Examining literature",
+        "Texts in context",
+        "Analysing, interpreting and evaluating",
+        "Phonic and word knowledge"
+    ],
+    "english::writing": [
+        "Text structure and organisation",
+        "Language for expressing and developing ideas",
+        "Creating literature",
+        "Creating texts"
+    ],
+    "mathematics::number": ["Number", "Algebra"],
+    "mathematics::measurement": ["Measurement", "Space"],
+    "mathematics::statistics": ["Statistics", "Probability"],
+    "science::science understanding": [
+        "Biological sciences",
+        "Chemical sciences",
+        "Earth and space sciences",
+        "Physical sciences"
+    ],
+    "science::science as a human endeavour": [
+        "Nature and development of science",
+        "Use and influence of science"
+    ],
+    "science::science inquiry skills": [
+        "Questioning and predicting",
+        "Planning and conducting",
+        "Processing, modelling and analysing",
+        "Evaluating",
+        "Communicating"
+    ],
+    "health and physical education::personal, social and community health": [
+        "Identities and change",
+        "Interacting with others",
+        "Making healthy and safe choices"
+    ],
+    "health and physical education::movement and physical activity": [
+        "Moving our bodies",
+        "Making active choices",
+        "Learning through movement"
+    ]
+]
+
 public func normalizeSubjectLabel(_ value: String) -> String {
     value
         .lowercased()
@@ -49,6 +114,35 @@ public func normalizeSubjectLabel(_ value: String) -> String {
         .replacingOccurrences(of: "\u{00a0}", with: " ")
         .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+public func componentStrandMatchesLearningFocus(
+    uiSubject: String,
+    learningFocus: String?,
+    componentStrand: String?
+) -> Bool {
+    let normalizedFocus = normalizeSubjectLabel(learningFocus ?? "")
+    guard !normalizedFocus.isEmpty else { return true }
+
+    let normalizedComponent = normalizeSubjectLabel(componentStrand ?? "")
+    guard !normalizedComponent.isEmpty else { return false }
+    if normalizedComponent.contains(normalizedFocus) || normalizedFocus.contains(normalizedComponent) {
+        return true
+    }
+
+    let normalizedSubject: String
+    switch normalizeSubjectLabel(uiSubject) {
+    case "math", "maths":
+        normalizedSubject = "mathematics"
+    case "hpe", "health and pe":
+        normalizedSubject = "health and physical education"
+    default:
+        normalizedSubject = normalizeSubjectLabel(uiSubject)
+    }
+    let key = "\(normalizedSubject)::\(normalizedFocus)"
+    return (componentStrandsByLearningFocus[key] ?? []).contains {
+        normalizeSubjectLabel($0) == normalizedComponent
+    }
 }
 
 public func getDatasetSubjects(_ data: CommentEngineData?) -> [String] {
@@ -74,7 +168,18 @@ public func resolveSubjectCandidates(uiSubject: String, datasetSubjects: [String
 }
 
 public func resolveSubjectForGeneration(uiSubject: String, data: CommentEngineData, focusStrand: String? = nil) -> SubjectResolution {
-    let datasetSubjects = getDatasetSubjects(data)
+    resolveSubjectForGeneration(
+        uiSubject: uiSubject,
+        datasetSubjects: getDatasetSubjects(data),
+        focusStrand: focusStrand
+    )
+}
+
+public func resolveSubjectForGeneration(
+    uiSubject: String,
+    datasetSubjects: [String],
+    focusStrand: String? = nil
+) -> SubjectResolution {
     let candidates = resolveSubjectCandidates(uiSubject: uiSubject, datasetSubjects: datasetSubjects)
     guard !candidates.isEmpty else {
         return SubjectResolution(

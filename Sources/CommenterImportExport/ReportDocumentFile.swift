@@ -20,6 +20,7 @@ public enum ReportDocumentFileError: LocalizedError, Equatable {
     case invalidDirectory(String)
     case emptyWrittenFile(URL)
     case verificationFailed(URL)
+    case failedOutputCouldNotBeRemoved(URL)
 
     public var errorDescription: String? {
         switch self {
@@ -31,6 +32,8 @@ public enum ReportDocumentFileError: LocalizedError, Equatable {
             return "The report document was written but is empty: \(url.lastPathComponent)"
         case let .verificationFailed(url):
             return "The report document was written but could not be verified: \(url.lastPathComponent)"
+        case let .failedOutputCouldNotBeRemoved(url):
+            return "Report document preparation failed, and the incomplete or unverified output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
         }
     }
 }
@@ -49,22 +52,42 @@ public func prepareReportDocumentFile(
     try ensureDocumentDirectory(directory, fileManager: fileManager)
     let packet = try prepareReportPacket(project: project, studentId: studentId)
     let filename = try reportExportFilename(project: project, format: format, studentId: studentId)
-    let destination = directory.appendingPathComponent(filename, isDirectory: false)
+    let destination = availableFileDestination(directory: directory, preferredFilename: filename, fileManager: fileManager)
     let headerText = "\(project.metadata.name) \(bullet) \(project.metadata.term)"
     let forbiddenStrings = forbiddenReportExportStrings(project: project)
     let data = try buildReportDocumentDOCX(packet: packet, headerText: headerText)
 
-    try writeDataAtomicallyApplyingDefaultProtection(data, to: destination, fileManager: fileManager)
+    do {
+        try writeDataAtomicallyApplyingDefaultProtection(data, to: destination, fileManager: fileManager)
+    } catch let writeError {
+        do {
+            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
+        } catch {
+            throw ReportDocumentFileError.failedOutputCouldNotBeRemoved(destination)
+        }
+        throw writeError
+    }
     do {
         let byteCount = try verifiedDocumentSize(url: destination, fileManager: fileManager)
         let readBack = try Data(contentsOf: destination)
+        guard readBack == data else {
+            throw ReportDocumentFileError.verificationFailed(destination)
+        }
         try verifyReportDocumentPackage(readBack, packet: packet, headerText: headerText, forbiddenStrings: forbiddenStrings)
         return PreparedReportDocumentFile(url: destination, byteCount: byteCount, format: format, studentCount: packet.students.count)
     } catch let error as ReportDocumentFileError {
-        try? fileManager.removeItem(at: destination)
+        do {
+            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
+        } catch {
+            throw ReportDocumentFileError.failedOutputCouldNotBeRemoved(destination)
+        }
         throw error
     } catch {
-        try? fileManager.removeItem(at: destination)
+        do {
+            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
+        } catch {
+            throw ReportDocumentFileError.failedOutputCouldNotBeRemoved(destination)
+        }
         throw ReportDocumentFileError.verificationFailed(destination)
     }
 }
@@ -134,6 +157,7 @@ private func verifyReportDocumentPackage(
     guard let document = entries["word/document.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
           let header = entries["word/header1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
           let footer = entries["word/footer1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
+          Set(entries.keys) == requiredDOCXEntries,
           document.contains("<w:document"),
           document.contains("<w:body>"),
           document.contains("<w:sectPr>"),
@@ -143,6 +167,12 @@ private func verifyReportDocumentPackage(
           header.contains(documentEscape(headerText)),
           footer.contains("<w:ftr"),
           footer.contains("PAGE")
+    else {
+        throw OOXMLZipWriterError.invalidArchive
+    }
+    guard wordTextValues(in: document) == expectedDocumentTextValues(packet),
+          wordTextValues(in: header) == [headerText],
+          wordTextValues(in: footer) == ["Page "]
     else {
         throw OOXMLZipWriterError.invalidArchive
     }
@@ -177,7 +207,7 @@ private func verifyReportDocumentPackage(
             }
         }
     }
-    try assertXMLPackageOmitsForbiddenStrings(entries: entries, forbiddenStrings: forbiddenStrings)
+    try assertReportParagraphsOmitForbiddenStrings(packet: packet, forbiddenStrings: forbiddenStrings)
 }
 
 private func documentData(_ xml: String) -> Data {
@@ -190,28 +220,62 @@ private func forbiddenReportExportStrings(project: Project) -> [String] {
     values.append(contentsOf: project.results.map(\.internalTeacherNote))
     values.append(project.metadata.aiSettings?.customInstruction)
     values.append(contentsOf: project.metadata.aiSettings?.forbiddenMentions ?? [])
-    values.append(contentsOf: project.metadata.aiSettings?.requiredMentions ?? [])
     for report in project.reports {
         values.append(contentsOf: report.variantIds.map(Optional.some))
         values.append(report.trace)
         values.append(report.resultFingerprint)
         values.append(contentsOf: hiddenAIExportStrings(report))
-        if let manualEdit = report.manualEdit,
-           !manualEdit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           manualEdit != report.text {
-            values.append(report.text)
-        }
     }
-    return uniqueForbiddenStrings(values)
+    let publicValues = publicExportValues(project)
+    return uniqueForbiddenStrings(values).filter { !publicValues.contains($0) }
 }
 
-private func assertXMLPackageOmitsForbiddenStrings(entries: [String: Data], forbiddenStrings: [String]) throws {
-    let xmlValues = entries.values.compactMap { String(data: $0, encoding: .utf8) }
+private func assertReportParagraphsOmitForbiddenStrings(packet: PreparedReportPacket, forbiddenStrings: [String]) throws {
+    let paragraphs = packet.students.flatMap { student in
+        student.sections.flatMap(\.paragraphs)
+    }
     for forbidden in forbiddenStrings {
-        let escaped = documentEscape(forbidden)
-        if xmlValues.contains(where: { $0.contains(forbidden) || $0.contains(escaped) }) {
+        if paragraphs.contains(where: { $0.contains(forbidden) }) {
             throw OOXMLZipWriterError.invalidArchive
         }
+    }
+}
+
+private func expectedDocumentTextValues(_ packet: PreparedReportPacket) -> [String] {
+    var values: [String] = []
+    if let summary = packet.summary {
+        values.append(packet.title)
+        values.append(packet.subtitle)
+        values.append(summary)
+    }
+    for student in packet.students {
+        values.append(student.displayName)
+        values.append(student.detail)
+        for section in student.sections {
+            values.append(section.subject)
+            let focus = section.focus.map { " \(bullet) Focus: \($0)" } ?? ""
+            values.append("Achievement: \(section.achievement)\(focus)")
+            values.append(contentsOf: section.paragraphs)
+        }
+    }
+    return values
+}
+
+private func wordTextValues(in xml: String) -> [String] {
+    guard let regex = try? NSRegularExpression(
+        pattern: #"<w:t\b[^>]*>(.*?)</w:t>"#,
+        options: [.dotMatchesLineSeparators]
+    ) else {
+        return []
+    }
+    let range = NSRange(xml.startIndex..<xml.endIndex, in: xml)
+    return regex.matches(in: xml, range: range).compactMap { match in
+        guard match.numberOfRanges > 1,
+              let valueRange = Range(match.range(at: 1), in: xml)
+        else {
+            return nil
+        }
+        return documentUnescape(String(xml[valueRange]))
     }
 }
 
@@ -222,6 +286,23 @@ private func uniqueForbiddenStrings(_ values: [String?]) -> [String] {
         guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return nil }
         return trimmed
     }
+}
+
+private func publicExportValues(_ project: Project) -> Set<String> {
+    var values = Set([project.metadata.name, project.metadata.term])
+    for student in project.roster {
+        values.insert(student.firstName)
+        values.insert(student.lastName)
+        values.insert([student.firstName, student.lastName].filter { !$0.isEmpty }.joined(separator: " "))
+        values.insert(student.yearLevel.rawValue)
+    }
+    for result in project.results {
+        values.insert(result.subject)
+        values.insert(displaySubjectName(result.subject))
+        if let focus = result.focusStrand { values.insert(focus) }
+        if let achievement = result.achievementLevel { values.insert(achievement.rawValue) }
+    }
+    return values
 }
 
 private func reportDocumentXML(packet: PreparedReportPacket) -> String {
@@ -307,6 +388,15 @@ private func documentEscape(_ value: String) -> String {
         .replacingOccurrences(of: ">", with: "&gt;")
         .replacingOccurrences(of: "\"", with: "&quot;")
         .replacingOccurrences(of: "'", with: "&apos;")
+}
+
+private func documentUnescape(_ value: String) -> String {
+    value
+        .replacingOccurrences(of: "&quot;", with: "\"")
+        .replacingOccurrences(of: "&apos;", with: "'")
+        .replacingOccurrences(of: "&lt;", with: "<")
+        .replacingOccurrences(of: "&gt;", with: ">")
+        .replacingOccurrences(of: "&amp;", with: "&")
 }
 
 private let documentXMLDeclaration = #"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#

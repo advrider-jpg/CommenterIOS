@@ -94,13 +94,28 @@ final class ReportDocumentFileTests: XCTestCase {
         let prepared = try prepareReportDocumentFile(project: project, format: .docx, directory: root, studentId: "s2")
         let document = try XCTUnwrap(try readStoredZipEntries(prepared.url)["word/document.xml"].flatMap { String(data: $0, encoding: .utf8) })
 
-        XCTAssertEqual(prepared.url.lastPathComponent, "Project_Ben_Reports.docx")
+        XCTAssertEqual(prepared.url.lastPathComponent, "Project_Ben_Stone_Year_6_Reports.docx")
         XCTAssertEqual(prepared.studentCount, 1)
         XCTAssertTrue(document.contains("Ben Stone"))
         XCTAssertTrue(document.contains("Focus: Reading"))
         XCTAssertTrue(document.contains("Ben paragraph."))
         XCTAssertFalse(document.contains("Ava Ng"))
         XCTAssertFalse(document.contains("Ava paragraph."))
+    }
+
+    func testPrepareReportDocumentFileDoesNotOverwriteAnExistingExport() throws {
+        let root = temporaryRoot()
+        var project = fixtureProject()
+        project.reports = [readyReport(project: project, result: project.results[0], text: "Ava paragraph.")]
+        let first = try prepareReportDocumentFile(project: project, format: .docx, directory: root)
+        let firstBytes = try Data(contentsOf: first.url)
+
+        let second = try prepareReportDocumentFile(project: project, format: .docx, directory: root)
+
+        XCTAssertEqual(first.url.lastPathComponent, "Project_Reports.docx")
+        XCTAssertEqual(second.url.lastPathComponent, "Project_Reports-2.docx")
+        XCTAssertNotEqual(first.url, second.url)
+        XCTAssertEqual(try Data(contentsOf: first.url), firstBytes)
     }
 
     func testPrepareReportDocumentFileRejectsUnsupportedFormatsHonestly() throws {
@@ -178,6 +193,29 @@ final class ReportDocumentFileTests: XCTestCase {
 
         let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
         XCTAssertEqual(files, [])
+    }
+
+    func testPrepareReportDocumentFileAllowsRequiredOutputAndDoesNotMistakeMarkupForPrivateData() throws {
+        let root = temporaryRoot()
+        var project = fixtureProject()
+        project.roster[0].internalTeacherNote = "w"
+        project.metadata.aiSettings = ProjectAISettings(requiredMentions: ["paragraph structure"])
+        project.reports = [
+            readyReport(
+                project: project,
+                result: project.results[0],
+                text: "Ava uses paragraph structure effectively.",
+                manualEdit: "Ava uses paragraph structure effectively. She now edits independently.",
+                generatedAt: 1
+            )
+        ]
+        project.reports[0].aiOptionsOverride = AIReportOptions(requiredMentions: ["paragraph structure"])
+
+        let prepared = try prepareReportDocumentFile(project: project, format: .docx, directory: root)
+        let document = try XCTUnwrap(try readStoredZipEntries(prepared.url)["word/document.xml"].flatMap { String(data: $0, encoding: .utf8) })
+
+        XCTAssertTrue(document.contains("paragraph structure"))
+        XCTAssertTrue(document.contains("She now edits independently."))
     }
 
     func testPrepareReportDocumentFileRejectsNonDirectoryDestination() throws {

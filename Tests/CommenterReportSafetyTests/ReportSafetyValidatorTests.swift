@@ -13,6 +13,35 @@ final class ReportSafetyValidatorTests: XCTestCase {
         XCTAssertEqual(summary.findings.filter { $0.category == .placeholder }.map(\.excerpt), ["[context]", "{{name}}"])
     }
 
+    func testRunsAllSafetyChecksEvenWhenOneBlockerAlreadyExists() {
+        let summary = ReportSafetyValidator.validate(
+            text: "# [context] Ava is lazy.",
+            context: context()
+        )
+
+        XCTAssertEqual(summary.status, .blocked)
+        XCTAssertTrue(summary.findings.contains { $0.category == .placeholder })
+        XCTAssertTrue(summary.findings.contains { $0.category == .tone })
+        XCTAssertTrue(summary.findings.contains { $0.category == .layout })
+    }
+
+    func testEmptyReportIsBlockedInsteadOfPassingWithOnlyWarnings() {
+        let summary = ReportSafetyValidator.validate(text: "   \n", context: context())
+
+        XCTAssertEqual(summary.status, .blocked)
+        XCTAssertTrue(summary.findings.contains { $0.category == .length && $0.severity == .block })
+    }
+
+    func testMaximumLengthUsesLiveUTF16Units() {
+        var validationContext = context()
+        validationContext.maximumCharacters = 3
+
+        let summary = ReportSafetyValidator.validate(text: "A😀a", context: validationContext)
+
+        XCTAssertEqual(summary.status, .blocked)
+        XCTAssertTrue(summary.findings.contains { $0.category == .length && $0.severity == .block })
+    }
+
     func testBlocksSensitiveInformationNotPresentInAllowedFacts() {
         let summary = ReportSafetyValidator.validate(
             text: "Ava has ADHD and participates well.",
@@ -45,6 +74,50 @@ final class ReportSafetyValidatorTests: XCTestCase {
 
         XCTAssertEqual(summary.status, .blocked)
         XCTAssertTrue(summary.findings.contains { $0.category == .pronoun && $0.excerpt == "he" })
+    }
+
+    func testAllowsNeutralSingularTheyForAnyStudent() {
+        let summary = ReportSafetyValidator.validate(
+            text: "Ava writes clearly. They explain their ideas thoughtfully.",
+            context: context(student: Student(id: "s1", firstName: "Ava", lastName: "Ng", gender: .female, yearLevel: .year5))
+        )
+
+        XCTAssertFalse(summary.findings.contains { $0.category == .pronoun })
+    }
+
+    func testChecksPronounMismatchBeyondTheFirstSentence() {
+        let summary = ReportSafetyValidator.validate(
+            text: "Ava writes clearly. She explains ideas well. He edits carefully.",
+            context: context(student: Student(id: "s1", firstName: "Ava", lastName: "Ng", gender: .female, yearLevel: .year5))
+        )
+
+        XCTAssertEqual(summary.status, .blocked)
+        XCTAssertTrue(summary.findings.contains { $0.category == .pronoun && $0.excerpt == "he" })
+    }
+
+    func testCommonLowercaseWordMatchingASurnameDoesNotLeakANameFinding() {
+        let summary = ReportSafetyValidator.validate(
+            text: "Ava is a young learner who writes with growing confidence.",
+            context: context(
+                student: Student(id: "s1", firstName: "Ava", lastName: "Young", gender: .female, yearLevel: .year5),
+                knownStudents: [
+                    Student(id: "s1", firstName: "Ava", lastName: "Young", gender: .female, yearLevel: .year5)
+                ]
+            )
+        )
+
+        XCTAssertFalse(summary.findings.contains { $0.category == .name && $0.severity == .block })
+    }
+
+    func testLowercaseFullNameStillBlocksAFirstNameOnlyLeak() {
+        let summary = ReportSafetyValidator.validate(
+            text: "ava young writes with growing confidence.",
+            context: context(
+                student: Student(id: "s1", firstName: "Ava", lastName: "Young", gender: .female, yearLevel: .year5)
+            )
+        )
+
+        XCTAssertTrue(summary.findings.contains { $0.category == .name && $0.severity == .block })
     }
 
     func testWarnsForUnsupportedClaimsButAllowsSupportedFacts() {

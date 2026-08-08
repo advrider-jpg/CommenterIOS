@@ -1,4 +1,5 @@
 import Foundation
+import CommenterImportExport
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -10,7 +11,7 @@ enum ImportMode {
     var allowedContentTypes: [UTType] {
         switch self {
         case .backup:
-            return [.json, .reportWriterBackup, .commenterBackup]
+            return [.json, .reportWriterBackup, .commenterBackup, .encryptedCommenterBackup]
         case .roster, .results:
             return [.commaSeparatedText, .xlsxWorkbook, .xlsWorkbook]
         }
@@ -42,7 +43,9 @@ struct PreparedExportDocument: FileDocument {
         guard !data.isEmpty else {
             throw Error.missingPreparedFile(url.lastPathComponent)
         }
-        self.contentType = UTType(filenameExtension: url.pathExtension) ?? .data
+        self.contentType = url.pathExtension.lowercased() == encryptedBackupFileExtension
+            ? .encryptedCommenterBackup
+            : (UTType(filenameExtension: url.pathExtension) ?? .data)
         self.defaultFilename = url.deletingPathExtension().lastPathComponent
     }
 
@@ -69,6 +72,10 @@ extension UTType {
     static let xlsWorkbook = UTType(filenameExtension: "xls") ?? .data
     static let reportWriterBackup = UTType(filenameExtension: "report-writer-backup.json") ?? .json
     static let commenterBackup = UTType(filenameExtension: "commenter-backup.json") ?? .json
+    static let encryptedCommenterBackup = UTType(
+        filenameExtension: encryptedBackupFileExtension,
+        conformingTo: .json
+    ) ?? .json
 }
 
 

@@ -13,10 +13,14 @@ public struct PreparedBackupFile: Equatable, Sendable {
     }
 }
 
+public let encryptedBackupFileExtension = "cbackup"
+public let encryptedBackupMIMEType = "application/json"
+
 public enum BackupFileWorkflowError: LocalizedError, Equatable {
     case invalidDirectory(String)
     case emptyWrittenFile(URL)
     case verificationFailed(URL)
+    case failedOutputCouldNotBeRemoved(URL)
 
     public var errorDescription: String? {
         switch self {
@@ -26,6 +30,8 @@ public enum BackupFileWorkflowError: LocalizedError, Equatable {
             return "The backup file was written but is empty: \(url.lastPathComponent)"
         case let .verificationFailed(url):
             return "The backup file was written but could not be verified: \(url.lastPathComponent)"
+        case let .failedOutputCouldNotBeRemoved(url):
+            return "Backup preparation failed, and the incomplete or unverified output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
         }
     }
 }
@@ -55,29 +61,90 @@ func prepareProjectBackupFile(
     try ensureWritableDirectory(directory, fileManager: fileManager)
     let serialized = try serializeProjectBackup(project: project, createdAt: createdAt)
     let filename = backupFilename(project: project, createdAt: createdAt)
-    let destination = directory.appendingPathComponent(filename, isDirectory: false)
+    let expectedProject = reconcileProjectForPersistence(project, nowMilliseconds: project.metadata.updatedAt)
+    return try prepareSerializedBackupFile(
+        serialized: serialized,
+        filename: filename,
+        expectedProject: expectedProject,
+        directory: directory,
+        fileManager: fileManager,
+        verifyReadBack: verifyReadBack
+    )
+}
+
+public func prepareEncryptedProjectBackupFile(
+    project: Project,
+    password: String,
+    directory: URL,
+    createdAt: Date = Date(),
+    fileManager: FileManager = .default
+) throws -> PreparedBackupFile {
+    try ensureWritableDirectory(directory, fileManager: fileManager)
+    let serialized = try serializeEncryptedProjectBackup(
+        project: project,
+        password: password,
+        createdAt: createdAt
+    )
+    let expectedProject = reconcileProjectForPersistence(project, nowMilliseconds: project.metadata.updatedAt)
+    return try prepareSerializedBackupFile(
+        serialized: serialized,
+        filename: encryptedBackupFilename(project: project),
+        expectedProject: expectedProject,
+        directory: directory,
+        fileManager: fileManager,
+        verifyReadBack: { try parseProjectBackup(serialized: $0, password: password) }
+    )
+}
+
+private func prepareSerializedBackupFile(
+    serialized: String,
+    filename: String,
+    expectedProject: Project,
+    directory: URL,
+    fileManager: FileManager,
+    verifyReadBack: (String) throws -> Project
+) throws -> PreparedBackupFile {
+    let destination = availableFileDestination(directory: directory, preferredFilename: filename, fileManager: fileManager)
     guard let data = serialized.data(using: .utf8) else {
         throw BackupError.couldNotOpen
     }
 
-    try writeDataAtomicallyApplyingDefaultProtection(data, to: destination, fileManager: fileManager)
-    let byteCount = try verifiedNonEmptySize(url: destination, fileManager: fileManager)
-
-    let readBack = try String(contentsOf: destination, encoding: .utf8)
-    let verifiedProject: Project
     do {
-        verifiedProject = try verifyReadBack(readBack)
+        try writeDataAtomicallyApplyingDefaultProtection(data, to: destination, fileManager: fileManager)
+    } catch let writeError {
+        do {
+            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
+        } catch {
+            throw BackupFileWorkflowError.failedOutputCouldNotBeRemoved(destination)
+        }
+        throw writeError
+    }
+    do {
+        let byteCount = try verifiedNonEmptySize(url: destination, fileManager: fileManager)
+        let readBack = try String(contentsOf: destination, encoding: .utf8)
+        guard readBack == serialized else {
+            throw BackupFileWorkflowError.verificationFailed(destination)
+        }
+        let verifiedProject = try verifyReadBack(readBack)
+        guard verifiedProject == expectedProject else {
+            throw BackupFileWorkflowError.verificationFailed(destination)
+        }
+        return PreparedBackupFile(url: destination, byteCount: byteCount, project: verifiedProject)
+    } catch let error as BackupFileWorkflowError {
+        do {
+            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
+        } catch {
+            throw BackupFileWorkflowError.failedOutputCouldNotBeRemoved(destination)
+        }
+        throw error
     } catch {
-        try? fileManager.removeItem(at: destination)
+        do {
+            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
+        } catch {
+            throw BackupFileWorkflowError.failedOutputCouldNotBeRemoved(destination)
+        }
         throw BackupFileWorkflowError.verificationFailed(destination)
     }
-
-    guard verifiedProject.metadata.id == project.metadata.id else {
-        try? fileManager.removeItem(at: destination)
-        throw BackupFileWorkflowError.verificationFailed(destination)
-    }
-
-    return PreparedBackupFile(url: destination, byteCount: byteCount, project: verifiedProject)
 }
 
 public func loadProjectBackupFile(
@@ -87,7 +154,7 @@ public func loadProjectBackupFile(
 ) throws -> PreparedBackupFile {
     let byteCount = try verifiedNonEmptySize(url: url, fileManager: fileManager)
     guard byteCount <= UInt64(encryptedBackupBytes) else {
-        throw BackupError.encryptedOversized(maxMegabytes: encryptedBackupBytes / (1024 * 1024))
+        throw BackupError.encryptedBackupReadOversized(maximumBytes: encryptedBackupBytes)
     }
     let serialized = try String(contentsOf: url, encoding: .utf8)
     let project = try parseProjectBackup(serialized: serialized, password: password)
@@ -98,6 +165,16 @@ public func backupFilename(project: Project, createdAt: Date = Date()) -> String
     let projectName = safeFilenameComponent(project.metadata.name).nilIfEmpty ?? "report-writer-project"
     let timestamp = backupTimestamp(createdAt)
     return "\(projectName)-\(timestamp).report-writer-backup.json"
+}
+
+public func encryptedBackupFilename(project: Project) -> String {
+    let sanitized = project.metadata.name.replacingOccurrences(
+        of: #"[^a-z0-9_-]+"#,
+        with: "_",
+        options: [.regularExpression, .caseInsensitive]
+    )
+    let baseName = sanitized.isEmpty ? "report_comment_writer_backup" : sanitized
+    return "\(baseName)_Backup_Copy.\(encryptedBackupFileExtension)"
 }
 
 private func ensureWritableDirectory(_ directory: URL, fileManager: FileManager) throws {
@@ -134,10 +211,19 @@ private func safeFilenameComponent(_ value: String) -> String {
     let filteredScalars = value.unicodeScalars.map { scalar -> Character in
         allowed.contains(scalar) ? Character(scalar) : "-"
     }
-    return String(filteredScalars)
+    let sanitized = String(filteredScalars)
         .replacingOccurrences(of: #"\s+"#, with: "-", options: .regularExpression)
         .replacingOccurrences(of: #"-+"#, with: "-", options: .regularExpression)
         .trimmingCharacters(in: CharacterSet(charactersIn: "-_ "))
+    var bounded = ""
+    var byteCount = 0
+    for character in sanitized {
+        let characterBytes = String(character).utf8.count
+        guard byteCount + characterBytes <= 120 else { break }
+        bounded.append(character)
+        byteCount += characterBytes
+    }
+    return bounded.trimmingCharacters(in: CharacterSet(charactersIn: "-_ "))
 }
 
 private extension String {

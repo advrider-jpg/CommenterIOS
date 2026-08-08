@@ -9,8 +9,9 @@ CommenterIOS is a native iPhone-first SwiftUI/TCA port of CommenterV3 with the
 MVP teacher workflow source surface present in package targets and an iOS app
 host. The checkout includes bundled production dataset loading, deterministic
 generation, local verified project persistence, recovery snapshots, CSV/XLSX/XLS
-import, DOCX/XLSX/XLS export, backup JSON import/export, support diagnostics,
-and native iOS import/export/share presentation wiring.
+import and matching teacher templates, DOCX/XLSX/XLS export, plaintext backup
+JSON and password-protected `.cbackup` import/export, damaged-record support and
+recovery handling, and native iOS import/export/share presentation wiring.
 
 The remaining release constraint is validation environment availability: Swift
 package dependency resolution, Xcode build/test, simulator/device validation,
@@ -25,10 +26,12 @@ validation, and teacher-review gates. The Work list report editor now has an
 AI Studio surface for persisted project tone defaults, report-specific AI
 overrides, on-device revision and evidence-draft previews, accept/reject review
 flow, an AI review queue, local safety checks, AI critique notes, and explicit
-approval before AI-derived text can become export-ready. Bulk AI support queues
-previews for individual teacher review rather than applying changes
-automatically, and safe App Intents can open review/preparation flows without
-generating, approving, exporting, or sharing report text outside the app.
+approval before AI-derived text can become export-ready. Every deterministic
+draft also requires an explicit teacher Done marker for its current wording.
+Bulk AI support queues previews for individual teacher review rather than
+applying changes automatically, and safe App Intents route to the actual review
+or preparation view without generating, approving, exporting, or sharing report
+text outside the app.
 
 ## Product Purpose
 
@@ -46,9 +49,11 @@ MVP scope includes:
 - production dataset loading and validation
 - deterministic comment generation
 - CSV, XLSX, and XLS import
+- CSV, XLSX, and XLS teacher import templates
 - DOCX, XLSX, and XLS export
-- backup JSON import/export
+- plaintext backup JSON and password-protected `.cbackup` import/export
 - recovery snapshots
+- explicit teacher review of current deterministic and AI-assisted wording
 - optional Apple Foundation Models on-device AI writing assistance, only when
   local availability is verified and teacher review remains mandatory
 - safe App Intents entry points for opening AI review/report preparation flows

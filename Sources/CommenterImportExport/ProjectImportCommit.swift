@@ -4,6 +4,8 @@ import Foundation
 public enum ProjectImportCommitError: LocalizedError, Equatable {
     case emptyRosterImport
     case emptyResultsImport
+    case duplicateRosterImport
+    case duplicateResultsImport
     case invalidExistingProject([String])
     case invalidImportedProject([String])
 
@@ -13,6 +15,10 @@ public enum ProjectImportCommitError: LocalizedError, Equatable {
             return "No students were prepared for import. Existing project data was left unchanged."
         case .emptyResultsImport:
             return "No results were prepared for import. Existing project data was left unchanged."
+        case .duplicateRosterImport:
+            return "The prepared roster contains a duplicate student identifier. Existing project data was left unchanged."
+        case .duplicateResultsImport:
+            return "The prepared results contain duplicate student and subject rows. Existing project data was left unchanged."
         case let .invalidExistingProject(issues):
             return "The existing project is not valid enough to import into: \(issues.joined(separator: " "))"
         case let .invalidImportedProject(issues):
@@ -47,6 +53,14 @@ public func projectByApplyingRosterImport(
         throw ProjectImportCommitError.emptyRosterImport
     }
     try validateImportBaseProject(project)
+    let existingIDs = Set(project.roster.map(\.id))
+    let importedIDs = importedStudents.map(\.id)
+    let importedIDSet = Set(importedIDs)
+    guard importedIDSet.count == importedIDs.count,
+          existingIDs.isDisjoint(with: importedIDSet)
+    else {
+        throw ProjectImportCommitError.duplicateRosterImport
+    }
 
     var next = project
     next.metadata.updatedAt = nowMilliseconds
@@ -65,6 +79,10 @@ public func projectByApplyingResultsImport(
         throw ProjectImportCommitError.emptyResultsImport
     }
     try validateImportBaseProject(project)
+    let importedKeys = importedResults.map { "\($0.studentId)::\($0.subject)" }
+    guard Set(importedKeys).count == importedKeys.count else {
+        throw ProjectImportCommitError.duplicateResultsImport
+    }
 
     var mergedResults = project.results
     importedResults.forEach { importedResult in

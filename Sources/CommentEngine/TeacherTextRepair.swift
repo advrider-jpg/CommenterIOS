@@ -217,7 +217,7 @@ private func repairText(_ rawValue: String?, context: TeacherTextRepairContext) 
     guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         return (raw, [], [], [])
     }
-    if raw.count > 2_000 {
+    if raw.utf16.count > 2_000 {
         issues.append(RepairIssue(code: "text-too-long", severity: .error, message: "Teacher text is too long to use safely in the report.", original: raw))
     }
     if matchesPattern(placeholderPattern, in: raw) {
@@ -285,7 +285,7 @@ private func classifyUnit(_ text: String, context: TeacherTextRepairContext) -> 
 
 private func phraseSafeEvidence(_ raw: String) -> String? {
     let text = stripTerminalPunctuation(raw)
-    if text.isEmpty || text.count > 120 { return nil }
+    if text.isEmpty || text.utf16.count > 120 { return nil }
     if matchesPattern(placeholderPattern, in: text)
         || matchesPattern(leadingPronounPattern, in: text, options: [.caseInsensitive])
         || matchesPattern(verbPhrasePattern, in: text, options: [.caseInsensitive])

@@ -30,12 +30,53 @@ final class SpreadsheetImportFileTests: XCTestCase {
             XCTAssertEqual(error as? SpreadsheetImportFileError, .emptyFile)
         }
 
+        var maximumCSV = Data("Value\n".utf8)
+        for _ in 0..<15 {
+            maximumCSV.append(Data((String(repeating: "x", count: 32_767) + "\n").utf8))
+        }
+        maximumCSV.append(Data(String(repeating: "x", count: 32_762).utf8))
+        XCTAssertEqual(maximumCSV.count, SpreadsheetImportFile.maxCSVImportBytes)
+        let maximumCSVURL = try writeTemporaryFile(name: "maximum.csv", data: maximumCSV)
+        XCTAssertNoThrow(try SpreadsheetImportFile.parseTabularImportFile(url: maximumCSVURL, label: "Roster"))
+
+        maximumCSV.append(UInt8(ascii: "x"))
         let oversizedURL = try writeTemporaryFile(
             name: "oversized.csv",
-            data: Data(repeating: UInt8(ascii: "x"), count: SpreadsheetImportFile.maxImportBytes + 1)
+            data: maximumCSV
         )
         XCTAssertThrowsError(try SpreadsheetImportFile.parseTabularImportFile(url: oversizedURL, label: "Roster")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .fileTooLarge(SpreadsheetImportFile.maxCSVImportBytes / 1024))
+        }
+    }
+
+    func testParseTabularImportFileRetainsOneMiBWorkbookCap() throws {
+        let oversizedURL = try writeTemporaryFile(
+            name: "oversized.xlsx",
+            data: Data(repeating: UInt8(ascii: "x"), count: SpreadsheetImportFile.maxImportBytes + 1)
+        )
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseTabularImportFile(url: oversizedURL, label: "Roster")) { error in
             XCTAssertEqual(error as? SpreadsheetImportFileError, .fileTooLarge(SpreadsheetImportFile.maxImportBytes / 1024))
+        }
+    }
+
+    func testParseTabularImportFileRejectsRenamedContentBeforeParsing() throws {
+        let workbook = try workbookData(sheetXML: """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>
+        """)
+        let renamedCSV = try writeTemporaryFile(name: "renamed.csv", data: workbook)
+        let renamedXLSX = try writeTemporaryFile(name: "renamed.xlsx", data: Data("not a workbook".utf8))
+        let renamedXLS = try writeTemporaryFile(name: "renamed.xls", data: Data("not a workbook".utf8))
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseTabularImportFile(url: renamedCSV, label: "Roster")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .contentDoesNotMatchFormat("Roster", .csv))
+        }
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseTabularImportFile(url: renamedXLSX, label: "Roster")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .contentDoesNotMatchFormat("Roster", .xlsx))
+        }
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseTabularImportFile(url: renamedXLS, label: "Roster")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .contentDoesNotMatchFormat("Roster", .xls))
         }
     }
 
@@ -165,6 +206,30 @@ final class SpreadsheetImportFileTests: XCTestCase {
         }
     }
 
+    func testParseXLSXRejectsMalformedSharedStringsInsteadOfIgnoringParserFailure() throws {
+        let data = try workbookData(
+            sheetXML: """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <sheetData>
+                <row r="1"><c r="A1" t="inlineStr"><is><t>First Name</t></is></c></row>
+                <row r="2"><c r="A2" t="inlineStr"><is><t>Ava</t></is></c></row>
+              </sheetData>
+            </worksheet>
+            """,
+            sharedStringsXML: """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <si><t>This part is malformed</si>
+            </sst>
+            """
+        )
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseXLSX(data, label: "Roster workbook")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .unreadableWorkbook("Roster workbook"))
+        }
+    }
+
     func testParseXLSXRejectsBrokenWorkbookRelationshipsInsteadOfFallbackImportingSheets() throws {
         let data = try workbookData(
             sheetXML: """
@@ -190,16 +255,50 @@ final class SpreadsheetImportFileTests: XCTestCase {
         }
     }
 
+    func testParseXLSXRejectsMoreThanTheMaximumDeclaredWorksheetsBeforeFollowingRelationships() throws {
+        let sheets = (1...(SpreadsheetImportFile.maxWorkbookWorksheets + 1))
+            .map { #"<sheet name="Sheet\#($0)" sheetId="\#($0)" r:id="rId\#($0)"/>"# }
+            .joined(separator: "\n")
+        let data = try workbookData(
+            sheetXML: """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>
+            """,
+            workbookSheetsXML: sheets
+        )
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseXLSX(data, label: "Roster workbook")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .unreadableWorkbook("Roster workbook"))
+        }
+    }
+
+    func testParseXLSXRejectsDuplicateDeclaredRelationshipIDsBeforeCoreXLSXCanTrap() throws {
+        let data = try workbookData(
+            sheetXML: """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>
+            """,
+            workbookSheetsXML: """
+            <sheet name="Sheet1" sheetId="1" r:id="rId1"/>
+            <sheet name="Sheet2" sheetId="2" r:id="rId1"/>
+            """
+        )
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseXLSX(data, label: "Roster workbook")) { error in
+            XCTAssertEqual(error as? SpreadsheetImportFileError, .unreadableWorkbook("Roster workbook"))
+        }
+    }
+
     func testParseXLSXRejectsOutOfBoundsColumnReferencesBeforeAllocation() throws {
         let data = try workbookData(sheetXML: """
         <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
           <sheetData>
             <row r="1">
-              <c r="BM1" t="inlineStr"><is><t>First Name</t></is></c>
+              <c r="IW1" t="inlineStr"><is><t>First Name</t></is></c>
             </row>
             <row r="2">
-              <c r="BM2" t="inlineStr"><is><t>Ava</t></is></c>
+              <c r="IW2" t="inlineStr"><is><t>Ava</t></is></c>
             </row>
           </sheetData>
         </worksheet>
@@ -207,6 +306,33 @@ final class SpreadsheetImportFileTests: XCTestCase {
 
         XCTAssertThrowsError(try SpreadsheetImportFile.parseXLSX(data, label: "Roster workbook")) { error in
             XCTAssertEqual(error as? SpreadsheetImportFileError, .unreadableWorkbook("Roster workbook"))
+        }
+    }
+
+    func testParseXLSXRejectsRowsWiderThanTheHeaderInsteadOfDiscardingCells() throws {
+        let data = try workbookData(sheetXML: """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetData>
+            <row r="1">
+              <c r="A1" t="inlineStr"><is><t>First Name</t></is></c>
+              <c r="B1" t="inlineStr"><is><t>Last Name</t></is></c>
+            </row>
+            <row r="2">
+              <c r="A2" t="inlineStr"><is><t>Ava</t></is></c>
+              <c r="B2" t="inlineStr"><is><t>Ng</t></is></c>
+              <c r="C2" t="inlineStr"><is><t>Silently lost before this repair</t></is></c>
+            </row>
+          </sheetData>
+        </worksheet>
+        """)
+
+        XCTAssertThrowsError(try SpreadsheetImportFile.parseXLSX(data, label: "Roster workbook")) { error in
+            guard let parserError = error as? CSVParserError,
+                  case .rowWidthMismatch(_, _, _) = parserError
+            else {
+                return XCTFail("Expected inconsistentColumnCount, got \(error)")
+            }
         }
     }
 
@@ -264,7 +390,8 @@ final class SpreadsheetImportFileTests: XCTestCase {
     private func workbookData(
         sheetXML: String,
         sharedStringsXML: String? = nil,
-        includeWorkbookRelationships: Bool = true
+        includeWorkbookRelationships: Bool = true,
+        workbookSheetsXML: String = #"<sheet name="Sheet1" sheetId="1" r:id="rId1"/>"#
     ) throws -> Data {
         var entries = [
             OOXMLZipEntry(path: "[Content_Types].xml", data: Data("""
@@ -288,7 +415,7 @@ final class SpreadsheetImportFileTests: XCTestCase {
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
               <sheets>
-                <sheet name="Sheet1" sheetId="1" r:id="rId1"/>
+                \(workbookSheetsXML)
               </sheets>
             </workbook>
             """.utf8))

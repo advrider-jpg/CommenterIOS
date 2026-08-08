@@ -1,5 +1,11 @@
 # Ridiculously Close Repository Audit
 
+> **Historical snapshot (2026-06-12).** This is preserved as the evidence and
+> reasoning from that audit date; it is not the live defect register or current
+> product verdict. Subsequent source changes and dated ledger entries supersede
+> resolved findings. Consult the live checkout and `docs/ledgers/PROJECT_LEDGER.md`
+> for current posture.
+
 ## 1. Executive Summary
 
 CommenterIOS is not a fake scaffold. The repository contains a serious native SwiftUI/TCA implementation of a local-only teacher report-writing app: domain models, deterministic generation, bundled production comment data, local JSON persistence, SQLite indexing, recovery snapshots, CSV/XLSX/XLS import, DOCX/XLSX/XLS export preparation, backup JSON import/export, App Intents, support diagnostics, and guarded Apple Foundation Models AI workflows.

@@ -70,6 +70,28 @@ final class ReportReadinessTests: XCTestCase {
         XCTAssertEqual(readiness.report?.manualEdit, "   ")
     }
 
+    func testEmptyManualEditDoesNotRestoreTextTheTeacherDeleted() {
+        var project = fixtureProject()
+        let fingerprint = buildGenerationFingerprint(
+            projectMetadata: project.metadata,
+            student: project.roster[0],
+            result: project.results[0],
+            concreteSubject: "English"
+        )
+        project.reports = [
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: "Ava writes clearly.",
+                manualEdit: "",
+                generatedAt: 1,
+                resultFingerprint: fingerprint
+            )
+        ]
+
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .missingReport)
+    }
+
     func testBlocksLanguageQualityIssue() {
         var project = fixtureProject()
         project.reports = [
@@ -114,6 +136,17 @@ final class ReportReadinessTests: XCTestCase {
         XCTAssertEqual(firstBlockingLanguageIssue(repeatedWord)?.code, "repeated-word")
     }
 
+    func testNeutralTheyIsAllowedForStudentsWithGenderedPronouns() {
+        let neutral = lintReportLanguage(
+            "Ava writes clearly. They use feedback well.",
+            displayName: "Ava",
+            firstName: "Ava",
+            expectedSubjectPronoun: "She"
+        )
+
+        XCTAssertFalse(neutral.issues.contains { $0.code == "wrong-pronoun" })
+    }
+
     func testLanguageLintKeepsLongSentenceWarningsSeparateFromExportBlockers() {
         let longSentence = Array(repeating: "Ava explains her ideas clearly", count: 12).joined(separator: " ") + "."
 
@@ -154,8 +187,116 @@ final class ReportReadinessTests: XCTestCase {
         XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .lockedStale)
 
         project.reports[0].resultFingerprint = fingerprint
+        project.reports[0].markTeacherReviewed(at: 2)
         XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .lockedReady)
         XCTAssertTrue(isReadyForExport(.lockedReady))
+    }
+
+    func testDeterministicReportMustBeMarkedDoneAfterCurrentChecksPass() {
+        var project = fixtureProject()
+        let fingerprint = buildGenerationFingerprint(
+            projectMetadata: project.metadata,
+            student: project.roster[0],
+            result: project.results[0],
+            concreteSubject: "English"
+        )
+        project.reports = [
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: "Ava writes clearly.",
+                generatedAt: 1,
+                resultFingerprint: fingerprint
+            )
+        ]
+
+        let draft = getReportReadiness(project: project, studentId: "s1", subject: "English")
+
+        XCTAssertEqual(draft.status, .needsTeacherCheck)
+        XCTAssertEqual(draft.message, "This draft passes the app checks. Read it and mark it Done before export.")
+        XCTAssertEqual(readinessLabel(draft.status), "Draft")
+        XCTAssertFalse(isReadyForExport(draft.status))
+
+        project.reports[0].markTeacherReviewed(at: 2)
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .ready)
+    }
+
+    func testStaleDetailsRemainThePrimaryBlockerBeforeTeacherReview() {
+        var project = fixtureProject()
+        project.reports = [
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: "Ava Ava writes about [context].",
+                generatedAt: 1,
+                resultFingerprint: "old"
+            )
+        ]
+
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .staleReport)
+    }
+
+    func testAIReportRequiresCurrentValidationApprovalAndWarningReview() {
+        var project = fixtureProject()
+        let text = "Ava writes clearly."
+        let textFingerprint = stableTextFingerprint(text)
+        let resultFingerprint = buildGenerationFingerprint(
+            projectMetadata: project.metadata,
+            student: project.roster[0],
+            result: project.results[0],
+            concreteSubject: "English"
+        )
+        project.reports = [
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: text,
+                generatedAt: 1,
+                resultFingerprint: resultFingerprint,
+                generationMode: .aiPolishedDeterministic,
+                reviewState: ReportReviewState(
+                    status: .approved,
+                    reviewedAt: 2,
+                    approvedAt: 2,
+                    approvalFingerprint: textFingerprint
+                ),
+                currentTextFingerprint: textFingerprint,
+                approvedTextFingerprint: textFingerprint
+            )
+        ]
+
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
+
+        project.reports[0].lastValidation = ReportValidationSummary(
+            status: .blocked,
+            findings: [],
+            validatedAt: 3,
+            textFingerprint: textFingerprint
+        )
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiValidationBlocked)
+
+        project.reports[0].lastValidation = ReportValidationSummary(
+            status: .passedWithWarnings,
+            findings: [],
+            validatedAt: 4,
+            textFingerprint: textFingerprint
+        )
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
+
+        project.reports[0].validationWarningReview = ReportWarningReviewRecord(
+            validationFingerprint: textFingerprint,
+            reviewedAt: 3
+        )
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
+
+        project.reports[0].validationWarningReview = ReportWarningReviewRecord(
+            validationFingerprint: textFingerprint,
+            reviewedAt: 5
+        )
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .ready)
+
+        project.reports[0].lastValidation?.textFingerprint = "stale-validation"
+        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
     }
 
     func testProjectReadinessSummarizesExpectedMatrix() {
@@ -170,7 +311,7 @@ final class ReportReadinessTests: XCTestCase {
             concreteSubject: "English"
         )
         project.reports = [
-            GeneratedReport(studentId: "s1", subject: "English", text: "Ava writes clearly.", generatedAt: 1, resultFingerprint: fingerprint)
+            GeneratedReport(studentId: "s1", subject: "English", text: "Ava writes clearly.", generatedAt: 1, resultFingerprint: fingerprint, reviewedAt: 2)
         ]
 
         let readiness = getProjectReadiness(project)

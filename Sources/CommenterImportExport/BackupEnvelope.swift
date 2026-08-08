@@ -9,15 +9,16 @@ import Security
 #endif
 
 public let projectBackupFormat = "commenter-project-backup"
-public let projectBackupVersion = 2
+public let projectBackupVersion = 4
 public let encryptedProjectBackupFormat = "commenter-project-backup-encrypted"
 public let encryptedProjectBackupVersion = 2
 public let encryptedBackupKDFIterations = 650_000
 public let encryptedBackupMinimumKDFIterations = 100_000
-public let encryptedBackupMaximumKDFIterations = 1_500_000
+public let encryptedBackupMaximumKDFIterations = 1_000_000
 public let encryptedBackupMinimumPasswordCharacters = 12
+public let encryptedBackupLegacyMinimumPasswordCharacters = 10
 public let encryptedBackupMaximumPasswordCharacters = 1_024
-public let encryptedBackupBytes = 192 * 1024 * 1024
+public let encryptedBackupBytes = ((ProjectLimits.backupBytes * 4 + 2) / 3) + (1024 * 1024)
 public let encryptedBackupSaltBytes = 16
 public let encryptedBackupIVBytes = 12
 public let encryptedBackupAuthenticationTagBytes = 16
@@ -27,10 +28,12 @@ public let backupImportableProjectIDMaximumCharacters = 120
 public struct ProjectBackupChecksum: Codable, Equatable, Sendable {
     public var algorithm: String
     public var projectFingerprint: String
+    public var bundleFingerprint: String?
 
-    public init(algorithm: String = "sha256", projectFingerprint: String) {
+    public init(algorithm: String = "sha256", projectFingerprint: String, bundleFingerprint: String? = nil) {
         self.algorithm = algorithm
         self.projectFingerprint = projectFingerprint
+        self.bundleFingerprint = bundleFingerprint
     }
 }
 
@@ -40,13 +43,34 @@ public struct ProjectBackupPayload: Codable, Equatable, Sendable {
     public var createdAt: String
     public var checksum: ProjectBackupChecksum?
     public var project: Project
+    public var customComments: [JSONValue]?
+    public var customCommentUsage: [JSONValue]?
+    public var stickyNotes: [JSONValue]?
+    public var teacherProfile: JSONValue?
+    public var reportingPreferences: JSONValue?
 
-    public init(format: String, version: Int, createdAt: String, checksum: ProjectBackupChecksum?, project: Project) {
+    public init(
+        format: String,
+        version: Int,
+        createdAt: String,
+        checksum: ProjectBackupChecksum?,
+        project: Project,
+        customComments: [JSONValue]? = nil,
+        customCommentUsage: [JSONValue]? = nil,
+        stickyNotes: [JSONValue]? = nil,
+        teacherProfile: JSONValue? = nil,
+        reportingPreferences: JSONValue? = nil
+    ) {
         self.format = format
         self.version = version
         self.createdAt = createdAt
         self.checksum = checksum
         self.project = project
+        self.customComments = customComments
+        self.customCommentUsage = customCommentUsage
+        self.stickyNotes = stickyNotes
+        self.teacherProfile = teacherProfile
+        self.reportingPreferences = reportingPreferences
     }
 }
 
@@ -139,41 +163,68 @@ public enum BackupCollisionKind: String, Equatable, Sendable {
 }
 
 public enum BackupError: LocalizedError, Equatable {
-    case oversized(maxMegabytes: Int)
-    case encryptedOversized(maxMegabytes: Int)
-    case decryptedOversized(maxMegabytes: Int)
+    case backupSaveOversized(maximumBytes: Int)
+    case backupReadOversized(maximumBytes: Int)
+    case encryptedBackupSaveOversized(maximumBytes: Int)
+    case encryptedBackupReadOversized(maximumBytes: Int)
+    case openedBackupOversized(maximumBytes: Int)
     case couldNotOpen
     case couldNotVerify
+    case encryptedCouldNotVerify
     case encryptedPasswordRequired
     case encryptedCouldNotDecrypt
     case encryptedUnsupported
     case invalidPassword(String)
     case invalidProject([String])
+    case unsupportedBundledData([String])
 
     public var errorDescription: String? {
         switch self {
-        case let .oversized(maxMegabytes):
-            return "This backup file is larger than \(maxMegabytes) MB and was not read."
-        case let .encryptedOversized(maxMegabytes):
-            return "This encrypted backup file is larger than \(maxMegabytes) MB and was not read."
-        case let .decryptedOversized(maxMegabytes):
-            return "This decrypted backup file is larger than \(maxMegabytes) MB and was not imported."
+        case let .backupSaveOversized(maximumBytes):
+            return "This backup copy is larger than \(formatBackupByteLimitForDisplay(maximumBytes)) and was not saved."
+        case let .backupReadOversized(maximumBytes):
+            return "This backup copy is larger than \(formatBackupByteLimitForDisplay(maximumBytes)) and was not read."
+        case let .encryptedBackupSaveOversized(maximumBytes):
+            return "The backup copy is larger than the configured save limit (\(formatBackupByteLimitForDisplay(maximumBytes))) and was not saved."
+        case let .encryptedBackupReadOversized(maximumBytes):
+            return "The backup copy is larger than the configured read limit (\(formatBackupByteLimitForDisplay(maximumBytes))) and was not read."
+        case let .openedBackupOversized(maximumBytes):
+            return "This opened backup copy is larger than \(formatBackupByteLimitForDisplay(maximumBytes)) and was not opened."
         case .couldNotOpen:
-            return "This backup file could not be opened. Choose a project backup file created by this app."
+            return "This backup copy could not be opened. Choose a backup copy created by this app."
         case .couldNotVerify:
-            return "This backup file could not be verified. It may be incomplete or changed."
+            return "This backup copy could not be verified. It may be incomplete or changed."
+        case .encryptedCouldNotVerify:
+            return "This password-protected backup copy could not be verified. It may be incomplete or changed."
         case .encryptedPasswordRequired:
-            return "This is an encrypted project backup. Enter the backup password to import it."
+            return "This is a password-protected backup copy. Enter the backup password to open it."
         case .encryptedCouldNotDecrypt:
-            return "The encrypted backup could not be opened. Check the backup password and try again."
+            return "The password-protected backup copy could not be opened. Check the backup password and try again."
         case .encryptedUnsupported:
             return "Encrypted backups are not available in this build."
         case let .invalidPassword(message):
             return message
         case let .invalidProject(issues):
             return "This backup file contains an invalid project: \(issues.joined(separator: " "))"
+        case let .unsupportedBundledData(labels):
+            return "This web backup also contains \(labels.joined(separator: ", ")). This version of the iOS app cannot preserve that bundled data, so the project was not imported."
         }
     }
+}
+
+public func formatBackupByteLimitForDisplay(_ bytes: Int) -> String {
+    let mebibyte = 1024 * 1024
+    let nonnegativeBytes = max(0, bytes)
+    if nonnegativeBytes.isMultiple(of: mebibyte) {
+        return "\(nonnegativeBytes / mebibyte) MB"
+    }
+    let wholeMebibytes = nonnegativeBytes / mebibyte
+    let remainder = nonnegativeBytes % mebibyte
+    let roundedDecimal = (remainder * 10 + mebibyte / 2) / mebibyte
+    if roundedDecimal == 10 {
+        return "about \(wholeMebibytes + 1).0 MB"
+    }
+    return "about \(wholeMebibytes).\(roundedDecimal) MB"
 }
 
 public func normalizeBackupPassword(_ password: String) -> String {
@@ -182,10 +233,10 @@ public func normalizeBackupPassword(_ password: String) -> String {
 
 public func validateBackupPasswordForEncryption(_ password: String, confirmation: String? = nil) -> BackupPasswordValidation {
     let normalized = normalizeBackupPassword(password)
-    if normalized.count < encryptedBackupMinimumPasswordCharacters {
-        return BackupPasswordValidation(ok: false, message: "Use at least \(encryptedBackupMinimumPasswordCharacters) characters for an encrypted backup password.")
+    if normalized.utf16.count < encryptedBackupMinimumPasswordCharacters {
+        return BackupPasswordValidation(ok: false, message: "Use at least \(encryptedBackupMinimumPasswordCharacters) characters for the backup copy password.")
     }
-    if normalized.count > encryptedBackupMaximumPasswordCharacters {
+    if normalized.utf16.count > encryptedBackupMaximumPasswordCharacters {
         return BackupPasswordValidation(ok: false, message: "Backup passwords must be \(encryptedBackupMaximumPasswordCharacters) characters or fewer.")
     }
     if normalized.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -205,7 +256,7 @@ public func validateBackupPasswordForImport(_ password: String) -> BackupPasswor
     if normalized.isEmpty {
         return BackupPasswordValidation(ok: false, message: "Enter the backup password.")
     }
-    if normalized.count > encryptedBackupMaximumPasswordCharacters {
+    if normalized.utf16.count > encryptedBackupMaximumPasswordCharacters {
         return BackupPasswordValidation(ok: false, message: "Backup passwords must be \(encryptedBackupMaximumPasswordCharacters) characters or fewer.")
     }
     if containsControlCharacter(normalized) {
@@ -248,18 +299,25 @@ public func serializeProjectBackup(project: Project, createdAt: Date = Date()) t
         throw BackupError.invalidProject(validation.issues)
     }
 
+    let fingerprint = try projectFingerprint(normalizedProject)
     let payload = ProjectBackupPayload(
         format: projectBackupFormat,
         version: projectBackupVersion,
         createdAt: iso8601String(createdAt),
-        checksum: ProjectBackupChecksum(projectFingerprint: try projectFingerprint(normalizedProject)),
+        checksum: ProjectBackupChecksum(
+            projectFingerprint: fingerprint,
+            bundleFingerprint: try emptyWebBundleFingerprint(
+                version: projectBackupVersion,
+                projectFingerprint: fingerprint
+            )
+        ),
         project: normalizedProject
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     let data = try encoder.encode(payload)
     guard data.count <= ProjectLimits.backupBytes else {
-        throw BackupError.oversized(maxMegabytes: ProjectLimits.backupBytes / (1024 * 1024))
+        throw BackupError.backupSaveOversized(maximumBytes: ProjectLimits.backupBytes)
     }
     guard let serialized = String(data: data, encoding: .utf8) else {
         throw BackupError.couldNotOpen
@@ -302,7 +360,7 @@ func serializeEncryptedProjectBackup(
 
     let plaintext = try serializeProjectBackup(project: project, createdAt: createdAt)
     guard plaintext.lengthOfBytes(using: .utf8) <= ProjectLimits.backupBytes else {
-        throw BackupError.oversized(maxMegabytes: ProjectLimits.backupBytes / (1024 * 1024))
+        throw BackupError.backupSaveOversized(maximumBytes: ProjectLimits.backupBytes)
     }
     guard let plaintextData = plaintext.data(using: .utf8) else {
         throw BackupError.couldNotOpen
@@ -318,7 +376,7 @@ func serializeEncryptedProjectBackup(
         checksum: EncryptedProjectBackupChecksum(ciphertextHash: ""),
         ciphertext: ""
     )
-    let aad = encryptedBackupAssociatedData(payload: envelope)
+    let aad = try encryptedBackupAssociatedData(payload: envelope)
     let ciphertext = try encryptAESGCM(plaintext: plaintextData, password: password, salt: salt, iterations: iterations, iv: iv, aad: aad)
         .base64EncodedString()
     let payload = EncryptedProjectBackupPayload(
@@ -334,7 +392,7 @@ func serializeEncryptedProjectBackup(
         throw BackupError.couldNotOpen
     }
     guard serialized.lengthOfBytes(using: .utf8) <= encryptedBackupBytes else {
-        throw BackupError.encryptedOversized(maxMegabytes: encryptedBackupBytes / (1024 * 1024))
+        throw BackupError.encryptedBackupSaveOversized(maximumBytes: encryptedBackupBytes)
     }
     return serialized
 }
@@ -351,7 +409,7 @@ public func looksLikeEncryptedProjectBackup(serialized: String) -> Bool {
 public func parseProjectBackup(serialized: String, password: String? = nil) throws -> Project {
     let byteCount = serialized.lengthOfBytes(using: .utf8)
     if byteCount > encryptedBackupBytes {
-        throw BackupError.encryptedOversized(maxMegabytes: encryptedBackupBytes / (1024 * 1024))
+        throw BackupError.encryptedBackupReadOversized(maximumBytes: encryptedBackupBytes)
     }
 
     let data: Data
@@ -365,7 +423,7 @@ public func parseProjectBackup(serialized: String, password: String? = nil) thro
         throw error
     } catch {
         if byteCount > ProjectLimits.backupBytes {
-            throw BackupError.oversized(maxMegabytes: ProjectLimits.backupBytes / (1024 * 1024))
+            throw BackupError.backupReadOversized(maximumBytes: ProjectLimits.backupBytes)
         }
         throw BackupError.couldNotOpen
     }
@@ -374,13 +432,13 @@ public func parseProjectBackup(serialized: String, password: String? = nil) thro
        object["format"] as? String == encryptedProjectBackupFormat {
         let plaintext = try decryptEncryptedBackupPayload(data: data, password: password)
         guard plaintext.lengthOfBytes(using: .utf8) <= ProjectLimits.backupBytes else {
-            throw BackupError.decryptedOversized(maxMegabytes: ProjectLimits.backupBytes / (1024 * 1024))
+            throw BackupError.openedBackupOversized(maximumBytes: ProjectLimits.backupBytes)
         }
         return try parsePlainProjectBackup(serialized: plaintext)
     }
 
     if byteCount > ProjectLimits.backupBytes {
-        throw BackupError.oversized(maxMegabytes: ProjectLimits.backupBytes / (1024 * 1024))
+        throw BackupError.backupReadOversized(maximumBytes: ProjectLimits.backupBytes)
     }
 
     return try parsePlainProjectBackup(serialized: serialized)
@@ -397,8 +455,14 @@ private func parsePlainProjectBackup(serialized: String) throws -> Project {
         throw BackupError.couldNotOpen
     }
 
-    guard payload.format == projectBackupFormat, payload.version == 1 || payload.version == 2 else {
+    guard payload.format == projectBackupFormat, (1...4).contains(payload.version) else {
         throw BackupError.couldNotOpen
+    }
+    guard hasValidSideStoreContainerShapes(serialized) else {
+        throw BackupError.couldNotOpen
+    }
+    if hasUnsupportedReportingPeriod(serialized) {
+        throw BackupError.unsupportedBundledData(["structured reporting-period settings"])
     }
     guard isBackupImportableProjectID(payload.project.metadata.id) else {
         throw BackupError.couldNotOpen
@@ -409,8 +473,13 @@ private func parsePlainProjectBackup(serialized: String) throws -> Project {
         throw BackupError.couldNotOpen
     }
 
+    let bundledData = unsupportedBundledDataLabels(payload)
+    guard bundledData.isEmpty else {
+        throw BackupError.unsupportedBundledData(bundledData)
+    }
+
     let normalizedProject = normalizeProjectForPersistence(payload.project)
-    if payload.version == 2 {
+    if payload.version >= 2 {
         guard let checksum = payload.checksum,
               checksum.algorithm == "sha256",
               !checksum.projectFingerprint.isEmpty
@@ -422,13 +491,80 @@ private func parsePlainProjectBackup(serialized: String) throws -> Project {
         guard checksum.projectFingerprint == rawFingerprint || checksum.projectFingerprint == normalizedFingerprint else {
             throw BackupError.couldNotVerify
         }
+        if payload.version >= 3 {
+            guard let bundleFingerprint = checksum.bundleFingerprint, !bundleFingerprint.isEmpty else {
+                throw BackupError.couldNotOpen
+            }
+            let expectedBundleFingerprint = try emptyWebBundleFingerprint(
+                version: payload.version,
+                projectFingerprint: normalizedFingerprint
+            )
+            guard bundleFingerprint == expectedBundleFingerprint else {
+                throw BackupError.couldNotVerify
+            }
+        }
     }
 
     return normalizedProject
 }
 
+private func hasValidSideStoreContainerShapes(_ serialized: String) -> Bool {
+    guard let data = serialized.data(using: .utf8),
+          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+        return false
+    }
+    for key in ["customComments", "customCommentUsage", "stickyNotes"] {
+        if let value = root[key], !(value is [Any]) {
+            return false
+        }
+    }
+    for key in ["teacherProfile", "reportingPreferences"] {
+        if let value = root[key], !(value is [String: Any]) {
+            return false
+        }
+    }
+    return true
+}
+
+private func hasUnsupportedReportingPeriod(_ serialized: String) -> Bool {
+    guard let data = serialized.data(using: .utf8),
+          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let project = root["project"] as? [String: Any],
+          let metadata = project["metadata"] as? [String: Any],
+          let reportingPeriod = metadata["reportingPeriod"]
+    else {
+        return false
+    }
+    return !(reportingPeriod is NSNull)
+}
+
 private func normalizeProjectForPersistence(_ project: Project) -> Project {
     reconcileProjectForPersistence(project, nowMilliseconds: project.metadata.updatedAt)
+}
+
+private func unsupportedBundledDataLabels(_ payload: ProjectBackupPayload) -> [String] {
+    var labels: [String] = []
+    if payload.customComments?.isEmpty == false { labels.append("saved comments") }
+    if payload.customCommentUsage?.isEmpty == false { labels.append("saved-comment usage") }
+    if payload.stickyNotes?.isEmpty == false { labels.append("sticky notes") }
+    if payload.teacherProfile != nil { labels.append("teacher profile data") }
+    if payload.reportingPreferences != nil { labels.append("reporting preferences") }
+    return labels
+}
+
+private func emptyWebBundleFingerprint(version: Int, projectFingerprint: String) throws -> String {
+    if version >= 4 {
+        return try sha256Hex(stableJSONString(.object([
+            "projectFingerprint": .string(projectFingerprint),
+            "customComments": .array([]),
+            "customCommentUsage": .array([]),
+            "stickyNotes": .array([]),
+            "teacherProfile": .null
+        ])))
+    }
+    let serialized = "{\"projectFingerprint\":\(stableJSONString(.string(projectFingerprint))),\"customComments\":[],\"stickyNotes\":[],\"teacherProfile\":null}"
+    return try sha256Hex(serialized)
 }
 
 private func decryptEncryptedBackupPayload(data: Data, password: String?) throws -> String {
@@ -437,7 +573,7 @@ private func decryptEncryptedBackupPayload(data: Data, password: String?) throws
         throw BackupError.encryptedPasswordRequired
     }
     guard try sha256Hex(payload.ciphertext) == payload.checksum.ciphertextHash else {
-        throw BackupError.couldNotVerify
+        throw BackupError.encryptedCouldNotVerify
     }
     guard let salt = Data(base64Encoded: payload.encryption.salt),
           let iv = Data(base64Encoded: payload.encryption.iv),
@@ -452,9 +588,12 @@ private func decryptEncryptedBackupPayload(data: Data, password: String?) throws
         throw BackupError.encryptedCouldNotDecrypt
     }
 
-    let aad = payload.version == encryptedProjectBackupVersion
-        ? encryptedBackupAssociatedData(payload: payload)
-        : Data()
+    let aad: Data
+    if payload.version == encryptedProjectBackupVersion {
+        aad = try encryptedBackupAssociatedData(payload: payload)
+    } else {
+        aad = Data()
+    }
     let plaintextData = try decryptAESGCM(
         ciphertextAndTag: ciphertext,
         password: password,
@@ -482,7 +621,7 @@ private func decodeEncryptedPayload(data: Data) throws -> EncryptedProjectBackup
           payload.encryption.kdf == "PBKDF2-SHA-256",
           (encryptedBackupMinimumKDFIterations...encryptedBackupMaximumKDFIterations).contains(payload.encryption.iterations),
           payload.encryption.plaintextFormat == projectBackupFormat,
-          payload.encryption.plaintextVersion == projectBackupVersion,
+          (2...4).contains(payload.encryption.plaintextVersion),
           payload.checksum.algorithm == "sha256",
           payload.checksum.ciphertextHash.count == 64,
           !payload.encryption.salt.isEmpty,
@@ -532,7 +671,7 @@ private func decryptAESGCM(ciphertextAndTag: Data, password: String, salt: Data,
 #if canImport(CryptoKit)
 private func deriveAESGCMKey(password: String, salt: Data, iterations: Int) throws -> SymmetricKey {
     let normalized = normalizeBackupPassword(password)
-    guard normalized.count >= encryptedBackupMinimumPasswordCharacters,
+    guard normalized.utf16.count >= encryptedBackupLegacyMinimumPasswordCharacters,
           (encryptedBackupMinimumKDFIterations...encryptedBackupMaximumKDFIterations).contains(iterations),
           salt.count == encryptedBackupSaltBytes,
           let passwordData = normalized.data(using: .utf8)
@@ -576,24 +715,24 @@ private func pbkdf2SHA256(password: Data, salt: Data, iterations: Int, keyByteCo
 }
 #endif
 
-private func encryptedBackupAssociatedData(payload: EncryptedProjectBackupPayload) -> Data {
+private func encryptedBackupAssociatedData(payload: EncryptedProjectBackupPayload) throws -> Data {
     let encryption = payload.encryption
     var encryptionFields = [
-        "\"algorithm\":\(jsonStringLiteral(encryption.algorithm))",
-        "\"kdf\":\(jsonStringLiteral(encryption.kdf))",
+        "\"algorithm\":\(try jsonStringLiteral(encryption.algorithm))",
+        "\"kdf\":\(try jsonStringLiteral(encryption.kdf))",
         "\"iterations\":\(encryption.iterations)",
-        "\"salt\":\(jsonStringLiteral(encryption.salt))",
-        "\"iv\":\(jsonStringLiteral(encryption.iv))",
-        "\"plaintextFormat\":\(jsonStringLiteral(encryption.plaintextFormat))",
+        "\"salt\":\(try jsonStringLiteral(encryption.salt))",
+        "\"iv\":\(try jsonStringLiteral(encryption.iv))",
+        "\"plaintextFormat\":\(try jsonStringLiteral(encryption.plaintextFormat))",
         "\"plaintextVersion\":\(encryption.plaintextVersion)"
     ]
     if let aad = encryption.aad {
-        encryptionFields.append("\"aad\":\(jsonStringLiteral(aad))")
+        encryptionFields.append("\"aad\":\(try jsonStringLiteral(aad))")
     }
     let json = "{"
-        + "\"format\":\(jsonStringLiteral(payload.format)),"
+        + "\"format\":\(try jsonStringLiteral(payload.format)),"
         + "\"version\":\(payload.version),"
-        + "\"createdAt\":\(jsonStringLiteral(payload.createdAt)),"
+        + "\"createdAt\":\(try jsonStringLiteral(payload.createdAt)),"
         + "\"encryption\":{\(encryptionFields.joined(separator: ","))}"
         + "}"
     return Data(json.utf8)
@@ -622,12 +761,12 @@ private func containsControlCharacter(_ value: String) -> Bool {
     }
 }
 
-private func jsonStringLiteral(_ value: String) -> String {
+private func jsonStringLiteral(_ value: String) throws -> String {
     guard let data = try? JSONSerialization.data(withJSONObject: [value]),
           let rendered = String(data: data, encoding: .utf8),
           rendered.count >= 2
     else {
-        return "\"\""
+        throw BackupError.couldNotOpen
     }
     return String(rendered.dropFirst().dropLast())
 }

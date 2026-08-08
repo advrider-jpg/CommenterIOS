@@ -32,6 +32,9 @@ memory alone.
 ## Backup
 
 - `C:\Commenterv3\client\src\lib\backup.ts`
+- `C:\Commenterv3\client\src\lib\persisted-schemas.ts`
+- `C:\Commenterv3\client\src\hooks\useProjectBackupExport.ts`
+- `C:\Commenterv3\client\src\hooks\useBackupImport.tsx`
 - backup-related tests in `C:\Commenterv3\client\src\lib\*.test.ts`
 
 ## Import
@@ -82,4 +85,3 @@ Useful for source behavior checks:
 - `npm run test:launcher`
 - `npm run test:coverage`
 - `npm run verify`
-

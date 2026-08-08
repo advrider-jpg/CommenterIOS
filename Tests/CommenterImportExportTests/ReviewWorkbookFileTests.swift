@@ -1,6 +1,6 @@
 import CommentEngine
 import CommenterDomain
-import CommenterImportExport
+@testable import CommenterImportExport
 import Foundation
 import XCTest
 
@@ -111,6 +111,7 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertGreaterThan(prepared.byteCount, 0)
         XCTAssertTrue(data.starts(with: Data([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])))
         XCTAssertFalse(data.starts(with: Data("PK".utf8)))
+        XCTAssertGreaterThanOrEqual(workbookStream.count, 4_096)
         XCTAssertTrue(labels.contains("Student Name"))
         XCTAssertTrue(labels.contains("'+Manual edit final comment."))
         XCTAssertFalse(labels.contains("Generated text should not be exported."))
@@ -128,6 +129,22 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertFalse(labels.contains("Private student note should stay local."))
         XCTAssertFalse(labels.contains("Private result note should stay local."))
         XCTAssertTrue(try readBoundSheetNames(workbookStream).contains("Reports"))
+    }
+
+    func testPrepareReviewWorkbookFileDoesNotOverwriteAnExistingExport() throws {
+        for format in [ImportExportFormat.xlsx, .xls] {
+            let root = temporaryRoot()
+            var project = fixtureProject()
+            project.reports = [readyReport(project: project, result: project.results[0], text: "Ava paragraph.")]
+            let first = try prepareReviewWorkbookFile(project: project, format: format, directory: root)
+            let firstBytes = try Data(contentsOf: first.url)
+
+            let second = try prepareReviewWorkbookFile(project: project, format: format, directory: root)
+
+            XCTAssertEqual(second.url.deletingPathExtension().lastPathComponent, "Project_Report_Review-2")
+            XCTAssertNotEqual(first.url, second.url)
+            XCTAssertEqual(try Data(contentsOf: first.url), firstBytes)
+        }
     }
 
     func testPrepareReviewWorkbookFileRejectsUnsupportedFormatsHonestly() throws {
@@ -206,6 +223,47 @@ final class ReviewWorkbookFileTests: XCTestCase {
             let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
             XCTAssertEqual(files, [])
         }
+    }
+
+    func testReviewWorkbooksAllowRequiredOutputAndDoNotMistakePackageBytesForPrivateData() throws {
+        for format in [ImportExportFormat.xlsx, .xls] {
+            let root = temporaryRoot()
+            var project = fixtureProject()
+            project.results[0].internalTeacherNote = "P"
+            project.metadata.aiSettings = ProjectAISettings(requiredMentions: ["paragraph structure"])
+            project.reports = [
+                readyReport(
+                    project: project,
+                    result: project.results[0],
+                    text: "Ava uses paragraph structure effectively.",
+                    manualEdit: "Ava uses paragraph structure effectively. She now edits independently.",
+                    generatedAt: 1
+                )
+            ]
+            project.reports[0].aiOptionsOverride = AIReportOptions(requiredMentions: ["paragraph structure"])
+
+            let prepared = try prepareReviewWorkbookFile(project: project, format: format, directory: root)
+
+            XCTAssertGreaterThan(prepared.byteCount, 0)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: prepared.url.path))
+        }
+    }
+
+    func testLegacyXLSWriterUsesConformingRegularStreamAndRoundTripsUnicode() throws {
+        let data = try LegacyXLSWorkbookWriter.workbook(
+            rows: [["Heading"], ["café"], ["日本語"]],
+            sheetName: "Résumé 📘"
+        )
+        let stream = try readCompoundWorkbookStream(data)
+
+        XCTAssertGreaterThanOrEqual(stream.count, 4_096)
+        XCTAssertEqual(try readBoundSheetNames(stream), ["Résumé 📘"])
+        XCTAssertEqual(try readBIFFLabels(stream), ["Heading", "café", "日本語"])
+        XCTAssertNoThrow(try LegacyXLSWorkbookWriter.validateWorkbook(
+            data,
+            requiredSheetName: "Résumé 📘",
+            requiredStrings: ["Heading", "café", "日本語"]
+        ))
     }
 
     func testPrepareReviewWorkbookFileRejectsNonDirectoryDestination() throws {
@@ -352,7 +410,7 @@ final class ReviewWorkbookFileTests: XCTestCase {
             let flags = record.payload[7]
             let start = 8
             if flags & 0x01 == 0 {
-                return String(bytes: record.payload[start..<start + length], encoding: .utf8)
+                return String(data: Data(record.payload[start..<start + length]), encoding: .isoLatin1)
             }
             return String(
                 decoding: stride(from: start, to: start + (length * 2), by: 2).map { uint16LE(record.payload, $0) },
@@ -383,7 +441,7 @@ final class ReviewWorkbookFileTests: XCTestCase {
         let start = offset + 3
         if flags & 0x01 == 0 {
             guard start + length <= payload.count else { return nil }
-            return String(bytes: payload[start..<start + length], encoding: .utf8)
+            return String(data: Data(payload[start..<start + length]), encoding: .isoLatin1)
         }
         guard start + (length * 2) <= payload.count else { return nil }
         return String(

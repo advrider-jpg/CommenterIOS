@@ -5,16 +5,25 @@ extension AppFeature {
         switch action {
         case .task,
              .tabSelected(_),
+             .worklistFocusChanged(_),
+             .appIntentRouteReceived(_),
              .datasetLoaded(_),
              .datasetFailed(_),
              .aiAvailabilityLoaded(_),
              .aiAvailabilityFailed(_),
              .projectStoreLoaded(_),
              .projectStoreFailed(_),
+             .stalePreparedFilePurgeFailed(_),
              .operationStatusDismissed,
              .copyDiagnosticsTapped,
              .copyDiagnosticsSucceeded,
-             .copyDiagnosticsFailed(_):
+             .copyDiagnosticsFailed(_),
+             .invalidProjectSupportCopyTapped(_),
+             .invalidProjectSupportCopyPrepared(_, _),
+             .invalidProjectSupportCopyFailed(_),
+             .invalidProjectRemovalConfirmed(_),
+             .invalidProjectRemoved(_),
+             .invalidProjectRemovalFailed(_):
             return reduceAppLifecycle(&state, action)
 
         case .createProjectTapped,
@@ -70,6 +79,7 @@ extension AppFeature {
              .resultNextStepGoalsChanged(_, _, _),
              .reportManualEditChanged(_, _, _),
              .reportLockChanged(_, _, _),
+             .reportMarkedDone(_, _),
              .reportApprovedForExport(_, _):
             return reduceProjectEditing(&state, action)
 
@@ -115,6 +125,7 @@ extension AppFeature {
              .resultsImportPicked(_),
              .backupImportPicked(_),
              .encryptedBackupPasswordRequired(_),
+             .encryptedBackupPasswordRejected(_, _),
              .backupPasswordEntered(_, _),
              .backupPasswordCancelled,
              .importCancelled,
@@ -124,8 +135,13 @@ extension AppFeature {
              .importCommitted(_, _),
              .importFailed(_),
              .prepareBackupTapped,
+             .prepareEncryptedBackupTapped,
+             .prepareEncryptedBackupConfirmed(_, _),
+             .encryptedBackupPreparationCancelled,
+             .prepareImportTemplateTapped(_, _),
              .prepareReportExportTapped(_),
              .filePrepared(_, _, _, _),
+             .importTemplatePrepared(_, _, _, _),
              .filePreparationFailed(_),
              .fileExportSaved(_),
              .fileExportCancelled,

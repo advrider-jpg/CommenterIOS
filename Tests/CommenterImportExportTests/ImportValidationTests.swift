@@ -25,23 +25,41 @@ final class ImportValidationTests: XCTestCase {
         XCTAssertEqual(compact[0].gender, .female)
         XCTAssertEqual(compact[0].attitudeDescriptor, "focused")
         XCTAssertEqual(compact[0].internalTeacherNote, "Seat near reading group")
+
+        let currentWebTemplate = try ImportValidation.parseRosterImportCSV(
+            "First Name,Last Name,Year Level,General Comment Point,Private Notes\nLeo,Wong,Year 6,Uses feedback thoughtfully,Keep local",
+            existingRoster: [],
+            createID: { "leo-id" }
+        )
+        XCTAssertEqual(currentWebTemplate[0].reportEmphasisNote, "Uses feedback thoughtfully")
+        XCTAssertEqual(currentWebTemplate[0].internalTeacherNote, "Keep local")
     }
 
-    func testRosterCSVImportBlocksDuplicatesAndUnsafeIDs() {
-        XCTAssertThrowsError(try ImportValidation.parseRosterImportCSV(
+    func testRosterCSVImportAllowsLegitimateDuplicateNamesAndBlocksUnsafeIDs() throws {
+        let sameAsExisting = try ImportValidation.parseRosterImportCSV(
             "First Name,Last Name,Year Level\nAva,Ng,Year 5",
             existingRoster: roster,
             createID: { "dup" }
-        )) { error in
-            XCTAssertTrue(error.localizedDescription.contains("already in the roster"))
-        }
+        )
+        XCTAssertEqual(sameAsExisting.map(\.id), ["dup"])
+
+        var nextID = 0
+        let sameNameRows = try ImportValidation.parseRosterImportCSV(
+            "First Name,Last Name,Year Level\nSam,Lee,Year 5\nSam,Lee,Year 5",
+            existingRoster: [],
+            createID: {
+                nextID += 1
+                return "same-\(nextID)"
+            }
+        )
+        XCTAssertEqual(sameNameRows.map(\.id), ["same-1", "same-2"])
 
         XCTAssertThrowsError(try ImportValidation.parseRosterImportCSV(
             "First Name,Last Name,Year Level\nSam,Lee,Year 5\nSam,Lee,Year 5",
             existingRoster: [],
             createID: { "x" }
         )) { error in
-            XCTAssertTrue(error.localizedDescription.contains("duplicate student"))
+            XCTAssertTrue(error.localizedDescription.contains("could not be prepared safely"))
         }
 
         XCTAssertThrowsError(try ImportValidation.parseRosterImportCSV(
@@ -135,6 +153,86 @@ final class ImportValidationTests: XCTestCase {
         }
     }
 
+    func testResultsCSVImportPreservesEveryOmittedExistingField() throws {
+        let existing = AchievementResult(
+            studentId: "s1",
+            subject: "English",
+            achievementLevel: .developing,
+            focusStrand: "Reading",
+            evidenceText: "Existing evidence",
+            textType: "persuasive text",
+            learningContext: "advertising unit",
+            internalTeacherNote: "Private teacher context",
+            reportEmphasisNote: "Existing report point",
+            commentsText: "Legacy internal comment",
+            flags: ["teacher-reviewed": true],
+            englishFocusTags: ["Inferencing"],
+            mathProficiencies: ["Reasoning"],
+            mathMindsetToggles: ["Growth mindset"],
+            nextStepGoals: ["use evidence from text"]
+        )
+
+        let imported = try ImportValidation.parseResultsImportCSV(
+            "First Name,Last Name,Subject,Achievement Level\nAva,Ng,English,Above Standard",
+            roster: roster,
+            selectedSubjects: selectedSubjects,
+            existingResults: [existing]
+        )
+
+        XCTAssertEqual(imported.count, 1)
+        XCTAssertEqual(imported[0].achievementLevel, .aboveStandard)
+        XCTAssertEqual(imported[0].focusStrand, existing.focusStrand)
+        XCTAssertEqual(imported[0].evidenceText, existing.evidenceText)
+        XCTAssertEqual(imported[0].textType, existing.textType)
+        XCTAssertEqual(imported[0].learningContext, existing.learningContext)
+        XCTAssertEqual(imported[0].internalTeacherNote, existing.internalTeacherNote)
+        XCTAssertEqual(imported[0].reportEmphasisNote, existing.reportEmphasisNote)
+        XCTAssertEqual(imported[0].commentsText, existing.commentsText)
+        XCTAssertEqual(imported[0].flags, existing.flags)
+        XCTAssertEqual(imported[0].englishFocusTags, existing.englishFocusTags)
+        XCTAssertEqual(imported[0].mathProficiencies, existing.mathProficiencies)
+        XCTAssertEqual(imported[0].mathMindsetToggles, existing.mathMindsetToggles)
+        XCTAssertEqual(imported[0].nextStepGoals, existing.nextStepGoals)
+    }
+
+    func testResultsCSVImportClearsPresentBlankFieldAndAcceptsCurrentPointHeader() throws {
+        let existing = AchievementResult(
+            studentId: "s1",
+            subject: "English",
+            achievementLevel: .developing,
+            evidenceText: "Existing evidence",
+            reportEmphasisNote: "Existing report point"
+        )
+
+        let imported = try ImportValidation.parseResultsImportCSV(
+            "First Name,Last Name,Subject,Achievement Level,Evidence,Point to Include in Comment\nAva,Ng,English,At Standard,,Updated report point",
+            roster: roster,
+            selectedSubjects: selectedSubjects,
+            existingResults: [existing]
+        )
+
+        XCTAssertEqual(imported[0].evidenceText, "")
+        XCTAssertEqual(imported[0].reportEmphasisNote, "Updated report point")
+    }
+
+    func testResultsCSVImportUsesExistingConcreteFocusWhenFocusColumnIsOmitted() throws {
+        let existing = AchievementResult(
+            studentId: "s1",
+            subject: "The Arts",
+            achievementLevel: .developing,
+            focusStrand: "Music"
+        )
+
+        let imported = try ImportValidation.parseResultsImportCSV(
+            "First Name,Last Name,Subject,Achievement Level\nAva,Ng,The Arts,At Standard",
+            roster: roster,
+            selectedSubjects: selectedSubjects,
+            existingResults: [existing]
+        )
+
+        XCTAssertEqual(imported[0].focusStrand, "Music")
+    }
+
     func testResultsCSVImportRejectsContextPlaceholdersAndUnreasonableLengths() {
         XCTAssertThrowsError(try ImportValidation.parseResultsImportCSV(
             [
@@ -162,6 +260,22 @@ final class ImportValidationTests: XCTestCase {
         )) { error in
             XCTAssertTrue(error.localizedDescription.contains("Optional report note must be 180 characters or fewer"))
         }
+
+        XCTAssertThrowsError(try ImportValidation.parseRosterImportCSV(
+            "First Name,Last Name,Year Level,General Comment Point\nAva,Ng,Year 5,\(String(repeating: "x", count: 181))",
+            existingRoster: [],
+            createID: { "new-id" }
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("General comment point must be 180 characters or fewer"))
+        }
+
+        XCTAssertThrowsError(try ImportValidation.parseRosterImportCSV(
+            "First Name,Last Name,Year Level,General Comment Point\nAva,Ng,Year 5,\(String(repeating: "😀", count: 91))",
+            existingRoster: [],
+            createID: { "new-id" }
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("General comment point must be 180 characters or fewer"))
+        }
     }
 
     func testResultsCSVImportRejectsSentenceLikeContextFields() {
@@ -180,6 +294,17 @@ final class ImportValidationTests: XCTestCase {
             [
                 "First Name,Last Name,Subject,Achievement Level,Learning Context",
                 "Ava,Ng,English,At Standard,Ava solved multi-step problems"
+            ].joined(separator: "\n"),
+            roster: roster,
+            selectedSubjects: selectedSubjects
+        )) { error in
+            XCTAssertTrue(error.localizedDescription.contains("Learning context / activity must be a short phrase, not a sentence"))
+        }
+
+        XCTAssertThrowsError(try ImportValidation.parseResultsImportCSV(
+            [
+                "First Name,Last Name,Subject,Achievement Level,Learning Context",
+                "Ava,Ng,English,At Standard,Ava describes a persuasive character"
             ].joined(separator: "\n"),
             roster: roster,
             selectedSubjects: selectedSubjects

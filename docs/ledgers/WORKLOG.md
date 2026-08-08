@@ -872,3 +872,16 @@ Append material work history here. Keep entries short, dated, and factual.
 - Kept the archive/TestFlight lane gated to `workflow_dispatch` so release
   archives, IPA export, and TestFlight upload still only report success after a
   real manual run with required signing and App Store Connect credentials.
+
+## 2026-08-08 - End-to-end product and source-truth remediation
+
+- Audited the native teacher workflow against the live CommenterV3 checkout and
+  repaired feature, purpose-fit, correctness, document-freshness, and
+  source-test coverage gaps.
+- Added truthful App Intent routing, deterministic Done review, complete AI
+  request ownership/cancellation handling, password-protected backups, verified
+  CSV/XLSX/XLS import templates, damaged-record recovery/support workflows, and
+  prepared-file lifecycle safeguards.
+- Hardened live-contract limits, deterministic generation, report readiness and
+  safety, JavaScript-compatible fingerprints, persistence transactions, and all
+  supported import/export formats. No validation commands were run by request.

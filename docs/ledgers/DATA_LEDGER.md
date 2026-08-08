@@ -43,10 +43,11 @@ The source map for porting behavior is:
 
 Agents must inspect current source files before porting behavior.
 
-## Planned iOS Storage Model
+## Implemented iOS Storage Model
 
-The intended MVP storage model is canonical project JSON plus SQLite metadata
-and indexes.
+The MVP storage model is canonical project JSON plus SQLite metadata and
+indexes. Project JSON is the authoritative restorable record; SQLite is a
+rebuildable local index and usage ledger rather than a second source of truth.
 
 Canonical project JSON remains important for:
 
@@ -56,13 +57,14 @@ Canonical project JSON remains important for:
 - portability between web and iOS
 - transparent debugging and migration
 
-SQLite metadata/indexes are planned for:
+SQLite metadata/indexes are implemented for:
 
 - project listing
-- revisions
-- timestamps
-- recovery snapshot lookup
-- usage ledger lookup
+- revision, timestamp, fingerprint, and file-path metadata
+- deterministic variant-usage ledger lookup
+
+Recovery snapshots are verified JSON files managed alongside the canonical
+project store; they are not represented as authoritative SQLite records.
 
 ## Fixture Boundaries
 
@@ -75,40 +77,61 @@ Fixtures belong under:
 Fixtures are test-only. They must not be bundled into the production app as
 runtime fallback data.
 
-## Current Generated Artifacts
+## Current Product Artifacts
 
-Initial generated/scaffolded app artifacts:
+The repository now contains production implementation surfaces rather than only
+the initial scaffold:
 
 - `Package.swift`
-- `Sources/`
-- `Tests/`
-- `.github/workflows/ios-ci.yml`
+- `CommenterIOS.xcodeproj` and the native app host
+- package targets under `Sources/` for domain, generation, persistence,
+  import/export, report safety, on-device AI gates, App Intents, design system,
+  and the application feature
+- source-backed test targets under `Tests/`
+- the bundled production comment-engine resource
+
+## Teacher Import Template Artifacts
+
+The app prepares the same class-list and report-details templates exposed by
+live CommenterV3 in CSV, XLSX, and legacy XLS form. The spreadsheet variants use
+the `Class List` and `Report Details` sheet names, respectively. Prepared files
+are written atomically, protected, read back, structurally verified, and given a
+collision-safe filename before the native save/share controls are enabled.
 
 ## Backup Envelope Contract
 
-The Swift scaffold includes the CommenterV3 backup wrapper foundation:
+The implementation preserves the CommenterV3 backup wrapper contract:
 
 - `format: "commenter-project-backup"`
-- `version: 2` for new backups
+- `version: 4` for new plaintext payloads; versions 1 through 4 remain readable
 - `createdAt` ISO-8601 timestamp
 - `checksum.algorithm: "sha256"`
 - `checksum.projectFingerprint`
+- `checksum.bundleFingerprint` for version 3 and later
 - `project`
 
 The fingerprint payload removes `metadata.persistence`, stable-sorts object
 keys recursively, serializes to compact JSON, and hashes with SHA-256. This is
 the source-truth contract from `C:\Commenterv3\client\src\lib\backup.ts` and
-`C:\Commenterv3\client\src\lib\persistence-fingerprint.ts`.
+`C:\Commenterv3\client\src\lib\persistence-fingerprint.ts`. New iOS backups
+emit the current version 4 payload with the canonical fingerprint for empty web
+side stores. Imports fail openly when a web backup contains custom comments,
+custom-comment usage, sticky notes, teacher profile, reporting preferences, or
+structured reporting-period data that the iOS app cannot preserve. The
+password-encrypted outer envelope remains its separate version 2 contract.
 
 Native backup file import/export workflows preserve the internal
 `commenter-project-backup` payload format for CommenterV3 compatibility. New
 Report Writer backup files use the user-facing
 `*.report-writer-backup.json` filename suffix; the legacy
 `*.commenter-backup.json` suffix remains accepted for import compatibility.
+Password-protected exports use CommenterV3's `.cbackup` extension and are
+written, read back, decrypted, and compared with the source project before the
+app reports a prepared file.
 
 ## Dataset Validation Contract
 
-The Swift scaffold ports the source-truth dataset validation contract from
+The implementation ports the source-truth dataset validation contract from
 `C:\Commenterv3\client\src\lib\comment-engine-contract.ts`.
 
 Validation now records:
@@ -129,7 +152,7 @@ rendering uses those fields to distinguish sentence-component recipes from
 phrase-component recipes and to reject declared component-slot mismatches before
 generation can emit misleading assembled text.
 
-The Swift scaffold also ports CommenterV3 subject mapping for supported subject
+The implementation also ports CommenterV3 subject mapping for supported subject
 aliases and aggregate subjects. `The Arts` and `Technologies` require a concrete
 focus before generation can honestly proceed.
 

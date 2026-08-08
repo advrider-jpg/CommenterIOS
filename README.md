@@ -2,9 +2,9 @@
 
 Native iPhone-first SwiftUI/TCA rewrite of CommenterV3.
 
-This repository starts from the production plan and source-truth handoff for
-porting the offline teacher report-writing app from `C:\Commenterv3` into a
-native iOS app.
+This repository implements the native iOS port of the offline teacher
+report-writing app in `C:\Commenterv3`; that live checkout remains the product
+source of truth for disputed or newly ported behavior.
 
 ## Product Contract
 
@@ -30,19 +30,22 @@ CommenterIOS must preserve the core CommenterV3 contract:
 
 ## Current Status
 
-This repo contains the native SwiftUI/TCA MVP source surface for the offline
+This repo contains the native SwiftUI/TCA MVP implementation for the offline
 teacher workflow: bundled production dataset loading, deterministic generation,
 local verified project persistence, recovery snapshots, CSV/XLSX/XLS imports,
-DOCX/XLSX/XLS report exports, backup JSON import/export, support diagnostics,
-and native iOS document workflows for import, export, and share completion. The
+matching CSV/XLSX/XLS teacher templates, DOCX/XLSX/XLS report exports, plaintext
+JSON and password-protected `.cbackup` import/export, deterministic
+teacher-review “Done” gating, support diagnostics, and native iOS document
+workflows for import, export, and share completion. The
 AI foundation includes on-device availability checks, project AI defaults with
 do-not-mention and required-mention constraints, report-specific AI overrides
 for those constraints, Foundation Models revision/draft/critique wiring behind
 compile/runtime gates, report-level AI preview accept/reject flow, an AI review
 queue, cancellable bulk AI preview queueing, evidence-draft previews, local
-safety checks, validation/evaluation fixtures, safe App Intents entry points,
-validation metadata, and teacher approval gates before any AI text can become
-export-ready.
+safety checks, validation/evaluation fixtures, App Intents that route into the
+requested in-app review area, validation metadata, and teacher approval gates
+before any AI text can become export-ready. Damaged local project records are
+listed with exact raw support-copy and recovery-preserving removal workflows.
 
 `CommenterIOS.xcodeproj` is present. Local Swift package and Xcode app-target
 validation still require dependency resolution plus an Apple toolchain and iOS
@@ -55,7 +58,7 @@ Start with:
 - [Production MVP plan](docs/PRODUCTION_MVP_PLAN.md)
 - [Scaffold decision](docs/decisions/0001-native-swiftui-tca.md)
 - [Source truth map](docs/source-truth/commenterv3-source-map.md)
-- [Initial backlog](docs/backlog/INITIAL_BACKLOG.md)
+- [Historical initial backlog](docs/backlog/INITIAL_BACKLOG.md)
 
 ## Intended Stack
 

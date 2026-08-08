@@ -68,12 +68,13 @@ public func prepareResultsImportPreview(
         from: url,
         importLabel: "Results",
         acceptedRowLabel: "result",
-        maxRows: ProjectLimits.results
+        maxRows: CSVParser.maxImportRows
     )
     let results = try ImportValidation.parseResultsImportRows(
         parsed,
         roster: project.roster,
-        selectedSubjects: project.metadata.selectedSubjects
+        selectedSubjects: project.metadata.selectedSubjects,
+        existingResults: project.results
     )
     guard !results.isEmpty else {
         throw ImportPreviewPreparationError.noAcceptedRows("result")
