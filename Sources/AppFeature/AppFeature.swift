@@ -11,6 +11,7 @@ public struct AppFeature: Sendable {
     @ObservableState
     public struct State: Equatable {
         public var selectedTab: Tab = .projects
+        public var worklistFocus: WorklistFocus = .all
         public var datasetStatus: DatasetStatus = .notLoaded
         public var projectStorageStatus: ProjectStorageStatus = .notLoaded
         public var aiAvailabilityStatus: AIAvailabilityStatus = .notChecked
@@ -27,8 +28,12 @@ public struct AppFeature: Sendable {
         public var projectCreationDraft: ProjectCreationDraft?
         public var activeImportKind: ImportWorkflowKind?
         public var pendingEncryptedBackupURL: URL?
+        public var encryptedBackupErrorMessage: String?
+        public var isEncryptedBackupPreparationPresented = false
+        public var encryptedBackupPreparationErrorMessage: String?
         public var pendingAIRevision: PendingAIRevision?
         public var pendingAIRevisions: [PendingAIRevision] = []
+        public var activeAIRequest: ActiveAIRequest?
         public var isBulkAIRevisionRunning = false
         public var latestReportCheck: ReportCheckResult?
         public var rosterImportState: TabularImportState = .neverImported
@@ -50,6 +55,21 @@ public struct AppFeature: Sendable {
         case projects
         case worklist
         case support
+    }
+
+    public enum WorklistFocus: String, CaseIterable, Equatable, Identifiable, Sendable {
+        case all
+        case setup
+        case results
+        case drafts
+        case files
+
+        public var id: String { rawValue }
+    }
+
+    public enum AppIntentRoute: Equatable, Sendable {
+        case aiReviewQueue
+        case reportPreparation
     }
 
     public enum DatasetStatus: Equatable, Sendable {
@@ -94,15 +114,35 @@ public struct AppFeature: Sendable {
     public struct PreparedFile: Equatable, Sendable {
         public var url: URL
         public var label: String
+        public var purpose: PreparedFilePurpose
         public var format: ImportExportFormat?
         public var preparedAtMilliseconds: Int64?
+        public var projectID: String?
+        public var isStale: Bool
 
-        public init(url: URL, label: String, format: ImportExportFormat? = nil, preparedAtMilliseconds: Int64? = nil) {
+        public init(
+            url: URL,
+            label: String,
+            purpose: PreparedFilePurpose = .projectOutput,
+            format: ImportExportFormat? = nil,
+            preparedAtMilliseconds: Int64? = nil,
+            projectID: String? = nil,
+            isStale: Bool = false
+        ) {
             self.url = url
             self.label = label
+            self.purpose = purpose
             self.format = format
             self.preparedAtMilliseconds = preparedAtMilliseconds
+            self.projectID = projectID
+            self.isStale = isStale
         }
+    }
+
+    public enum PreparedFilePurpose: Equatable, Sendable {
+        case projectOutput
+        case importTemplate
+        case damagedRecordSupportCopy
     }
 
     public struct PreparedFileRecord: Equatable, Sendable {
@@ -214,6 +254,27 @@ public struct AppFeature: Sendable {
         }
     }
 
+    public enum AIRequestKind: String, Equatable, Sendable {
+        case polish
+        case toneAdjustment
+        case evidenceDraft
+        case critique
+    }
+
+    public struct ActiveAIRequest: Equatable, Sendable {
+        public var projectID: String
+        public var studentID: String
+        public var subject: String
+        public var kind: AIRequestKind
+
+        public init(projectID: String, studentID: String, subject: String, kind: AIRequestKind) {
+            self.projectID = projectID
+            self.studentID = studentID
+            self.subject = subject
+            self.kind = kind
+        }
+    }
+
     public enum ImportWorkflowKind: Equatable, Sendable {
         case roster
         case results
@@ -226,6 +287,7 @@ public struct AppFeature: Sendable {
         case validating(String)
         case previewReady(count: Int, source: String)
         case zeroValidRecords(String)
+        case cancelled(String)
         case failed(String)
         case success(count: Int, source: String)
         case stale(String)
@@ -268,12 +330,15 @@ public struct AppFeature: Sendable {
     public enum Action: Equatable, Sendable {
         case task
         case tabSelected(Tab)
+        case worklistFocusChanged(WorklistFocus)
+        case appIntentRouteReceived(AppIntentRoute)
         case datasetLoaded(DatasetSnapshot)
         case datasetFailed(String)
         case aiAvailabilityLoaded(AIModelAvailability)
         case aiAvailabilityFailed(String)
         case projectStoreLoaded(ProjectListDiagnostics)
         case projectStoreFailed(String)
+        case stalePreparedFilePurgeFailed(String)
         case createProjectTapped
         case projectCreationNameChanged(String)
         case projectCreationTermChanged(String)
@@ -321,6 +386,7 @@ public struct AppFeature: Sendable {
         case reportsGenerationFailed(String)
         case reportManualEditChanged(String, String, String)
         case reportLockChanged(String, String, Bool)
+        case reportMarkedDone(String, String)
         case reportApprovedForExport(String, String)
         case reportAIPolishTapped(String, String)
         case reportAIPolishCompleted(String, String, String, AIReportRevisionResult)
@@ -362,6 +428,7 @@ public struct AppFeature: Sendable {
         case resultsImportPicked(URL)
         case backupImportPicked(URL)
         case encryptedBackupPasswordRequired(URL)
+        case encryptedBackupPasswordRejected(URL, String)
         case backupPasswordEntered(URL, String)
         case backupPasswordCancelled
         case importCancelled
@@ -371,8 +438,13 @@ public struct AppFeature: Sendable {
         case importCommitted(Project, String)
         case importFailed(String)
         case prepareBackupTapped
+        case prepareEncryptedBackupTapped
+        case prepareEncryptedBackupConfirmed(String, String)
+        case encryptedBackupPreparationCancelled
+        case prepareImportTemplateTapped(CSVTemplateKind, ImportExportFormat)
         case prepareReportExportTapped(ImportExportFormat)
         case filePrepared(URL, String, ImportExportFormat, Int64)
+        case importTemplatePrepared(URL, String, ImportExportFormat, Int64)
         case filePreparationFailed(String)
         case deleteProjectConfirmed(String)
         case projectListDeleteConfirmed(String)
@@ -392,6 +464,12 @@ public struct AppFeature: Sendable {
         case copyDiagnosticsTapped
         case copyDiagnosticsSucceeded
         case copyDiagnosticsFailed(String)
+        case invalidProjectSupportCopyTapped(String)
+        case invalidProjectSupportCopyPrepared(InvalidProjectSupportCopy, Int64)
+        case invalidProjectSupportCopyFailed(String)
+        case invalidProjectRemovalConfirmed(String)
+        case invalidProjectRemoved(ProjectListDiagnostics)
+        case invalidProjectRemovalFailed(String)
     }
 
     @Dependency(\.datasetClient) var datasetClient

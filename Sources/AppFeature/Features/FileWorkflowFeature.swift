@@ -13,7 +13,7 @@ extension AppFeature {
                 state.operationStatus = .failed("Open a project before importing a roster.")
                 return .none
             }
-            guard canStartFileWorkflow(state: &state, label: "roster import") else { return .none }
+            guard canStartFileWorkflow(state: &state, label: "roster import", requiresSavedProject: true) else { return .none }
             state.projectStorageStatus = .importing
             state.activeImportKind = .roster
             state.rosterImportState = .validating("Validating roster import before changing the project.")
@@ -44,7 +44,7 @@ extension AppFeature {
                 state.operationStatus = .failed("Open a project before importing results.")
                 return .none
             }
-            guard canStartFileWorkflow(state: &state, label: "results import") else { return .none }
+            guard canStartFileWorkflow(state: &state, label: "results import", requiresSavedProject: true) else { return .none }
             let prerequisites = resultsImportPrerequisiteMessages(project)
             guard prerequisites.isEmpty else {
                 state.resultsImportState = .failed(prerequisites.joined(separator: " "))
@@ -77,7 +77,7 @@ extension AppFeature {
             }
 
         case let .backupImportPicked(url):
-            guard canStartFileWorkflow(state: &state, label: "backup import") else { return .none }
+            guard canStartFileWorkflow(state: &state, label: "backup import", requiresSavedProject: true) else { return .none }
             state.projectStorageStatus = .importing
             state.activeImportKind = .backup
             state.operationStatus = .busy("Validating backup JSON before saving it locally.")
@@ -106,13 +106,23 @@ extension AppFeature {
             state.projectStorageStatus = .loaded
             state.activeImportKind = nil
             state.pendingEncryptedBackupURL = url
+            state.encryptedBackupErrorMessage = nil
             state.operationStatus = .idle
+            return .none
+
+        case let .encryptedBackupPasswordRejected(url, message):
+            state.projectStorageStatus = .loaded
+            state.activeImportKind = nil
+            state.pendingEncryptedBackupURL = url
+            state.encryptedBackupErrorMessage = message
+            state.operationStatus = .failed(message)
             return .none
 
         case let .backupPasswordEntered(url, password):
             guard state.pendingEncryptedBackupURL == url else { return .none }
-            guard canStartFileWorkflow(state: &state, label: "encrypted backup import") else { return .none }
+            guard canStartFileWorkflow(state: &state, label: "encrypted backup import", requiresSavedProject: true) else { return .none }
             state.pendingEncryptedBackupURL = nil
+            state.encryptedBackupErrorMessage = nil
             state.projectStorageStatus = .importing
             state.activeImportKind = .backup
             state.operationStatus = .busy("Decrypting and validating encrypted backup before saving locally.")
@@ -131,7 +141,7 @@ extension AppFeature {
                         sourceFormat: .backupJSON
                     )))
                 } catch BackupError.encryptedCouldNotDecrypt, BackupError.encryptedPasswordRequired {
-                    await send(.importFailed("The encrypted backup could not be opened. Check the backup password and try again."))
+                    await send(.encryptedBackupPasswordRejected(url, "The encrypted backup could not be opened. Check the password and try again; no project data changed."))
                 } catch {
                     await send(.importFailed(userVisibleErrorMessage(error)))
                 }
@@ -139,6 +149,7 @@ extension AppFeature {
 
         case .backupPasswordCancelled:
             state.pendingEncryptedBackupURL = nil
+            state.encryptedBackupErrorMessage = nil
             state.projectStorageStatus = .loaded
             state.activeImportKind = nil
             state.operationStatus = .cancelled("Encrypted backup import cancelled.")
@@ -147,9 +158,9 @@ extension AppFeature {
         case .importCancelled:
             state.projectStorageStatus = .loaded
             if state.activeImportKind == .roster {
-                state.rosterImportState = .failed("Roster import cancelled. No project data changed.")
+                state.rosterImportState = .cancelled("Roster import cancelled. No project data changed.")
             } else if state.activeImportKind == .results {
-                state.resultsImportState = .failed("Results import cancelled. No project data changed.")
+                state.resultsImportState = .cancelled("Results import cancelled. No project data changed.")
             }
             state.activeImportKind = nil
             state.pendingImport = nil
@@ -210,9 +221,9 @@ extension AppFeature {
         case .importPreviewCancelled:
             if let pendingImport = state.pendingImport {
                 if pendingImport.kind == .roster {
-                    state.rosterImportState = .failed("Roster import preview cancelled. No project data changed.")
+                    state.rosterImportState = .cancelled("Roster import preview cancelled. No project data changed.")
                 } else if pendingImport.kind == .results {
-                    state.resultsImportState = .failed("Results import preview cancelled. No project data changed.")
+                    state.resultsImportState = .cancelled("Results import preview cancelled. No project data changed.")
                 }
             }
             state.projectStorageStatus = .loaded
@@ -230,6 +241,8 @@ extension AppFeature {
             } else if committedImport?.kind == .results {
                 state.resultsImportState = .success(count: committedImport?.acceptedRows ?? 0, source: importSourceLabel(committedImport?.sourceFormat))
             }
+            markPreparedFileStale(&state)
+            invalidateAllAIReviewState(&state)
             acceptVerifiedProject(&state, project: project, message: message)
             state.projects.removeAll { $0.id == project.metadata.id }
             state.projects.append(projectSummary(project))
@@ -254,7 +267,7 @@ extension AppFeature {
                     state.resultsImportState = .failed(message)
                 }
             }
-            state.operationStatus = .failed("Import failed before a verified commit. Check local storage before retrying: \(message)")
+            state.operationStatus = .failed("Import stopped before a verified commit. No project data was changed: \(message)")
             return .none
 
         case .prepareBackupTapped:
@@ -269,15 +282,111 @@ extension AppFeature {
             }
             let previousPreparedURL = state.preparedFile?.url
             state.projectStorageStatus = .preparingFile
-            state.preparedFile = nil
             state.operationStatus = .busy("Preparing and verifying backup JSON.")
             let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
                 if let previousPreparedURL {
-                    try? await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    do {
+                        try await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    } catch {
+                        await send(.preparedFileDiscardFailed("The existing prepared file could not be removed, so no replacement backup was created: \(userVisibleErrorMessage(error))"))
+                        return
+                    }
                 }
                 do {
                     await send(.filePrepared(try await projectStoreClient.prepareBackup(project), "Verified backup JSON is ready to export or share.", .backupJSON, preparedAt))
+                } catch {
+                    await send(.filePreparationFailed(userVisibleErrorMessage(error)))
+                }
+            }
+
+        case .prepareEncryptedBackupTapped:
+            guard state.selectedProject != nil else {
+                state.operationStatus = .failed("Open a project before preparing a password-protected backup.")
+                return .none
+            }
+            guard canStartFileWorkflow(state: &state, label: "password-protected backup preparation") else { return .none }
+            guard !hasUnsavedChanges(state) else {
+                state.operationStatus = .failed("Save current changes before preparing a password-protected backup so it reflects verified local storage.")
+                return .none
+            }
+            state.isEncryptedBackupPreparationPresented = true
+            state.encryptedBackupPreparationErrorMessage = nil
+            state.operationStatus = .idle
+            return .none
+
+        case let .prepareEncryptedBackupConfirmed(password, confirmation):
+            guard state.isEncryptedBackupPreparationPresented,
+                  let project = state.selectedProject
+            else { return .none }
+            let validation = validateBackupPasswordForEncryption(password, confirmation: confirmation)
+            guard validation.ok else {
+                state.encryptedBackupPreparationErrorMessage = validation.message ?? "Choose a valid password and enter it the same way twice."
+                return .none
+            }
+            guard canStartFileWorkflow(state: &state, label: "password-protected backup preparation") else { return .none }
+            guard !hasUnsavedChanges(state) else {
+                state.encryptedBackupPreparationErrorMessage = "Save current changes before preparing the password-protected backup."
+                return .none
+            }
+            let previousPreparedURL = state.preparedFile?.url
+            state.isEncryptedBackupPreparationPresented = false
+            state.encryptedBackupPreparationErrorMessage = nil
+            state.projectStorageStatus = .preparingFile
+            state.operationStatus = .busy("Encrypting, writing, and verifying a password-protected backup.")
+            let preparedAt = dateClient.nowMilliseconds()
+            return .run { send in
+                if let previousPreparedURL {
+                    do {
+                        try await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    } catch {
+                        await send(.preparedFileDiscardFailed("The existing prepared file could not be removed, so no password-protected backup was created: \(userVisibleErrorMessage(error))"))
+                        return
+                    }
+                }
+                do {
+                    let url = try await projectStoreClient.prepareEncryptedBackup(project, password)
+                    await send(.filePrepared(url, "Verified password-protected .cbackup file is ready. Keep its password separately; Report Writer cannot recover a forgotten password.", .backupJSON, preparedAt))
+                } catch {
+                    await send(.filePreparationFailed(userVisibleErrorMessage(error)))
+                }
+            }
+
+        case .encryptedBackupPreparationCancelled:
+            state.isEncryptedBackupPreparationPresented = false
+            state.encryptedBackupPreparationErrorMessage = nil
+            state.operationStatus = .cancelled("Password-protected backup preparation cancelled. No file was created.")
+            return .none
+
+        case let .prepareImportTemplateTapped(kind, format):
+            guard format == .csv || format == .xlsx || format == .xls else {
+                state.operationStatus = .failed("Import templates are available only as CSV, XLSX, or XLS files.")
+                return .none
+            }
+            guard canStartFileWorkflow(state: &state, label: "import-template preparation") else { return .none }
+            let previousPreparedURL = state.preparedFile?.url
+            let templateLabel = kind == .roster ? "roster" : "results"
+            let formatLabel = format.rawValue.uppercased()
+            state.projectStorageStatus = .preparingFile
+            state.operationStatus = .busy("Preparing and verifying \(formatLabel) \(templateLabel) import template.")
+            let preparedAt = dateClient.nowMilliseconds()
+            return .run { send in
+                if let previousPreparedURL {
+                    do {
+                        try await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    } catch {
+                        await send(.preparedFileDiscardFailed("The existing prepared file could not be removed, so no import template was created: \(userVisibleErrorMessage(error))"))
+                        return
+                    }
+                }
+                do {
+                    let url = try await projectStoreClient.prepareImportTemplate(kind, format)
+                    await send(.importTemplatePrepared(
+                        url,
+                        "Verified \(formatLabel) \(templateLabel) import template is ready to save or share.",
+                        format,
+                        preparedAt
+                    ))
                 } catch {
                     await send(.filePreparationFailed(userVisibleErrorMessage(error)))
                 }
@@ -301,12 +410,16 @@ extension AppFeature {
             }
             let previousPreparedURL = state.preparedFile?.url
             state.projectStorageStatus = .preparingFile
-            state.preparedFile = nil
             state.operationStatus = .busy("Checking readiness and preparing \(format.rawValue.uppercased()) export.")
             let preparedAt = dateClient.nowMilliseconds()
             return .run { send in
                 if let previousPreparedURL {
-                    try? await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    do {
+                        try await projectStoreClient.discardPreparedFile(previousPreparedURL)
+                    } catch {
+                        await send(.preparedFileDiscardFailed("The existing prepared file could not be removed, so no replacement report file was created: \(userVisibleErrorMessage(error))"))
+                        return
+                    }
                 }
                 do {
                     await send(.filePrepared(try await projectStoreClient.prepareReportExport(project, format), "\(format.rawValue.uppercased()) export file is verified and ready.", format, preparedAt))
@@ -317,12 +430,32 @@ extension AppFeature {
 
         case let .filePrepared(url, label, format, preparedAt):
             state.projectStorageStatus = .loaded
-            state.preparedFile = PreparedFile(url: url, label: label, format: format, preparedAtMilliseconds: preparedAt)
+            state.preparedFile = PreparedFile(
+                url: url,
+                label: label,
+                format: format,
+                preparedAtMilliseconds: preparedAt,
+                projectID: state.selectedProject?.metadata.id
+            )
             state.lastPreparedFiles[format] = PreparedFileRecord(
                 format: format,
                 filename: url.lastPathComponent,
                 label: label,
                 preparedAtMilliseconds: preparedAt
+            )
+            state.operationStatus = .prepared(label)
+            return .none
+
+        case let .importTemplatePrepared(url, label, format, preparedAt):
+            state.projectStorageStatus = .loaded
+            state.worklistFocus = .files
+            state.preparedFile = PreparedFile(
+                url: url,
+                label: label,
+                purpose: .importTemplate,
+                format: format,
+                preparedAtMilliseconds: preparedAt,
+                projectID: nil
             )
             state.operationStatus = .prepared(label)
             return .none
@@ -335,7 +468,6 @@ extension AppFeature {
 
         case let .fileExportSaved(url):
             let preparedURL = state.preparedFile?.url
-            state.preparedFile = nil
             state.operationStatus = .busy("File saved to \(url.lastPathComponent). Removing temporary prepared copy.")
             return discardPreparedFileEffect(
                 preparedURL,
@@ -346,7 +478,6 @@ extension AppFeature {
 
         case .fileExportCancelled:
             let preparedURL = state.preparedFile?.url
-            state.preparedFile = nil
             state.operationStatus = .busy("File export cancelled. Removing temporary prepared copy.")
             return discardPreparedFileEffect(
                 preparedURL,
@@ -357,7 +488,6 @@ extension AppFeature {
 
         case let .fileExportFailed(message):
             let preparedURL = state.preparedFile?.url
-            state.preparedFile = nil
             state.operationStatus = .busy("File export failed: \(message). Removing temporary prepared copy.")
             return discardPreparedFileEffect(
                 preparedURL,
@@ -367,12 +497,19 @@ extension AppFeature {
             )
 
         case let .fileShareStarted(url):
+            guard let preparedFile = state.preparedFile,
+                  preparedFile.url == url,
+                  !preparedFile.isStale,
+                  preparedFile.purpose != .projectOutput || preparedFile.projectID == state.selectedProject?.metadata.id
+            else {
+                state.operationStatus = .failed("The prepared file is no longer current. Dismiss it and prepare a new file from the verified project state.")
+                return .none
+            }
             state.operationStatus = .busy("Opening native share sheet for \(url.lastPathComponent).")
             return .none
 
         case let .fileShareCompleted(url):
             let preparedURL = state.preparedFile?.url ?? url
-            state.preparedFile = nil
             state.operationStatus = .busy("Share completed for \(url.lastPathComponent). Removing temporary prepared copy.")
             return discardPreparedFileEffect(
                 preparedURL,
@@ -383,7 +520,6 @@ extension AppFeature {
 
         case .fileShareCancelled:
             let preparedURL = state.preparedFile?.url
-            state.preparedFile = nil
             state.operationStatus = .busy("Share cancelled. Removing temporary prepared copy.")
             return discardPreparedFileEffect(
                 preparedURL,
@@ -394,7 +530,6 @@ extension AppFeature {
 
         case let .fileShareFailed(message):
             let preparedURL = state.preparedFile?.url
-            state.preparedFile = nil
             state.operationStatus = .busy("Share failed: \(message). Removing temporary prepared copy.")
             return discardPreparedFileEffect(
                 preparedURL,
@@ -405,7 +540,6 @@ extension AppFeature {
 
         case .preparedFileDismissed:
             let preparedURL = state.preparedFile?.url
-            state.preparedFile = nil
             if case .prepared = state.operationStatus {
                 state.operationStatus = .idle
             }
@@ -417,10 +551,12 @@ extension AppFeature {
             )
 
         case let .preparedFileDiscardCompleted(status):
+            state.preparedFile = nil
             state.operationStatus = status
             return .none
 
         case let .preparedFileDiscardFailed(message):
+            state.projectStorageStatus = .loaded
             state.operationStatus = .failed(message)
             return .none
 
@@ -467,13 +603,25 @@ private func isZeroAcceptedRowsMessage(_ message: String, rowLabel: String) -> B
     return normalized.contains("no ") && normalized.contains("accepted")
 }
 
-private func canStartFileWorkflow(state: inout AppFeature.State, label: String) -> Bool {
+private func canStartFileWorkflow(
+    state: inout AppFeature.State,
+    label: String,
+    requiresSavedProject: Bool = false
+) -> Bool {
     guard !isLongRunningProjectOperation(state.projectStorageStatus) else {
         state.operationStatus = .failed("Wait for the current local operation to finish before starting \(label).")
         return false
     }
     guard state.pendingImport == nil else {
         state.operationStatus = .failed("Confirm or cancel the pending import before starting \(label).")
+        return false
+    }
+    guard !isAIWorkRunning(state) else {
+        state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before starting \(label).")
+        return false
+    }
+    if requiresSavedProject, hasUnsavedChanges(state) {
+        state.operationStatus = .failed("Save the open project before starting \(label) so the operation uses verified local state and does not silently include other unsaved edits.")
         return false
     }
     return true

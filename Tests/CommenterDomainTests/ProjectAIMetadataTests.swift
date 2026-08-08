@@ -24,8 +24,41 @@ final class ProjectAIMetadataTests: XCTestCase {
         XCTAssertEqual(report.effectiveGenerationMode, .deterministic)
         XCTAssertNil(report.aiTrace)
         XCTAssertNil(report.reviewState)
+        XCTAssertNil(report.reviewedAt)
         XCTAssertNil(report.latestAIReviewNotes)
         XCTAssertNil(report.validationWarningReview)
+    }
+
+    func testDeterministicReviewMarkerRoundTripsAndWordingChangesInvalidateIt() throws {
+        var report = GeneratedReport(
+            studentId: "s1",
+            subject: "English",
+            text: "Ava writes clearly.",
+            generatedAt: 123,
+            resultFingerprint: "result-fingerprint",
+            reviewedAt: 10
+        )
+
+        let encoded = try JSONEncoder().encode(report)
+        let decoded = try JSONDecoder().decode(GeneratedReport.self, from: encoded)
+
+        XCTAssertEqual(decoded.reviewedAt, 10)
+
+        report.applyManualEdit("Ava writes with clarity.")
+        XCTAssertNil(report.reviewedAt)
+
+        report.markTeacherReviewed(at: 11)
+        XCTAssertEqual(report.reviewedAt, 11)
+
+        report.applyManualEdit(nil)
+        XCTAssertNil(report.reviewedAt)
+
+        report.markTeacherReviewed(at: 0)
+        XCTAssertNil(report.reviewedAt)
+
+        report.markTeacherReviewed(at: 12)
+        report.text = "Ava now writes with clear detail."
+        XCTAssertNil(report.reviewedAt)
     }
 
     func testRoundTripsAIReviewTraceAndValidationFields() throws {

@@ -52,33 +52,5 @@ public func sha256Hex(_ data: Data) throws -> String {
 }
 
 public func stableJSONString(_ value: JSONValue) -> String {
-    switch value {
-    case let .string(string):
-        return jsonEscapedString(string)
-    case let .number(number):
-        if number.rounded(.towardZero) == number {
-            return String(Int64(number))
-        }
-        return String(number)
-    case let .bool(bool):
-        return bool ? "true" : "false"
-    case let .array(array):
-        return "[" + array.map(stableJSONString).joined(separator: ",") + "]"
-    case let .object(object):
-        return "{" + object.keys.sorted().map { key in
-            jsonEscapedString(key) + ":" + stableJSONString(object[key] ?? .null)
-        }.joined(separator: ",") + "}"
-    case .null:
-        return "null"
-    }
-}
-
-private func jsonEscapedString(_ value: String) -> String {
-    guard let data = try? JSONSerialization.data(withJSONObject: [value], options: []),
-          let rendered = String(data: data, encoding: .utf8),
-          rendered.count >= 2
-    else {
-        return "\"\""
-    }
-    return String(rendered.dropFirst().dropLast())
+    javaScriptJSONString(value)
 }

@@ -6,8 +6,8 @@ public let maxResultFreeTextLength = 2_000
 public let maxReportEmphasisNoteLength = 180
 private let leadingPronounPattern = #"^(he|she|they|i|we)\b"#
 private let subordinateClausePattern = #"^(because|when|while|although|if|as)\b"#
-private let finiteVerbPattern = #"\b(am|are|is|was|were|be|being|been|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|read|reads|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
-private let leadingFinitePattern = #"^(am|are|is|was|were|has|have|had|do|does|did|can|could|will|would|should|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
+private let finiteVerbPattern = #"\b(am|are|is|was|were|be|being|been|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|described|describes|describe|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|read|reads|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
+private let leadingFinitePattern = #"^(am|are|is|was|were|has|have|had|do|does|did|can|could|will|would|should|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|described|describes|describe|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
 
 public struct ImportValidationError: LocalizedError, Equatable {
     public var message: String
@@ -41,7 +41,6 @@ public enum ImportValidation {
     ) throws -> [Student] {
         try assertCSVHeaders(parsed.headers, required: ["First Name", "Last Name", "Year Level"])
 
-        var seen = Set<String>()
         var usedIDs = Set(existingRoster.map(\.id))
         var rejectedRows: [String] = []
         var validStudents: [Student] = []
@@ -58,13 +57,6 @@ public enum ImportValidation {
                 continue
             }
 
-            let duplicateKey = studentKey(firstName: firstName, lastName: lastName, yearLevel: yearLevel.rawValue)
-            guard !seen.contains(duplicateKey) else {
-                rejectedRows.append("\(rowLabel): duplicate student \(firstName) \(lastName) (\(yearLevel.rawValue)) is not allowed")
-                continue
-            }
-            seen.insert(duplicateKey)
-
             let genderRaw = CSVParser.value(in: row, matching: "Gender")
             guard let gender = normalizeImportedGender(genderRaw) else {
                 rejectedRows.append("\(rowLabel): gender \"\(genderRaw)\" is not recognised; use Male, Female, M, F, or leave blank")
@@ -75,6 +67,19 @@ public enum ImportValidation {
             let attitudeDescriptor = canonicalAttitude(attitudeRaw)
             if !attitudeRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, attitudeDescriptor == nil {
                 rejectedRows.append("\(rowLabel): attitude descriptor \"\(attitudeRaw)\" is not recognised")
+                continue
+            }
+
+            let reportEmphasisNote = firstCSVValue(row, aliases: [
+                "General Comment Point",
+                "GeneralCommentPoint",
+                "Point to Include in Comment",
+                "PointToIncludeInComment",
+                "Report Emphasis Note",
+                "ReportEmphasisNote"
+            ])
+            guard reportEmphasisNote.utf16.count <= maxReportEmphasisNoteLength else {
+                rejectedRows.append("\(rowLabel): General comment point must be \(maxReportEmphasisNoteLength) characters or fewer")
                 continue
             }
 
@@ -102,9 +107,11 @@ public enum ImportValidation {
                         "PrivateTeacherNote",
                         "Private Teacher Note",
                         "Teacher Note",
+                        "Private Notes",
                         "Comments",
                         "Notes"
                     ]).nilIfEmpty,
+                    reportEmphasisNote: reportEmphasisNote.nilIfEmpty,
                     attitudeDescriptor: attitudeDescriptor
                 )
             )
@@ -112,30 +119,28 @@ public enum ImportValidation {
 
         try throwImportErrors(kind: "students", validCount: validStudents.count, rejectedRows: rejectedRows)
 
-        let existingKeys = Set(existingRoster.map { studentKey(firstName: $0.firstName, lastName: $0.lastName, yearLevel: $0.yearLevel.rawValue) })
-        if let duplicate = validStudents.first(where: { existingKeys.contains(studentKey(firstName: $0.firstName, lastName: $0.lastName, yearLevel: $0.yearLevel.rawValue)) }) {
-            throw ImportValidationError("\(duplicate.firstName) \(duplicate.lastName) (\(duplicate.yearLevel.rawValue)) is already in the roster. Existing project data was left unchanged.")
-        }
-
         return validStudents
     }
 
     public static func parseResultsImportCSV(
         _ text: String,
         roster: [Student],
-        selectedSubjects: [String: SelectedSubject]
+        selectedSubjects: [String: SelectedSubject],
+        existingResults: [AchievementResult] = []
     ) throws -> [AchievementResult] {
         try parseResultsImportRows(
-            CSVParser.parseCSV(text, maxRows: ProjectLimits.results),
+            CSVParser.parseCSV(text, maxRows: CSVParser.maxImportRows),
             roster: roster,
-            selectedSubjects: selectedSubjects
+            selectedSubjects: selectedSubjects,
+            existingResults: existingResults
         )
     }
 
     public static func parseResultsImportRows(
         _ parsed: CSVParseResult,
         roster: [Student],
-        selectedSubjects: [String: SelectedSubject]
+        selectedSubjects: [String: SelectedSubject],
+        existingResults: [AchievementResult] = []
     ) throws -> [AchievementResult] {
         try assertCSVHeaderAliases(parsed.headers, required: [
             .one("First Name"),
@@ -149,6 +154,11 @@ public enum ImportValidation {
             index[normalizeSubjectLabel(subject)] = subject
             index[normalizeSubjectLabel(displaySubjectName(subject))] = subject
         }
+        let importedFields = resultImportFields(for: parsed.headers)
+        let existingResultsByKey = Dictionary(
+            existingResults.map { (resultKey(studentId: $0.studentId, subject: $0.subject), $0) },
+            uniquingKeysWith: { current, _ in current }
+        )
         var importedKeys = Set<String>()
         var rejectedRows: [String] = []
         var newResults: [AchievementResult] = []
@@ -194,17 +204,21 @@ public enum ImportValidation {
                 continue
             }
 
+            let key = resultKey(studentId: student.id, subject: canonicalSubjectName)
+            let existingResult = existingResultsByKey[key]
+            let focusWasImported = importedFields.contains(.focusStrand)
+            let focusToValidate = focusWasImported ? focus : (existingResult?.focusStrand ?? "")
             var canonicalFocus = focus
             if subjectRequiresConcreteFocus(canonicalSubjectName) {
-                guard !focus.isEmpty else {
+                guard !focusToValidate.isEmpty else {
                     rejectedRows.append("\(rowLabel): \(displaySubjectName(canonicalSubjectName)) requires a specific subject in Focus, such as Music or Digital Technologies")
                     continue
                 }
-                guard let matchedFocus = getConcreteFocusOptions(canonicalSubjectName).first(where: { normalizeSubjectLabel($0) == normalizeSubjectLabel(focus) }) else {
-                    rejectedRows.append("\(rowLabel): Focus \"\(focus)\" is not a recognised specific subject for \(displaySubjectName(canonicalSubjectName))")
+                guard let matchedFocus = getConcreteFocusOptions(canonicalSubjectName).first(where: { normalizeSubjectLabel($0) == normalizeSubjectLabel(focusToValidate) }) else {
+                    rejectedRows.append("\(rowLabel): Focus \"\(focusToValidate)\" is not a recognised specific subject for \(displaySubjectName(canonicalSubjectName))")
                     continue
                 }
-                canonicalFocus = matchedFocus
+                canonicalFocus = focusWasImported ? matchedFocus : ""
             }
 
             guard let achievementLevel = normalizeAchievementLevel(level) else {
@@ -212,12 +226,10 @@ public enum ImportValidation {
                 continue
             }
 
-            let resultKey = "\(student.id)::\(canonicalSubjectName)"
-            guard !importedKeys.contains(resultKey) else {
+            guard !importedKeys.contains(key) else {
                 rejectedRows.append("\(rowLabel): duplicate result for \(firstName) \(lastName) / \(displaySubjectName(canonicalSubjectName))")
                 continue
             }
-            importedKeys.insert(resultKey)
 
             let evidenceText = CSVParser.value(in: row, matching: "Evidence")
             guard validateResultFreeText(evidenceText, rowLabel: rowLabel, fieldLabel: "Evidence", rejectedRows: &rejectedRows) else {
@@ -231,9 +243,11 @@ public enum ImportValidation {
                 "Report Note",
                 "ReportEmphasisNote",
                 "Report Emphasis Note",
+                "PointToIncludeInComment",
+                "Point to Include in Comment",
                 "Comments"
             ])
-            guard commentsText.count <= maxReportEmphasisNoteLength else {
+            guard commentsText.utf16.count <= maxReportEmphasisNoteLength else {
                 rejectedRows.append("\(rowLabel): Optional report note must be \(maxReportEmphasisNoteLength) characters or fewer")
                 continue
             }
@@ -303,23 +317,31 @@ public enum ImportValidation {
                 continue
             }
 
+            let importedResult = AchievementResult(
+                studentId: student.id,
+                subject: canonicalSubjectName,
+                achievementLevel: achievementLevel,
+                focusStrand: canonicalFocus,
+                evidenceText: evidenceText,
+                textType: textType.nilIfEmpty,
+                learningContext: learningContext.nilIfEmpty,
+                reportEmphasisNote: commentsText,
+                commentsText: "",
+                flags: [:],
+                englishFocusTags: englishFocusTags,
+                mathProficiencies: mathProficiencies,
+                mathMindsetToggles: mathMindsetToggles,
+                nextStepGoals: nextStepGoals
+            )
+            importedKeys.insert(key)
             newResults.append(
-                AchievementResult(
-                    studentId: student.id,
-                    subject: canonicalSubjectName,
-                    achievementLevel: achievementLevel,
-                    focusStrand: canonicalFocus,
-                    evidenceText: evidenceText,
-                    textType: textType.nilIfEmpty,
-                    learningContext: learningContext.nilIfEmpty,
-                    reportEmphasisNote: commentsText,
-                    commentsText: "",
-                    flags: [:],
-                    englishFocusTags: englishFocusTags,
-                    mathProficiencies: mathProficiencies,
-                    mathMindsetToggles: mathMindsetToggles,
-                    nextStepGoals: nextStepGoals
-                )
+                existingResult.map {
+                    mergeImportedAchievementResult(
+                        existing: $0,
+                        imported: importedResult,
+                        importedFields: importedFields
+                    )
+                } ?? importedResult
             )
         }
 
@@ -332,6 +354,32 @@ private enum RequiredHeader {
     case one(String)
     case any([String])
 }
+
+private enum AchievementResultImportField: Hashable {
+    case achievementLevel
+    case focusStrand
+    case evidenceText
+    case textType
+    case learningContext
+    case reportEmphasisNote
+    case englishFocusTags
+    case mathProficiencies
+    case mathMindsetToggles
+    case nextStepGoals
+}
+
+private let resultImportFieldAliases: [(field: AchievementResultImportField, aliases: [String])] = [
+    (.achievementLevel, ["Achievement Level", "AchievementLevel", "Level"]),
+    (.focusStrand, ["Focus"]),
+    (.evidenceText, ["Evidence"]),
+    (.textType, ["Text Type", "TextType", "Genre", "Writing Type", "WritingType"]),
+    (.learningContext, ["Learning Context", "LearningContext", "Context", "Activity", "Activity Context", "Investigation Context", "Unit Context"]),
+    (.reportEmphasisNote, ["PointToIncludeInComment", "Point to Include in Comment", "OptionalReportNote", "Optional Report Note", "ReportNote", "Report Note", "ReportEmphasisNote", "Report Emphasis Note", "Comments"]),
+    (.englishFocusTags, ["EnglishFocusAreas", "English Focus Areas", "EnglishFocusTags", "English Focus Tags"]),
+    (.mathProficiencies, ["MathematicsProficiencyAreas", "Mathematics Proficiency Areas", "MathProficiencies", "Math Proficiencies"]),
+    (.mathMindsetToggles, ["MathematicsLearningHabits", "Mathematics Learning Habits", "MathMindsets", "Math Mindsets"]),
+    (.nextStepGoals, ["NextStepGoals", "Next Step Goals"])
+]
 
 private let attitudeAdjectives = [
     "bright",
@@ -439,6 +487,38 @@ private func firstCSVValue(_ row: [String: String], aliases: [String]) -> String
     aliases.lazy.map { CSVParser.value(in: row, matching: $0) }.first { !$0.isEmpty } ?? ""
 }
 
+private func resultImportFields(for headers: [String]) -> Set<AchievementResultImportField> {
+    let normalizedHeaders = Set(headers.map(CSVParser.normalizeHeader))
+    return Set(resultImportFieldAliases.compactMap { entry in
+        entry.aliases.contains { normalizedHeaders.contains(CSVParser.normalizeHeader($0)) } ? entry.field : nil
+    })
+}
+
+private func resultKey(studentId: String, subject: String) -> String {
+    "\(studentId)::\(subject)"
+}
+
+private func mergeImportedAchievementResult(
+    existing: AchievementResult,
+    imported: AchievementResult,
+    importedFields: Set<AchievementResultImportField>
+) -> AchievementResult {
+    var merged = existing
+    merged.studentId = imported.studentId
+    merged.subject = imported.subject
+    if importedFields.contains(.achievementLevel) { merged.achievementLevel = imported.achievementLevel }
+    if importedFields.contains(.focusStrand) { merged.focusStrand = imported.focusStrand }
+    if importedFields.contains(.evidenceText) { merged.evidenceText = imported.evidenceText }
+    if importedFields.contains(.textType) { merged.textType = imported.textType }
+    if importedFields.contains(.learningContext) { merged.learningContext = imported.learningContext }
+    if importedFields.contains(.reportEmphasisNote) { merged.reportEmphasisNote = imported.reportEmphasisNote }
+    if importedFields.contains(.englishFocusTags) { merged.englishFocusTags = imported.englishFocusTags }
+    if importedFields.contains(.mathProficiencies) { merged.mathProficiencies = imported.mathProficiencies }
+    if importedFields.contains(.mathMindsetToggles) { merged.mathMindsetToggles = imported.mathMindsetToggles }
+    if importedFields.contains(.nextStepGoals) { merged.nextStepGoals = imported.nextStepGoals }
+    return merged
+}
+
 private func parseCommaSeparated(_ value: String) -> [String] {
     value.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
 }
@@ -493,17 +573,9 @@ private func validateResultFreeText(
     fieldLabel: String,
     rejectedRows: inout [String]
 ) -> Bool {
-    guard value.count > maxResultFreeTextLength else { return true }
+    guard value.utf16.count > maxResultFreeTextLength else { return true }
     rejectedRows.append("\(rowLabel): \(fieldLabel) must be \(maxResultFreeTextLength) characters or fewer")
     return false
-}
-
-private func studentKey(firstName: String, lastName: String, yearLevel: String) -> String {
-    [
-        firstName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-        lastName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-        yearLevel.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    ].joined(separator: "::")
 }
 
 private func normalizeYearLevel(_ value: String) -> StudentYearLevel? {
@@ -582,7 +654,7 @@ private func parseImportedReportContextField(
         rejectedRows.append("\(rowLabel): \(fieldLabel) must not contain template placeholders such as [context] or {Name}.")
         return nil
     }
-    if normalized.count > 120 {
+    if normalized.utf16.count > 120 {
         rejectedRows.append("\(rowLabel): \(fieldLabel) must be 120 characters or fewer.")
         return nil
     }

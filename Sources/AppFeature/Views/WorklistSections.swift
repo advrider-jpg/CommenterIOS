@@ -167,6 +167,7 @@ struct RosterSection: View {
     let onInternalNoteChanged: (String, String) -> Void
     let onAttitudeDescriptorChanged: (String, String) -> Void
     let onImportRoster: () -> Void
+    let onPrepareTemplate: (ImportExportFormat) -> Void
     let onOpenStudentEditor: (String) -> Void
     let isDisabled: Bool
 
@@ -185,6 +186,23 @@ struct RosterSection: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(isDisabled)
+                WorklistRuledDivider()
+                Menu {
+                    ForEach([ImportExportFormat.csv, .xlsx, .xls], id: \.self) { format in
+                        Button("Prepare \(format.rawValue.uppercased()) Template") {
+                            onPrepareTemplate(format)
+                        }
+                    }
+                } label: {
+                    WorklistActionRow(
+                        title: "Prepare Roster Template",
+                        subtitle: "Create a blank/example class-list file to fill in and import later.",
+                        systemImage: "doc.badge.plus",
+                        tone: .local,
+                        isEnabled: !isDisabled
+                    )
+                }
                 .disabled(isDisabled)
                 WorklistRuledDivider()
                 Button(action: onAddStudent) {
@@ -269,7 +287,7 @@ struct RosterSection: View {
         }
         let duplicateCount = duplicateStudentDisplayKeys(roster: project.roster).count
         if duplicateCount > 0 {
-            messages.append("\(duplicateCount) duplicate student \(duplicateCount == 1 ? "identity needs" : "identities need") resolving before the project can be saved cleanly.")
+            messages.append("\(duplicateCount) shared student name-and-year \(duplicateCount == 1 ? "combination is" : "combinations are") kept as distinct students by ID. Enter results manually for those students because a name-based results file cannot distinguish them safely.")
         }
         return messages
     }
@@ -526,6 +544,7 @@ struct ResultsSection: View {
     let onMathMindsetTogglesChanged: (String, String, [String]) -> Void
     let onNextStepGoalsChanged: (String, String, [String]) -> Void
     let onImportResults: () -> Void
+    let onPrepareTemplate: (ImportExportFormat) -> Void
     let isDisabled: Bool
 
     @State private var studentFilter = Self.allFilter
@@ -547,6 +566,23 @@ struct ResultsSection: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!canImportResults)
+                WorklistRuledDivider()
+                Menu {
+                    ForEach([ImportExportFormat.csv, .xlsx, .xls], id: \.self) { format in
+                        Button("Prepare \(format.rawValue.uppercased()) Template") {
+                            onPrepareTemplate(format)
+                        }
+                    }
+                } label: {
+                    WorklistActionRow(
+                        title: "Prepare Results Template",
+                        subtitle: "Create a blank/example report-details file to fill in and import later.",
+                        systemImage: "doc.badge.plus",
+                        tone: .local,
+                        isEnabled: !isDisabled
+                    )
+                }
+                .disabled(isDisabled)
                 if let disabledMessage = resultsImportDisabledMessage {
                     WorklistRuledDivider()
                     WorklistNote(disabledMessage, tone: .warning)
@@ -1067,6 +1103,7 @@ struct ReportsSection: View {
     let onGenerate: () -> Void
     let onManualEditChanged: (String, String, String) -> Void
     let onLockChanged: (String, String, Bool) -> Void
+    let onMarkReportDone: (String, String) -> Void
     let onApproveReportForExport: (String, String) -> Void
     let onAIPolishReport: (String, String) -> Void
     let onAIToneAdjustReport: (String, String) -> Void
@@ -1167,7 +1204,11 @@ struct ReportsSection: View {
                 }
                 if !pendingReviewQueue.isEmpty {
                     WorklistRuledDivider()
-                    WorklistStatusChip("\(pendingReviewQueue.count) AI preview \(pendingReviewQueue.count == 1 ? "waiting" : "waiting")", systemImage: "doc.text.magnifyingglass", tone: .prepared)
+                    WorklistStatusChip(
+                        "\(pendingReviewQueue.count) AI \(pendingReviewQueue.count == 1 ? "preview" : "previews") waiting",
+                        systemImage: "doc.text.magnifyingglass",
+                        tone: .prepared
+                    )
                 }
                 if readiness?.entries.contains(where: { $0.status == .staleReport || $0.status == .lockedStale }) == true {
                     WorklistRuledDivider()
@@ -1199,14 +1240,20 @@ struct ReportsSection: View {
                             }
                             .accessibilityIdentifier("ai-review-queue-row-\(pending.studentId)-\(accessibilityKey(pending.subject))")
                         } else {
-                            WorklistActionRow(
-                                title: "\(pending.studentId) / \(pending.subject)",
-                                subtitle: "Preview can no longer be matched to an open draft. Reject or regenerate after reviewing the project state.",
-                                systemImage: "exclamationmark.triangle",
-                                tone: .warning,
-                                isEnabled: false,
-                                showsChevron: false
-                            )
+                            Button {
+                                onRejectAIRevision(pending.studentId, pending.subject)
+                            } label: {
+                                WorklistActionRow(
+                                    title: "Remove stale AI preview",
+                                    subtitle: "\(pending.studentId) / \(pending.subject) no longer matches an open draft. Removing it does not change report text.",
+                                    systemImage: "trash",
+                                    tone: .warning,
+                                    isEnabled: !isDisabled,
+                                    showsChevron: false
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isDisabled)
                             .accessibilityIdentifier("ai-review-queue-stale-\(pending.studentId)-\(accessibilityKey(pending.subject))")
                         }
                         if pending.id != pendingReviewQueue.last?.id {
@@ -1328,6 +1375,7 @@ struct ReportsSection: View {
             isDisabled: isDisabled,
             onManualEditChanged: { onManualEditChanged(report.studentId, report.subject, $0) },
             onLockChanged: { onLockChanged(report.studentId, report.subject, $0) },
+            onMarkDone: { onMarkReportDone(report.studentId, report.subject) },
             onApproveForExport: { onApproveReportForExport(report.studentId, report.subject) },
             onAIPolish: { onAIPolishReport(report.studentId, report.subject) },
             onAIToneAdjust: { onAIToneAdjustReport(report.studentId, report.subject) },
@@ -1374,6 +1422,7 @@ private struct ReportEditorView: View {
     let isDisabled: Bool
     let onManualEditChanged: (String) -> Void
     let onLockChanged: (Bool) -> Void
+    let onMarkDone: () -> Void
     let onApproveForExport: () -> Void
     let onAIPolish: () -> Void
     let onAIToneAdjust: () -> Void
@@ -1402,9 +1451,7 @@ private struct ReportEditorView: View {
             Section {
                 WorklistNotebookCard(clipped: true) {
                     aiReviewStatus
-                    if report.requiresTeacherApprovalForExport {
-                        WorklistRuledDivider()
-                    }
+                    WorklistRuledDivider()
                     TextEditor(text: Binding(
                         get: { report.manualEdit ?? report.text },
                         set: onManualEditChanged
@@ -1436,6 +1483,20 @@ private struct ReportEditorView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(isDisabled || !canApproveAIReport)
+                    } else {
+                        WorklistRuledDivider()
+                        Button(action: onMarkDone) {
+                            WorklistActionRow(
+                                title: deterministicDraftIsDone ? "Done — Included in Export" : "Mark Draft Done",
+                                subtitle: deterministicDoneSubtitle,
+                                systemImage: "checkmark.circle",
+                                tone: deterministicDraftIsDone ? .local : .action,
+                                isEnabled: !isDisabled && canMarkDeterministicDraftDone,
+                                showsChevron: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isDisabled || !canMarkDeterministicDraftDone)
                     }
                 }
                 .worklistSectionRow()
@@ -1509,7 +1570,38 @@ private struct ReportEditorView: View {
             if let finding = report.lastValidation?.findings.first {
                 WorklistNote(finding.message, tone: finding.severity == .block ? .warning : .neutral)
             }
+        } else if deterministicDraftIsDone {
+            WorklistStatusChip("Done — included in export", systemImage: "checkmark.seal", tone: .success)
+            WorklistNote("This deterministic draft has been teacher-reviewed in its current form. Editing or regenerating the wording will return it to Draft status.")
+        } else if currentReportReadiness.status == .needsTeacherCheck {
+            WorklistStatusChip("Draft needs teacher review", systemImage: "person.crop.circle.badge.checkmark", tone: .warning)
+            WorklistNote(currentReportReadiness.message, tone: .warning)
+        } else {
+            WorklistStatusChip(readinessLabel(currentReportReadiness.status), systemImage: "exclamationmark.triangle", tone: .warning)
+            WorklistNote(currentReportReadiness.message, tone: .warning)
         }
+    }
+
+    private var currentReportReadiness: ReportReadiness {
+        getReportReadiness(project: project, studentId: report.studentId, subject: report.subject)
+    }
+
+    private var deterministicDraftIsDone: Bool {
+        !report.requiresTeacherApprovalForExport && isReadyForExport(currentReportReadiness.status)
+    }
+
+    private var canMarkDeterministicDraftDone: Bool {
+        !report.requiresTeacherApprovalForExport && currentReportReadiness.status == .needsTeacherCheck
+    }
+
+    private var deterministicDoneSubtitle: String {
+        if deterministicDraftIsDone {
+            return "Teacher review is recorded for the current wording. Edit or regenerate to return it to Draft."
+        }
+        if currentReportReadiness.status == .needsTeacherCheck {
+            return "Confirms you read the current wording. Save the project afterward to persist Done status."
+        }
+        return currentReportReadiness.message
     }
 
     private var canApproveAIReport: Bool {
@@ -2351,6 +2443,7 @@ struct ReportExportsSection: View {
 struct BackupSection: View {
     let record: AppFeature.PreparedFileRecord?
     let onPrepareBackup: () -> Void
+    let onPrepareEncryptedBackup: () -> Void
     let isDisabled: Bool
     let disabledReason: String?
 
@@ -2363,6 +2456,18 @@ struct BackupSection: View {
                         subtitle: backupSubtitle,
                         systemImage: "externaldrive.badge.checkmark",
                         tone: .local,
+                        isEnabled: !isDisabled
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isDisabled)
+                WorklistRuledDivider()
+                Button(action: onPrepareEncryptedBackup) {
+                    WorklistActionRow(
+                        title: "Prepare Password-Protected Backup",
+                        subtitle: "Creates a verified .cbackup file after you enter and confirm a password. A forgotten password cannot be recovered.",
+                        systemImage: "lock.doc",
+                        tone: .action,
                         isEnabled: !isDisabled
                     )
                 }
@@ -2387,44 +2492,50 @@ struct BackupSection: View {
 
 struct PreparedFileSection: View {
     let preparedFile: AppFeature.PreparedFile?
-    let hasHiddenStalePreparedFile: Bool
     let onSavePreparedFile: () -> Void
     let onSharePreparedFile: () -> Void
     let onDismissPreparedFile: () -> Void
     let isDisabled: Bool
 
     var body: some View {
-        if preparedFile != nil || hasHiddenStalePreparedFile {
+        if let preparedFile {
             Section {
                 WorklistNotebookCard(clipped: true) {
-                    if hasHiddenStalePreparedFile {
-                        WorklistStatusChip("Prepared file hidden until current edits are saved", systemImage: "exclamationmark.triangle", tone: .warning)
+                    if preparedFile.isStale {
+                        WorklistStatusChip("Prepared file is stale and cannot be saved or shared", systemImage: "exclamationmark.triangle", tone: .warning)
                         WorklistRuledDivider()
-                        WorklistNote("Save the project and prepare a new file so exports and shares reflect verified local state.", tone: .warning)
-                    }
-                    if let preparedFile {
-                        if hasHiddenStalePreparedFile {
-                            WorklistRuledDivider()
-                        }
+                        WorklistNote("The project changed after this file was prepared, or another project is now open. Remove this temporary file, save current edits, and prepare a new one.", tone: .warning)
+                    } else if preparedFile.purpose == .damagedRecordSupportCopy {
+                        WorklistStatusChip("Raw damaged-record support copy ready — not a backup", systemImage: "exclamationmark.triangle", tone: .warning)
+                        WorklistRuledDivider()
+                        WorklistNote(preparedFile.label, tone: .warning)
+                    } else if preparedFile.purpose == .importTemplate {
+                        Label("Verified import template is ready", systemImage: "checkmark.seal")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(CommenterStationeryTheme.Colors.localGreen)
+                        WorklistRuledDivider()
+                        WorklistNote(preparedFile.label)
+                    } else {
                         Label("Verified prepared file is ready", systemImage: "checkmark.seal")
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(CommenterStationeryTheme.Colors.localGreen)
                             .accessibilityIdentifier("prepared-file-ready")
                         WorklistRuledDivider()
-                        LabeledContent("Prepared file", value: preparedFile.url.lastPathComponent)
                         Text(preparedFile.label)
                             .font(.footnote)
                             .foregroundStyle(CommenterStationeryTheme.Colors.secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
-                        if let preparedAt = preparedFile.preparedAtMilliseconds {
-                            WorklistRuledDivider()
-                            LabeledContent("Prepared", value: CommenterFormatters.timestamp(preparedAt))
-                        }
                     }
+                    if let preparedAt = preparedFile.preparedAtMilliseconds {
+                        WorklistRuledDivider()
+                        LabeledContent("Prepared", value: CommenterFormatters.timestamp(preparedAt))
+                    }
+                    WorklistRuledDivider()
+                    LabeledContent("Temporary file", value: preparedFile.url.lastPathComponent)
                 }
                 .worklistSectionRow()
-                if preparedFile != nil {
-                    WorklistNotebookCard(perforated: false) {
+                WorklistNotebookCard(perforated: false) {
+                    if !preparedFile.isStale {
                         Button(action: onSavePreparedFile) {
                             WorklistActionRow(title: "Save Prepared File Copy", systemImage: "square.and.arrow.down", tone: .local, isEnabled: !isDisabled)
                         }
@@ -2437,18 +2548,40 @@ struct PreparedFileSection: View {
                         .buttonStyle(.plain)
                         .disabled(isDisabled)
                         WorklistRuledDivider()
-                        WorklistNote("This file has been prepared and verified locally. Saving reports success only after the file exporter returns; sharing records completed, cancelled, or failed native share outcomes.")
+                        WorklistNote(
+                            preparedFile.purpose == .damagedRecordSupportCopy
+                                ? "This exact raw copy is for support or manual recovery work only. It cannot be restored or imported as a Commenter backup."
+                                : (preparedFile.purpose == .importTemplate
+                                    ? "This template has been prepared and verified locally. Save it, fill it in, then import the completed file from the matching roster or results section."
+                                    : "This file has been prepared and verified locally. Saving reports success only after the file exporter returns; sharing records completed, cancelled, or failed native share outcomes.")
+                        )
                         WorklistRuledDivider()
-                        Button(action: onDismissPreparedFile) {
-                            WorklistActionRow(title: "Dismiss Prepared File", systemImage: "xmark", tone: .neutral, isEnabled: !isDisabled, showsChevron: false)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isDisabled)
                     }
-                    .worklistSectionRow()
+                    Button(action: onDismissPreparedFile) {
+                        WorklistActionRow(
+                            title: preparedFile.isStale ? "Remove Stale Prepared File" : "Dismiss Prepared File",
+                            systemImage: "xmark",
+                            tone: preparedFile.isStale ? .warning : .neutral,
+                            isEnabled: !isDisabled,
+                            showsChevron: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDisabled)
                 }
+                .worklistSectionRow()
             } header: {
-                WorklistTapeHeader("Prepared file", detail: "Verified file ready for native save or share", tone: .prepared)
+                WorklistTapeHeader(
+                    "Prepared file",
+                    detail: preparedFile.isStale
+                        ? "Temporary file retained only so it can be removed safely"
+                        : (preparedFile.purpose == .damagedRecordSupportCopy
+                            ? "Non-restorable support copy ready for native save or share"
+                            : (preparedFile.purpose == .importTemplate
+                                ? "Verified teacher template ready for native save or share"
+                                : "Verified file ready for native save or share")),
+                    tone: preparedFile.isStale || preparedFile.purpose == .damagedRecordSupportCopy ? .warning : .prepared
+                )
             }
         }
     }
@@ -2476,6 +2609,8 @@ private func tabularImportStatus(_ state: AppFeature.TabularImportState, emptyLa
         WorklistStatusChip("Preview ready: \(count) rows from \(source)", systemImage: "doc.text.magnifyingglass", tone: .prepared)
     case let .zeroValidRecords(message):
         WorklistStatusChip(message, systemImage: "0.circle", tone: .warning)
+    case let .cancelled(message):
+        WorklistStatusChip(message, systemImage: "xmark.circle", tone: .warning)
     case let .failed(message):
         WorklistStatusChip(message, systemImage: "exclamationmark.triangle", tone: .failure)
     case let .success(count, source):

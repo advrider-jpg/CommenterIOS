@@ -26,10 +26,21 @@ public struct CommentGenerationResult: Equatable, Sendable {
 extension CommentEngineClient: DependencyKey {
     public static let liveValue = CommentEngineClient { project in
         let engine = try await productionDatasetCache.load()
+        let existingVariantIDs = reportVariantIds(project)
+        let existingUsage = existingVariantIDs.reduce(into: [String: Int]()) { counts, variantID in
+            counts[variantID, default: 0] += 1
+        }
+        let existingReportTexts = Set(
+            project.reports
+                .map(\.exportText)
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        )
         var generator = try ReportGenerator(
             data: engine.data,
             projectMetadata: project.metadata,
-            usedVariantIds: Set(reportVariantIds(project))
+            usedVariantIds: Set(existingVariantIDs),
+            existingUsage: existingUsage,
+            blockedReportTexts: existingReportTexts
         )
         let now = milliseconds(Date())
         var next = project

@@ -1,3 +1,4 @@
+import CommenterAppIntents
 import CommenterDomain
 import CommenterImportExport
 import ComposableArchitecture
@@ -5,6 +6,7 @@ import DesignSystem
 import SwiftUI
 import UniformTypeIdentifiers
 
+@MainActor
 public struct AppView: View {
     private let store: StoreOf<AppFeature>
 
@@ -13,7 +15,11 @@ public struct AppView: View {
     @State private var isExportingFile = false
     @State private var sharePresentation: SharePresentation?
     @State private var projectDeletionCandidate: ProjectDeletionCandidate?
+    @State private var invalidProjectRemovalCandidate: InvalidProjectRemovalCandidate?
     @State private var encryptedBackupPassword = ""
+    @State private var encryptedBackupExportPassword = ""
+    @State private var encryptedBackupExportConfirmation = ""
+    @StateObject private var appIntentRouter = CommenterAppIntentRouter.shared
 
     public init(store: StoreOf<AppFeature>) {
         self.store = store
@@ -27,6 +33,8 @@ public struct AppView: View {
                     status: viewStore.projectStorageStatus,
                     projects: viewStore.projects,
                     operationStatus: viewStore.operationStatus,
+                    hasUnsavedProjectChanges: viewStore.hasUnsavedProjectChanges,
+                    isAIWorkRunning: viewStore.activeAIRequest != nil || viewStore.isBulkAIRevisionRunning,
                     onCreateProject: { viewStore.send(.createProjectTapped) },
                     onOpenProject: { viewStore.send(.projectTapped($0)) },
                     onImportBackup: { importMode = .backup },
@@ -50,11 +58,14 @@ public struct AppView: View {
                     pendingAIRevision: viewStore.pendingAIRevision,
                     pendingAIRevisions: viewStore.pendingAIRevisions,
                     isBulkAIRevisionRunning: viewStore.isBulkAIRevisionRunning,
+                    activeAIRequest: viewStore.activeAIRequest,
                     latestReportCheck: viewStore.latestReportCheck,
                     rosterImportState: viewStore.rosterImportState,
                     resultsImportState: viewStore.resultsImportState,
                     lastPreparedFiles: viewStore.lastPreparedFiles,
                     datasetStatus: viewStore.datasetStatus,
+                    taskFocus: viewStore.worklistFocus,
+                    onTaskFocusChanged: { viewStore.send(.worklistFocusChanged($0)) },
                     onGoToProjects: { viewStore.send(.tabSelected(.projects)) },
                     onProjectNameChanged: { viewStore.send(.projectNameChanged($0)) },
                     onProjectTermChanged: { viewStore.send(.projectTermChanged($0)) },
@@ -94,6 +105,7 @@ public struct AppView: View {
                     onGenerate: { viewStore.send(.generateReportsTapped) },
                     onManualEditChanged: { viewStore.send(.reportManualEditChanged($0, $1, $2)) },
                     onLockChanged: { viewStore.send(.reportLockChanged($0, $1, $2)) },
+                    onMarkReportDone: { viewStore.send(.reportMarkedDone($0, $1)) },
                     onApproveReportForExport: { viewStore.send(.reportApprovedForExport($0, $1)) },
                     onAIPolishReport: { viewStore.send(.reportAIPolishTapped($0, $1)) },
                     onAIToneAdjustReport: { viewStore.send(.reportAIToneAdjustTapped($0, $1)) },
@@ -120,27 +132,23 @@ public struct AppView: View {
                     onReportAIOptionsReset: { viewStore.send(.reportAIOptionsReset($0, $1)) },
                     onImportRoster: { importMode = .roster },
                     onImportResults: { importMode = .results },
+                    onPrepareImportTemplate: { viewStore.send(.prepareImportTemplateTapped($0, $1)) },
                     onPrepareBackup: { viewStore.send(.prepareBackupTapped) },
+                    onPrepareEncryptedBackup: { viewStore.send(.prepareEncryptedBackupTapped) },
                     onPrepareExport: { viewStore.send(.prepareReportExportTapped($0)) },
                     onSavePreparedFile: {
-                        guard let preparedFile = viewStore.preparedFile else {
-                            viewStore.send(.fileExportFailed("No verified prepared file is available."))
-                            return
-                        }
-                        do {
-                            exportDocument = try PreparedExportDocument(url: preparedFile.url)
-                            isExportingFile = true
-                        } catch {
-                            viewStore.send(.fileExportFailed(userVisibleErrorMessage(error)))
-                        }
+                        beginSavingPreparedFile(
+                            viewStore.preparedFile,
+                            selectedProjectID: viewStore.selectedProject?.metadata.id,
+                            viewStore: viewStore
+                        )
                     },
                     onSharePreparedFile: {
-                        guard let preparedFile = viewStore.preparedFile else {
-                            viewStore.send(.fileShareFailed("No verified prepared file is available."))
-                            return
-                        }
-                        sharePresentation = SharePresentation(url: preparedFile.url)
-                        viewStore.send(.fileShareStarted(preparedFile.url))
+                        beginSharingPreparedFile(
+                            viewStore.preparedFile,
+                            selectedProjectID: viewStore.selectedProject?.metadata.id,
+                            viewStore: viewStore
+                        )
                     },
                     onDismissPreparedFile: { viewStore.send(.preparedFileDismissed) },
                     onDismissStatus: { viewStore.send(.operationStatusDismissed) },
@@ -153,6 +161,29 @@ public struct AppView: View {
                 SupportRootView(
                     state: viewStore.state,
                     onCopyDiagnostics: { viewStore.send(.copyDiagnosticsTapped) },
+                    onPrepareInvalidProjectSupportCopy: { viewStore.send(.invalidProjectSupportCopyTapped($0)) },
+                    onRequestInvalidProjectRemoval: { record in
+                        guard let recordID = record.recordID else { return }
+                        invalidProjectRemovalCandidate = InvalidProjectRemovalCandidate(
+                            id: recordID,
+                            redactedProjectLabel: diagnosticIdentifier(record.id, prefix: "project", redaction: .redacted)
+                        )
+                    },
+                    onSavePreparedFile: {
+                        beginSavingPreparedFile(
+                            viewStore.preparedFile,
+                            selectedProjectID: viewStore.selectedProject?.metadata.id,
+                            viewStore: viewStore
+                        )
+                    },
+                    onSharePreparedFile: {
+                        beginSharingPreparedFile(
+                            viewStore.preparedFile,
+                            selectedProjectID: viewStore.selectedProject?.metadata.id,
+                            viewStore: viewStore
+                        )
+                    },
+                    onDismissPreparedFile: { viewStore.send(.preparedFileDismissed) },
                     onDismissStatus: { viewStore.send(.operationStatusDismissed) }
                 )
                     .tabItem { Label("Support", systemImage: "questionmark.circle") }
@@ -161,6 +192,22 @@ public struct AppView: View {
             .tint(CommenterColors.accent)
             .sensoryFeedback(.selection, trigger: viewStore.selectedTab)
             .task { await viewStore.send(.task).finish() }
+            .onChange(of: appIntentRouter.pendingDestination, initial: true) { _, destination in
+                guard let destination else { return }
+                switch destination {
+                case .aiReviewQueue:
+                    viewStore.send(.appIntentRouteReceived(.aiReviewQueue))
+                case .reportPreparation:
+                    viewStore.send(.appIntentRouteReceived(.reportPreparation))
+                }
+                appIntentRouter.consume(destination)
+            }
+            .onChange(of: viewStore.isEncryptedBackupPreparationPresented) { _, isPresented in
+                if !isPresented {
+                    encryptedBackupExportPassword = ""
+                    encryptedBackupExportConfirmation = ""
+                }
+            }
             .fileImporter(
                 isPresented: importBinding,
                 allowedContentTypes: importMode?.allowedContentTypes ?? [.data],
@@ -229,6 +276,27 @@ public struct AppView: View {
             } message: { _ in
                 Text("A recovery snapshot of the verified local project will be created before the project file is removed. Save or reopen first if there are unsaved edits.")
             }
+            .confirmationDialog(
+                "Remove Damaged Saved Work?",
+                isPresented: Binding(
+                    get: { invalidProjectRemovalCandidate != nil },
+                    set: { isPresented in
+                        if !isPresented { invalidProjectRemovalCandidate = nil }
+                    }
+                ),
+                titleVisibility: .visible,
+                presenting: invalidProjectRemovalCandidate
+            ) { candidate in
+                Button("Remove \(candidate.redactedProjectLabel)", role: .destructive) {
+                    invalidProjectRemovalCandidate = nil
+                    viewStore.send(.invalidProjectRemovalConfirmed(candidate.id))
+                }
+                Button("Cancel", role: .cancel) {
+                    invalidProjectRemovalCandidate = nil
+                }
+            } message: { _ in
+                Text("Save the raw support copy first if you may need it. Removal moves the damaged record out of active projects into app-owned quarantine and preserves its local recovery material, but the record will no longer open as a project.")
+            }
             .alert(
                 "Encrypted backup",
                 isPresented: Binding(
@@ -248,9 +316,76 @@ public struct AppView: View {
                     viewStore.send(.backupPasswordCancelled)
                 }
             } message: { _ in
-                Text("Enter the password used to encrypt this backup.")
+                if let message = viewStore.encryptedBackupErrorMessage {
+                    Text("\(message) Enter the password used to encrypt this backup.")
+                } else {
+                    Text("Enter the password used to encrypt this backup.")
+                }
+            }
+            .alert(
+                "Prepare Password-Protected Backup",
+                isPresented: Binding(
+                    get: { viewStore.isEncryptedBackupPreparationPresented },
+                    set: { _ in }
+                )
+            ) {
+                SecureField("Password", text: $encryptedBackupExportPassword)
+                SecureField("Confirm password", text: $encryptedBackupExportConfirmation)
+                Button("Prepare") {
+                    viewStore.send(.prepareEncryptedBackupConfirmed(
+                        encryptedBackupExportPassword,
+                        encryptedBackupExportConfirmation
+                    ))
+                }
+                Button("Cancel", role: .cancel) {
+                    encryptedBackupExportPassword = ""
+                    encryptedBackupExportConfirmation = ""
+                    viewStore.send(.encryptedBackupPreparationCancelled)
+                }
+            } message: {
+                if let message = viewStore.encryptedBackupPreparationErrorMessage {
+                    Text(message)
+                } else {
+                    Text("Use 12–1024 characters and enter the same password twice. Store it separately: Report Writer cannot recover a forgotten backup password.")
+                }
             }
         }
+    }
+
+    private func beginSavingPreparedFile(
+        _ preparedFile: AppFeature.PreparedFile?,
+        selectedProjectID: String?,
+        viewStore: ViewStore<AppFeature.State, AppFeature.Action>
+    ) {
+        guard let preparedFile,
+              !preparedFile.isStale,
+              preparedFile.purpose != .projectOutput || preparedFile.projectID == selectedProjectID
+        else {
+            viewStore.send(.fileExportFailed("The prepared file is no longer current. Dismiss it and prepare a new file from verified local state."))
+            return
+        }
+        do {
+            exportDocument = try PreparedExportDocument(url: preparedFile.url)
+            isExportingFile = true
+        } catch {
+            viewStore.send(.fileExportFailed(userVisibleErrorMessage(error)))
+        }
+    }
+
+    private func beginSharingPreparedFile(
+        _ preparedFile: AppFeature.PreparedFile?,
+        selectedProjectID: String?,
+        viewStore: ViewStore<AppFeature.State, AppFeature.Action>
+    ) {
+        guard let preparedFile,
+              !preparedFile.isStale,
+              preparedFile.purpose != .projectOutput || preparedFile.projectID == selectedProjectID
+        else {
+            viewStore.send(.fileShareFailed("The prepared file is no longer current. Dismiss it and prepare a new file from verified local state."))
+            return
+        }
+        sharePresentation = SharePresentation(url: preparedFile.url)
+        viewStore.send(.fileShareStarted(preparedFile.url))
     }
 
     private var importBinding: Binding<Bool> {
@@ -292,6 +427,7 @@ public struct AppView: View {
         _ result: Result<URL, Error>,
         viewStore: ViewStore<AppFeature.State, AppFeature.Action>
     ) {
+        defer { exportDocument = nil }
         switch result {
         case let .success(url):
             viewStore.send(.fileExportSaved(url))
@@ -428,4 +564,9 @@ private struct ProjectCreationSheet: View {
 private struct ProjectDeletionCandidate: Identifiable, Equatable {
     let id: String
     let name: String
+}
+
+private struct InvalidProjectRemovalCandidate: Identifiable, Equatable {
+    let id: String
+    let redactedProjectLabel: String
 }

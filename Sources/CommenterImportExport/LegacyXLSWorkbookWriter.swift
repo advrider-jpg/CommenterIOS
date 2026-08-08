@@ -77,6 +77,14 @@ enum LegacyXLSWorkbookWriter {
         }
     }
 
+    static func labelValues(_ data: Data) throws -> [String] {
+        let stream = try workbookStream(from: data)
+        return try biffRecords(stream).compactMap { record in
+            guard record.id == 0x0204, record.payload.count >= 9 else { return nil }
+            return decodeXLUnicodeString(record.payload, offset: 6)
+        }
+    }
+
     private static func biffWorkbookStream(rows: [[String]], sheetName: String) throws -> Data {
         let sheet = try worksheetStream(rows: rows)
         let globalsWithoutOffset = try globalsStream(sheetOffset: 0, sheetName: sheetName)
@@ -129,13 +137,19 @@ enum LegacyXLSWorkbookWriter {
 
     private static func boundsheetPayload(sheetOffset: UInt32, sheetName: String) -> Data {
         let safeName = safeSheetName(sheetName)
+        let nameUnits = Array(safeName.utf16)
         var payload = Data()
         payload.appendUInt32LE(sheetOffset)
         payload.appendUInt8(0)
         payload.appendUInt8(0)
-        payload.appendUInt8(UInt8(safeName.count))
-        payload.appendUInt8(0)
-        payload.append(Data(safeName.utf8))
+        payload.appendUInt8(UInt8(nameUnits.count))
+        if nameUnits.allSatisfy({ $0 <= 0x00ff }) {
+            payload.appendUInt8(0)
+            payload.append(contentsOf: nameUnits.map { UInt8($0 & 0x00ff) })
+        } else {
+            payload.appendUInt8(1)
+            nameUnits.forEach { payload.appendUInt16LE($0) }
+        }
         return payload
     }
 
@@ -184,7 +198,17 @@ enum LegacyXLSWorkbookWriter {
 
     private static func compoundFile(workbookStream: Data) throws -> Data {
         guard workbookStream.count <= Int(UInt32.max) else { throw LegacyXLSWorkbookError.workbookTooLarge }
-        let workbookSectorCount = max(1, sectorCount(for: workbookStream.count))
+        // Streams smaller than the compound-file mini-stream cutoff must normally
+        // be stored in a mini stream. This deliberately small writer has no mini
+        // stream, so pad the Workbook stream to the 4 KB cutoff and store it in
+        // the regular FAT chain. Recording the padded size keeps the file valid
+        // for readers that enforce the cutoff instead of accepting our old,
+        // non-conforming short regular stream.
+        var storedWorkbookStream = workbookStream
+        if storedWorkbookStream.count < 4_096 {
+            storedWorkbookStream.append(Data(repeating: 0, count: 4_096 - storedWorkbookStream.count))
+        }
+        let workbookSectorCount = max(1, sectorCount(for: storedWorkbookStream.count))
         var fatSectorCount = 1
         while true {
             let totalSectors = workbookSectorCount + fatSectorCount + 1
@@ -200,9 +224,9 @@ enum LegacyXLSWorkbookWriter {
         guard totalSectors <= Int(UInt32.max) else { throw LegacyXLSWorkbookError.workbookTooLarge }
 
         var data = compoundHeader(fatSectors: (0..<fatSectorCount).map { UInt32(fatStart + $0) }, directorySector: UInt32(directorySector))
-        data.append(paddedSectorData(workbookStream))
+        data.append(paddedSectorData(storedWorkbookStream))
         data.append(fatData(workbookSectorCount: workbookSectorCount, fatSectorCount: fatSectorCount, totalSectors: totalSectors))
-        data.append(directoryData(workbookStartSector: 0, workbookSize: workbookStream.count))
+        data.append(directoryData(workbookStartSector: 0, workbookSize: storedWorkbookStream.count))
         return data
     }
 
@@ -327,7 +351,7 @@ enum LegacyXLSWorkbookWriter {
         let start = 8
         if flags & 0x01 == 0 {
             guard start + length <= payload.count else { return nil }
-            return String(bytes: payload[start..<start + length], encoding: .utf8)
+            return String(data: Data(payload[start..<start + length]), encoding: .isoLatin1)
         }
         guard start + (length * 2) <= payload.count else { return nil }
         return String(decoding: stride(from: start, to: start + (length * 2), by: 2).map { payload.uint16LE(at: $0) }, as: UTF16.self)
@@ -340,7 +364,7 @@ enum LegacyXLSWorkbookWriter {
         let start = offset + 3
         if flags & 0x01 == 0 {
             guard start + length <= payload.count else { return nil }
-            return String(bytes: payload[start..<start + length], encoding: .utf8)
+            return String(data: Data(payload[start..<start + length]), encoding: .isoLatin1)
         }
         guard start + (length * 2) <= payload.count else { return nil }
         return String(decoding: stride(from: start, to: start + (length * 2), by: 2).map { payload.uint16LE(at: $0) }, as: UTF16.self)
@@ -350,7 +374,16 @@ enum LegacyXLSWorkbookWriter {
         let invalid = CharacterSet(charactersIn: #"\/?*[]:"#)
         let cleaned = String(name.unicodeScalars.map { invalid.contains($0) ? " " : Character($0) })
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return String((cleaned.isEmpty ? "Sheet" : cleaned).prefix(31))
+        let candidate = cleaned.isEmpty ? "Sheet" : cleaned
+        var safe = ""
+        var utf16Count = 0
+        for character in candidate {
+            let characterCount = character.utf16.count
+            guard utf16Count + characterCount <= 31 else { break }
+            safe.append(character)
+            utf16Count += characterCount
+        }
+        return safe.isEmpty ? "Sheet" : safe
     }
 
     private static func compoundDirectoryName(_ name: String) -> Data {

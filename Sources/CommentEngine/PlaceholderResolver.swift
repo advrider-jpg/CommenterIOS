@@ -100,7 +100,8 @@ public func buildPlaceholderContext(
     overrides: [String: String] = [:]
 ) -> PlaceholderContext {
     let pronouns = getPronounSet(student: student)
-    let focus = result.focusStrand == "none" ? nil : result.focusStrand?.trimmedNonEmpty
+    let rawFocus = result.focusStrand?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let focus = rawFocus?.lowercased() == "none" ? nil : rawFocus?.trimmedNonEmpty
     let evidence = result.evidenceText?.trimmedNonEmpty
     return PlaceholderContext(
         displayName: overrides["displayName"] ?? getDisplayName(student: student, projectMetadata: projectMetadata),
@@ -195,7 +196,7 @@ public func normalizeReportContextField(_ value: String?) -> String? {
         .trimmingCharacters(in: .whitespacesAndNewlines)
     let emptyMarkers = ["", "n/a", "na", "not applicable", "none", "null", "-", "\u{2014}"]
     guard !emptyMarkers.contains(normalized.lowercased()) else { return nil }
-    guard normalized.count <= 120 else { return nil }
+    guard normalized.utf16.count <= 120 else { return nil }
     guard findUnresolvedPlaceholders(normalized).isEmpty else { return nil }
     return normalized
 }

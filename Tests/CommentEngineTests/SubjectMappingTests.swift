@@ -40,4 +40,42 @@ final class SubjectMappingTests: XCTestCase {
         XCTAssertTrue(subjectMatchesUiSubject(datasetSubject: "Digital Technologies", uiSubject: "Technologies", datasetSubjects: subjects))
         XCTAssertFalse(subjectMatchesUiSubject(datasetSubject: "Music", uiSubject: "Technologies", datasetSubjects: subjects))
     }
+
+    func testLearningFocusMapsToDetailedProductionCurriculumStrands() {
+        XCTAssertTrue(
+            componentStrandMatchesLearningFocus(
+                uiSubject: "English",
+                learningFocus: "Writing",
+                componentStrand: "Creating texts"
+            )
+        )
+        XCTAssertTrue(
+            componentStrandMatchesLearningFocus(
+                uiSubject: "Maths",
+                learningFocus: "Measurement",
+                componentStrand: "Space"
+            )
+        )
+        XCTAssertTrue(
+            componentStrandMatchesLearningFocus(
+                uiSubject: "Health and P.E.",
+                learningFocus: "Movement and physical activity",
+                componentStrand: "Learning through movement"
+            )
+        )
+        XCTAssertFalse(
+            componentStrandMatchesLearningFocus(
+                uiSubject: "English",
+                learningFocus: "Reading",
+                componentStrand: "Creating texts"
+            )
+        )
+        XCTAssertFalse(
+            componentStrandMatchesLearningFocus(
+                uiSubject: "English",
+                learningFocus: "Reading",
+                componentStrand: nil
+            )
+        )
+    }
 }

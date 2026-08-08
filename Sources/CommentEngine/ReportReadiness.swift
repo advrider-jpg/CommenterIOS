@@ -9,6 +9,7 @@ public enum ReportReadinessStatus: String, Codable, Equatable, Sendable {
     case missingReport = "missing-report"
     case unresolvedPlaceholder = "unresolved-placeholder"
     case languageQualityIssue = "language-quality-issue"
+    case needsTeacherCheck = "needs-teacher-check"
     case aiNeedsReview = "ai-needs-review"
     case aiValidationBlocked = "ai-validation-blocked"
     case staleReport = "stale-report"
@@ -169,9 +170,7 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
     }
 
     let report = project.reports.first { $0.studentId == studentId && $0.subject == subject }
-    let text = report.map { report in
-        report.manualEdit ?? report.text
-    }
+    let text = report.map(\.exportText)
     guard let report, let text, text.trimmedNonEmpty != nil else {
         return ReportReadiness(
             status: .missingReport,
@@ -179,6 +178,25 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
             subject: subject,
             studentName: resultReadiness.studentName,
             message: "\(resultReadiness.studentName) needs a draft report for \(subject).",
+            result: result,
+            report: report
+        )
+    }
+
+    let expectedFingerprint = buildGenerationFingerprint(
+        projectMetadata: project.metadata,
+        student: student,
+        result: result,
+        concreteSubject: report.concreteSubject ?? subject
+    )
+    let stale = report.resultFingerprint != expectedFingerprint
+    if stale {
+        return ReportReadiness(
+            status: report.isLocked ? .lockedStale : .staleReport,
+            studentId: studentId,
+            subject: subject,
+            studentName: resultReadiness.studentName,
+            message: "\(resultReadiness.studentName)'s \(subject) draft needs updating because the result or focus area changed.",
             result: result,
             report: report
         )
@@ -218,7 +236,21 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
     }
 
     if report.requiresTeacherApprovalForExport {
-        if report.lastValidation?.status == .blocked {
+        let currentFingerprint = stableTextFingerprint(text)
+        guard let validation = report.lastValidation,
+              validation.textFingerprint == currentFingerprint
+        else {
+            return ReportReadiness(
+                status: .aiNeedsReview,
+                studentId: studentId,
+                subject: subject,
+                studentName: resultReadiness.studentName,
+                message: "\(resultReadiness.studentName)'s \(subject) AI draft must be validated and teacher-reviewed in its current form before export.",
+                result: result,
+                report: report
+            )
+        }
+        if validation.status == .blocked {
             return ReportReadiness(
                 status: .aiValidationBlocked,
                 studentId: studentId,
@@ -229,7 +261,22 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
                 report: report
             )
         }
-        let currentFingerprint = stableTextFingerprint(text)
+        if validation.status == .passedWithWarnings {
+            guard let warningReview = report.validationWarningReview,
+                  warningReview.validationFingerprint == currentFingerprint,
+                  warningReview.reviewedAt >= validation.validatedAt
+            else {
+                return ReportReadiness(
+                    status: .aiNeedsReview,
+                    studentId: studentId,
+                    subject: subject,
+                    studentName: resultReadiness.studentName,
+                    message: "\(resultReadiness.studentName)'s \(subject) AI draft has validation warnings that the teacher must review before export.",
+                    result: result,
+                    report: report
+                )
+            }
+        }
         guard report.reviewState?.status == .approved,
               report.reviewState?.approvalFingerprint == currentFingerprint,
               report.approvedTextFingerprint == currentFingerprint
@@ -246,20 +293,13 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
         }
     }
 
-    let expectedFingerprint = buildGenerationFingerprint(
-        projectMetadata: project.metadata,
-        student: student,
-        result: result,
-        concreteSubject: report.concreteSubject ?? subject
-    )
-    let stale = report.resultFingerprint != expectedFingerprint
-    if stale {
+    if !report.requiresTeacherApprovalForExport, (report.reviewedAt ?? 0) <= 0 {
         return ReportReadiness(
-            status: report.isLocked ? .lockedStale : .staleReport,
+            status: .needsTeacherCheck,
             studentId: studentId,
             subject: subject,
             studentName: resultReadiness.studentName,
-            message: "\(resultReadiness.studentName)'s \(subject) draft needs updating because the result or focus area changed.",
+            message: "This draft passes the app checks. Read it and mark it Done before export.",
             result: result,
             report: report
         )
@@ -296,6 +336,8 @@ public func readinessLabel(_ status: ReportReadinessStatus) -> String {
         return "Contains template text"
     case .languageQualityIssue:
         return "Language check needed"
+    case .needsTeacherCheck:
+        return "Draft"
     case .aiNeedsReview:
         return "AI review needed"
     case .aiValidationBlocked:
@@ -315,7 +357,7 @@ public func readinessLabel(_ status: ReportReadinessStatus) -> String {
 
 public extension GeneratedReport {
     var exportText: String {
-        manualEdit?.isEmpty == false ? manualEdit ?? "" : text
+        manualEdit ?? text
     }
 
     var requiresTeacherApprovalForExport: Bool {
@@ -402,7 +444,7 @@ public func firstBlockingLanguageIssue(_ result: ReportLanguageLintResult) -> Re
 private func hasValidConcreteFocus(subject: String, result: AchievementResult?) -> Bool {
     guard subjectRequiresConcreteFocus(subject) else { return true }
     let focus = (result?.focusStrand ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !focus.isEmpty, focus != "none" else { return false }
+    guard !focus.isEmpty, focus.lowercased() != "none" else { return false }
     return getConcreteFocusOptions(subject).contains { $0.localizedCaseInsensitiveCompare(focus) == .orderedSame }
 }
 
@@ -439,15 +481,21 @@ private let articlePatterns: [SevereLanguagePattern] = [
 private func wrongPronounIssue(text: String, expectedSubjectPronoun: String) -> ReportLanguageIssue? {
     let expected = expectedSubjectPronoun.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     guard ["he", "she", "they"].contains(expected) else { return nil }
-    guard let match = firstMatch(pattern: #"(?:^|[.!?]\s+)(He|She|They)\b"#, in: text),
-          let pronoun = firstMatch(pattern: #"\b(He|She|They)\b"#, in: match)
-    else { return nil }
-    guard pronoun.lowercased() != expected else { return nil }
+    guard let regex = try? NSRegularExpression(pattern: #"\b(he|she|they)\b"#, options: [.caseInsensitive]) else { return nil }
+    let range = NSRange(text.startIndex..<text.endIndex, in: text)
+    let pronoun = regex.matches(in: text, range: range).compactMap { match -> String? in
+        guard let matchRange = Range(match.range(at: 1), in: text) else { return nil }
+        let value = String(text[matchRange])
+        let normalized = value.lowercased()
+        if normalized == expected || normalized == "they" { return nil }
+        return value
+    }.first
+    guard let pronoun else { return nil }
     return ReportLanguageIssue(
         code: "wrong-pronoun",
         severity: .error,
         message: "The report uses \"\(pronoun)\" where the student's subject pronoun is \"\(expectedSubjectPronoun)\".",
-        excerpt: match,
+        excerpt: pronoun,
         suggestion: "Use \"\(expectedSubjectPronoun)\" for this student.",
         source: .customRule
     )

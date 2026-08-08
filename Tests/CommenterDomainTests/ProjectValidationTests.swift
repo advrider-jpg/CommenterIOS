@@ -63,6 +63,15 @@ final class ProjectValidationTests: XCTestCase {
         XCTAssertTrue(result.issues.contains("Learning context / activity must be a short phrase, not a sentence."))
     }
 
+    func testStoredValidationCountsContextLimitsAsLiveUTF16Units() {
+        var project = fixtureProject()
+        project.results[0].textType = String(repeating: "😀", count: 61)
+
+        XCTAssertTrue(
+            validateStoredProjectShape(project).issues.contains("Text type / genre must be 120 characters or fewer.")
+        )
+    }
+
     func testStoredValidationTreatsEmptyContextMarkersAsEmpty() {
         var project = fixtureProject()
         project.results[0].textType = "n/a"
@@ -86,6 +95,75 @@ final class ProjectValidationTests: XCTestCase {
         ]
 
         XCTAssertTrue(validateStoredProjectShape(project).ok)
+    }
+
+    func testStoredValidationRejectsUnsafePersistenceRevisionAndBlankFingerprint() {
+        var project = fixtureProject()
+        project.metadata.persistence = ProjectPersistenceMetadata(
+            revision: -1,
+            savedAt: -1,
+            savedBy: " ",
+            fingerprint: " "
+        )
+
+        let result = validateStoredProjectShape(project)
+
+        XCTAssertTrue(result.issues.contains("Project revision metadata is invalid."))
+        XCTAssertTrue(result.issues.contains("Project fingerprint metadata is invalid."))
+    }
+
+    func testStoredValidationRejectsBlankStudentIdentifier() {
+        var project = fixtureProject()
+        project.roster[0].id = " "
+        project.results[0].studentId = " "
+        project.reports[0].studentId = " "
+
+        let result = validateStoredProjectShape(project)
+
+        XCTAssertTrue(result.issues.contains("Student ids are required."))
+    }
+
+    func testStoredValidationAllowsSameNameStudentsWithStableUniqueIdentifiers() {
+        var project = fixtureProject()
+        project.roster.append(
+            Student(id: "s2", firstName: "Ava", lastName: "Ng", yearLevel: .year5)
+        )
+
+        XCTAssertTrue(validateStoredProjectShape(project).ok)
+    }
+
+    func testStoredValidationRejectsStaleCurrentAndApprovalFingerprints() {
+        var project = fixtureProject()
+        project.reports[0].currentTextFingerprint = "stale-current"
+        project.reports[0].reviewState = ReportReviewState(
+            status: .approved,
+            reviewedAt: 2,
+            approvedAt: 2,
+            approvalFingerprint: "stale-approval"
+        )
+        project.reports[0].approvedTextFingerprint = "stale-approved-text"
+
+        let result = validateStoredProjectShape(project)
+
+        XCTAssertTrue(result.issues.contains("A report's current-text fingerprint does not match its saved text."))
+        XCTAssertTrue(result.issues.contains("An approved report does not match its teacher approval fingerprint."))
+    }
+
+    func testStoredValidationTreatsAnExplicitlyEmptyManualEditAsCurrentText() {
+        var project = fixtureProject()
+        project.reports[0].manualEdit = ""
+        project.reports[0].currentTextFingerprint = stableTextFingerprint("")
+
+        XCTAssertTrue(validateStoredProjectShape(project).ok)
+    }
+
+    func testStoredValidationRejectsNegativeTeacherReviewTimestamp() {
+        var project = fixtureProject()
+        project.reports[0].reviewedAt = -1
+
+        XCTAssertTrue(
+            validateStoredProjectShape(project).issues.contains("A report's teacher-review timestamp is invalid.")
+        )
     }
 
     private func fixtureProject() -> Project {

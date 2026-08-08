@@ -93,6 +93,43 @@ final class ProductionCommentDatasetTests: XCTestCase {
         XCTAssertTrue(validation.diagnostics.warnings.contains { $0.contains("UniquenessGuard has no eligible records") })
     }
 
+    func testDatasetDiagnosticsRejectInvalidRecipeContractsAndNonpositiveGuards() throws {
+        let raw = #"""
+        {
+          "ComponentBank": [
+            { "Key_ID": "c1", "Subject": "English", "Type": "Strength", "Level": "Year 5", "Band": "At Standard", "Text": "[Student Name] writes." }
+          ],
+          "RecipeBank": [
+            { "Recipe_ID": "valid", "Pattern": "{Strength}", "ComponentMode": "sentence-components", "RequiredTypes": ["Strength"] },
+            { "Recipe_ID": "valid", "Pattern": "{Strength}" },
+            { "Recipe_ID": "bad-mode", "Pattern": "{Strength}", "ComponentMode": "paragraph-components" },
+            { "Recipe_ID": "bad-shape", "Pattern": "{Strength}", "RequiredTypes": { "Strength": true } },
+            { "Recipe_ID": "bad-type", "Pattern": "{Strength}", "RequiredTypes": ["Summary"] }
+          ],
+          "AssembledVariants": [
+            { "Variant_ID": "v1", "Key_ID": "c1", "Text": "[Student Name] writes." }
+          ],
+          "UniquenessGuard": [
+            { "Rule": "MaxUsagePerClass", "Value": 2 },
+            { "Rule": "Zero", "Value": 0 },
+            { "Rule": "Negative", "Value": -1 },
+            { "Rule": "Boolean", "Value": true },
+            { "Rule": "OutOfRange", "Value": 1e300 }
+          ]
+        }
+        """#
+
+        let validation = try ProductionCommentDataset.diagnose(rawData: Data(raw.utf8))
+
+        XCTAssertTrue(validation.diagnostics.valid)
+        XCTAssertEqual(validation.diagnostics.recipeCount, 2)
+        XCTAssertEqual(validation.diagnostics.rejected[.recipeBank]?.malformed, 3)
+        XCTAssertTrue(validation.diagnostics.warnings.contains { $0.contains("Duplicate RecipeBank Recipe_ID") })
+        XCTAssertEqual(validation.diagnostics.uniquenessGuardCount, 1)
+        XCTAssertEqual(validation.diagnostics.rejected[.uniquenessGuard]?.missingRequiredFields, 4)
+        XCTAssertEqual(validation.diagnostics.uniquenessRules, ["MaxUsagePerClass": 2])
+    }
+
     func testPlaceholderResolutionRequiresRealContext() {
         let metadata = ProjectMetadata(
             id: "project-1",
@@ -178,6 +215,18 @@ final class ProductionCommentDatasetTests: XCTestCase {
             .error
         )
         XCTAssertEqual(
+            reportContextPhraseFeedback(value: "Ada planned a paragraph", label: "Text type / genre", example: "persuasive paragraph")?.tone,
+            .error
+        )
+        XCTAssertEqual(
+            reportContextPhraseFeedback(value: "Ada described a character", label: "Text type / genre", example: "persuasive paragraph")?.tone,
+            .error
+        )
+        XCTAssertEqual(
+            reportContextPhraseFeedback(value: String(repeating: "😀", count: 61), label: "Text type / genre", example: "persuasive paragraph")?.tone,
+            .error
+        )
+        XCTAssertEqual(
             evidenceInputFeedback(value: "inferring character motivation", student: student, subject: "English", result: result, projectMetadata: metadata)?.tone,
             .success
         )
@@ -188,6 +237,37 @@ final class ProductionCommentDatasetTests: XCTestCase {
         XCTAssertEqual(
             reportNoteInputFeedback(value: "They use feedback", student: student, subject: "English", result: result, projectMetadata: metadata)?.detail,
             "Preview after wording check: \"She uses feedback.\"."
+        )
+    }
+
+    func testPlaceholderContextTreatsCaseVariedNoneFocusAsMissingContext() {
+        let metadata = ProjectMetadata(
+            id: "project-1",
+            name: "Room 1",
+            term: "Term 1",
+            yearLevel: .year5,
+            createdAt: 0,
+            updatedAt: 0,
+            useFirstNameOnly: true
+        )
+        let student = Student(id: "student-1", firstName: "Ada", lastName: "Lovelace", yearLevel: .year5)
+        let result = AchievementResult(
+            studentId: student.id,
+            subject: "English",
+            achievementLevel: .atStandard,
+            focusStrand: " None "
+        )
+        let context = buildPlaceholderContext(
+            student: student,
+            subject: "English",
+            result: result,
+            projectMetadata: metadata
+        )
+
+        XCTAssertNil(context.unitTopic)
+        XCTAssertEqual(
+            resolveReportPlaceholders(text: "{StudentName} worked in [unit/topic].", context: context).missingContext,
+            ["[unit/topic]"]
         )
     }
 }

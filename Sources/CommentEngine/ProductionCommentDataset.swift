@@ -105,6 +105,7 @@ public enum ProductionCommentDataset {
             components.append(component)
         }
 
+        var recipeIds = Set<String>()
         let recipes: [Recipe] = rawRecipes.compactMap { entry in
             guard let record = entry as? [String: Any] else {
                 rejected[.recipeBank, default: RejectionCount()].malformed += 1
@@ -114,11 +115,35 @@ public enum ProductionCommentDataset {
                 rejected[.recipeBank, default: RejectionCount()].missingRequiredFields += 1
                 return nil
             }
-            let requiredTypes = stringArray(record, field: "RequiredTypes")?.compactMap(Component.ComponentType.init(rawValue:))
+            let componentMode = requiredString(record, field: "ComponentMode")
+            if let componentMode,
+               componentMode != "sentence-components",
+               componentMode != "phrase-components" {
+                rejected[.recipeBank, default: RejectionCount()].malformed += 1
+                warnings.append("RecipeBank record \(requiredString(record, field: "Recipe_ID") ?? "(unknown)") has an unsupported ComponentMode and was excluded.")
+                return nil
+            }
+            let rawRequiredTypes = stringArray(record, field: "RequiredTypes")
+            if let rawRequiredTypesValue = record["RequiredTypes"],
+               !(rawRequiredTypesValue is NSNull),
+               rawRequiredTypes == nil {
+                rejected[.recipeBank, default: RejectionCount()].malformed += 1
+                return nil
+            }
+            let requiredTypes = rawRequiredTypes?.compactMap(Component.ComponentType.init(rawValue:))
+            if let rawRequiredTypes, requiredTypes?.count != rawRequiredTypes.count {
+                rejected[.recipeBank, default: RejectionCount()].malformed += 1
+                warnings.append("RecipeBank record \(requiredString(record, field: "Recipe_ID") ?? "(unknown)") declares an unsupported component type and was excluded.")
+                return nil
+            }
+            let recipeID = requiredString(record, field: "Recipe_ID") ?? ""
+            if !recipeIds.insert(recipeID).inserted {
+                warnings.append("Duplicate RecipeBank Recipe_ID encountered: \(recipeID).")
+            }
             return Recipe(
-                recipeID: requiredString(record, field: "Recipe_ID") ?? "",
+                recipeID: recipeID,
                 pattern: requiredString(record, field: "Pattern") ?? "",
-                componentMode: requiredString(record, field: "ComponentMode"),
+                componentMode: componentMode,
                 requiredTypes: requiredTypes?.isEmpty == true ? nil : requiredTypes
             )
         }
@@ -160,7 +185,12 @@ public enum ProductionCommentDataset {
                 rejected[.uniquenessGuard, default: RejectionCount()].malformed += 1
                 return nil
             }
-            guard hasRequiredStrings(record, fields: requiredGuardFields), let value = numericValue(record["Value"]), value.isFinite else {
+            guard hasRequiredStrings(record, fields: requiredGuardFields),
+                  let value = numericValue(record["Value"]),
+                  value.isFinite,
+                  value > 0,
+                  value < Double(Int.max)
+            else {
                 rejected[.uniquenessGuard, default: RejectionCount()].missingRequiredFields += 1
                 return nil
             }
@@ -288,6 +318,7 @@ public enum ProductionCommentDataset {
     }
 
     private static func numericValue(_ value: Any?) -> Double? {
+        if value is Bool { return nil }
         if let number = value as? NSNumber {
             return number.doubleValue
         }

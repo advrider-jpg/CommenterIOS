@@ -9,6 +9,10 @@ private struct BulkAIPolishCancelID: Hashable {}
 
 extension AppFeature {
     func reduceProjectAIWorkflow(_ state: inout State, _ action: Action) -> Effect<Action> {
+        if isAIWorkRunning(state), !isAIWorkflowContinuation(action) {
+            state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before starting another AI or review action.")
+            return .none
+        }
         switch action {
         case let .reportAIPolishTapped(studentId, subject):
             guard state.pendingImport == nil, !isLongRunningProjectOperation(state.projectStorageStatus) else {
@@ -17,6 +21,14 @@ extension AppFeature {
             }
             guard !state.isBulkAIRevisionRunning else {
                 state.operationStatus = .failed("Cancel or finish the running bulk AI revision before requesting a single AI revision.")
+                return .none
+            }
+            guard state.activeAIRequest == nil else {
+                state.operationStatus = .failed("Wait for the current on-device AI request to finish before requesting another revision.")
+                return .none
+            }
+            guard state.pendingAIRevision == nil else {
+                state.operationStatus = .failed("Accept or reject the waiting single-report AI preview before requesting another revision.")
                 return .none
             }
             guard case .checked(.available) = state.aiAvailabilityStatus else {
@@ -33,13 +45,22 @@ extension AppFeature {
                 state.operationStatus = .failed("Unlock this draft before requesting an AI revision.")
                 return .none
             }
+            guard matchingPendingRevision(state, studentId: studentId, subject: subject) == nil else {
+                state.operationStatus = .failed("Accept or reject the waiting AI preview before requesting another revision.")
+                return .none
+            }
             let currentText = report.exportText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !currentText.isEmpty else {
                 state.operationStatus = .failed("A draft must contain report text before AI can revise it.")
                 return .none
             }
-            state.pendingAIRevision = nil
             state.latestReportCheck = nil
+            state.activeAIRequest = ActiveAIRequest(
+                projectID: project.metadata.id,
+                studentID: studentId,
+                subject: subject,
+                kind: .polish
+            )
             state.operationStatus = .busy("Requesting an on-device AI revision for teacher review.")
             let requestOriginalText = report.exportText
             let request = AIReportRevisionRequest(
@@ -54,11 +75,15 @@ extension AppFeature {
                     let result = try await aiClient.reviseDeterministicDraft(request)
                     await send(.reportAIPolishCompleted(studentId, subject, requestOriginalText, result))
                 } catch {
-                    await send(.reportAIPolishFailed(studentId, subject, error.localizedDescription))
+                    await send(.reportAIPolishFailed(studentId, subject, userVisibleErrorMessage(error)))
                 }
             }
 
         case let .reportAIPolishCompleted(studentId, subject, originalText, result):
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .polish) else {
+                state.operationStatus = .failed("The AI revision returned after its original project or draft was no longer active. The result was discarded.")
+                return .none
+            }
             guard let project = state.selectedProject,
                   let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
             else {
@@ -97,6 +122,9 @@ extension AppFeature {
             return .none
 
         case let .reportAIPolishFailed(studentId, subject, message):
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .polish) else {
+                return .none
+            }
             clearPendingAIRevision(&state, studentId: studentId, subject: subject)
             state.operationStatus = .failed("AI revision did not change the draft: \(message)")
             return .none
@@ -108,6 +136,14 @@ extension AppFeature {
             }
             guard !state.isBulkAIRevisionRunning else {
                 state.operationStatus = .failed("Cancel or finish the running bulk AI revision before requesting an AI tone adjustment.")
+                return .none
+            }
+            guard state.activeAIRequest == nil else {
+                state.operationStatus = .failed("Wait for the current on-device AI request to finish before requesting a tone adjustment.")
+                return .none
+            }
+            guard state.pendingAIRevision == nil else {
+                state.operationStatus = .failed("Accept or reject the waiting single-report AI preview before requesting a tone adjustment.")
                 return .none
             }
             guard case .checked(.available) = state.aiAvailabilityStatus else {
@@ -124,13 +160,22 @@ extension AppFeature {
                 state.operationStatus = .failed("Unlock this draft before requesting an AI tone adjustment.")
                 return .none
             }
+            guard matchingPendingRevision(state, studentId: studentId, subject: subject) == nil else {
+                state.operationStatus = .failed("Accept or reject the waiting AI preview before requesting a tone adjustment.")
+                return .none
+            }
             let currentText = report.exportText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !currentText.isEmpty else {
                 state.operationStatus = .failed("A draft must contain report text before AI can adjust its tone.")
                 return .none
             }
-            state.pendingAIRevision = nil
             state.latestReportCheck = nil
+            state.activeAIRequest = ActiveAIRequest(
+                projectID: project.metadata.id,
+                studentID: studentId,
+                subject: subject,
+                kind: .toneAdjustment
+            )
             state.operationStatus = .busy("Requesting an on-device AI tone adjustment for teacher review.")
             let requestOriginalText = report.exportText
             let request = AIReportRevisionRequest(
@@ -145,11 +190,15 @@ extension AppFeature {
                     let result = try await aiClient.adjustTone(request)
                     await send(.reportAIToneAdjustCompleted(studentId, subject, requestOriginalText, result))
                 } catch {
-                    await send(.reportAIToneAdjustFailed(studentId, subject, error.localizedDescription))
+                    await send(.reportAIToneAdjustFailed(studentId, subject, userVisibleErrorMessage(error)))
                 }
             }
 
         case let .reportAIToneAdjustCompleted(studentId, subject, originalText, result):
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .toneAdjustment) else {
+                state.operationStatus = .failed("The AI tone adjustment returned after its original project or draft was no longer active. The result was discarded.")
+                return .none
+            }
             guard let project = state.selectedProject,
                   let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
             else {
@@ -188,6 +237,9 @@ extension AppFeature {
             return .none
 
         case let .reportAIToneAdjustFailed(studentId, subject, message):
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .toneAdjustment) else {
+                return .none
+            }
             clearPendingAIRevision(&state, studentId: studentId, subject: subject)
             state.operationStatus = .failed("AI tone adjustment did not change the draft: \(message)")
             return .none
@@ -199,6 +251,14 @@ extension AppFeature {
             }
             guard !state.isBulkAIRevisionRunning else {
                 state.operationStatus = .failed("Cancel or finish the running bulk AI revision before requesting an AI evidence draft.")
+                return .none
+            }
+            guard state.activeAIRequest == nil else {
+                state.operationStatus = .failed("Wait for the current on-device AI request to finish before requesting an evidence draft.")
+                return .none
+            }
+            guard state.pendingAIRevision == nil else {
+                state.operationStatus = .failed("Accept or reject the waiting single-report AI preview before requesting an evidence draft.")
                 return .none
             }
             guard case .checked(.available) = state.aiAvailabilityStatus else {
@@ -226,8 +286,13 @@ extension AppFeature {
                 state.operationStatus = .failed("Add report-safe evidence, learning context, or a report emphasis note before requesting an AI evidence draft.")
                 return .none
             }
-            state.pendingAIRevision = nil
             state.latestReportCheck = nil
+            state.activeAIRequest = ActiveAIRequest(
+                projectID: project.metadata.id,
+                studentID: studentId,
+                subject: subject,
+                kind: .evidenceDraft
+            )
             state.operationStatus = .busy("Requesting an on-device AI draft from report-safe evidence for teacher review.")
             let requestOriginalText = report.exportText
             let request = AIReportDraftRequest(
@@ -242,11 +307,15 @@ extension AppFeature {
                     let result = try await aiClient.draftFromEvidence(request)
                     await send(.reportAIDraftFromEvidenceCompleted(studentId, subject, requestOriginalText, result))
                 } catch {
-                    await send(.reportAIDraftFromEvidenceFailed(studentId, subject, error.localizedDescription))
+                    await send(.reportAIDraftFromEvidenceFailed(studentId, subject, userVisibleErrorMessage(error)))
                 }
             }
 
         case let .reportAIDraftFromEvidenceCompleted(studentId, subject, originalText, result):
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .evidenceDraft) else {
+                state.operationStatus = .failed("The AI evidence draft returned after its original project or draft was no longer active. The result was discarded.")
+                return .none
+            }
             guard let project = state.selectedProject,
                   let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
             else {
@@ -284,6 +353,9 @@ extension AppFeature {
             return .none
 
         case let .reportAIDraftFromEvidenceFailed(studentId, subject, message):
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .evidenceDraft) else {
+                return .none
+            }
             clearPendingAIRevision(&state, studentId: studentId, subject: subject)
             state.operationStatus = .failed("AI evidence draft did not change the draft: \(message)")
             return .none
@@ -295,6 +367,14 @@ extension AppFeature {
             }
             guard !state.isBulkAIRevisionRunning else {
                 state.operationStatus = .failed("Bulk AI revision is already running.")
+                return .none
+            }
+            guard state.activeAIRequest == nil else {
+                state.operationStatus = .failed("Wait for the current on-device AI request to finish before requesting bulk AI revisions.")
+                return .none
+            }
+            guard state.aiReviewQueueCount == 0 else {
+                state.operationStatus = .failed("Accept or reject the waiting AI previews before starting another bulk request.")
                 return .none
             }
             guard case .checked(.available) = state.aiAvailabilityStatus else {
@@ -312,7 +392,6 @@ extension AppFeature {
                 state.operationStatus = .failed("No unlocked draft reports are eligible for bulk AI revision.")
                 return .none
             }
-            state.pendingAIRevision = nil
             state.latestReportCheck = nil
             state.isBulkAIRevisionRunning = true
             state.operationStatus = .busy("Requesting bulk on-device AI revisions for teacher review.")
@@ -337,7 +416,7 @@ extension AppFeature {
                     } catch is CancellationError {
                         throw CancellationError()
                     } catch {
-                        failures.append("\(report.studentId) / \(report.subject): \(error.localizedDescription)")
+                        failures.append("\(report.studentId) / \(report.subject): \(userVisibleErrorMessage(error))")
                     }
                 }
                 await send(.reportBulkAIPolishCompleted(completed, failures))
@@ -345,12 +424,20 @@ extension AppFeature {
             .cancellable(id: BulkAIPolishCancelID(), cancelInFlight: true)
 
         case let .reportBulkAIPolishProgress(completed):
+            guard state.isBulkAIRevisionRunning,
+                  bulkCompletionMatchesCurrentDraft(state, completed: completed)
+            else {
+                return .none
+            }
             appendBulkAIPreview(&state, completed: completed)
             let count = state.pendingAIRevisions.count
             state.operationStatus = .busy("Bulk AI revision queued \(count) teacher-review \(count == 1 ? "preview" : "previews").")
             return .none
 
         case let .reportBulkAIPolishCompleted(completed, failures):
+            guard state.isBulkAIRevisionRunning else {
+                return .none
+            }
             state.isBulkAIRevisionRunning = false
             guard !completed.isEmpty else {
                 state.operationStatus = .failed(
@@ -360,7 +447,13 @@ extension AppFeature {
                 )
                 return .none
             }
-            let previews = completed.map { item in
+            let currentCompleted = completed.filter { bulkCompletionMatchesCurrentDraft(state, completed: $0) }
+            guard !currentCompleted.isEmpty else {
+                let failureDetail = failures.isEmpty ? "" : " \(failures.joined(separator: " | "))"
+                state.operationStatus = .failed("Bulk AI revision produced no current previews; stale results were discarded and draft text stayed unchanged.\(failureDetail)")
+                return .none
+            }
+            let previews = currentCompleted.map { item in
                 PendingAIRevision(
                     id: pendingAIRevisionId(
                         traceId: item.result.trace.traceId,
@@ -390,11 +483,18 @@ extension AppFeature {
                     reviewNotes: first.reviewWarnings
                 )
             }
-            let failureSuffix = failures.isEmpty ? "" : " \(failures.count) draft \(failures.count == 1 ? "failed" : "failed") and stayed unchanged."
-            state.operationStatus = .prepared("\(previews.count) AI revision \(previews.count == 1 ? "preview is" : "previews are") ready for teacher review.\(failureSuffix)")
+            let staleCount = completed.count - currentCompleted.count
+            let failureSuffix = failures.isEmpty
+                ? ""
+                : " \(failures.count) \(failures.count == 1 ? "draft failed" : "drafts failed") and stayed unchanged."
+            let staleSuffix = staleCount == 0 ? "" : " \(staleCount) stale \(staleCount == 1 ? "result was" : "results were") discarded because the draft changed."
+            state.operationStatus = .prepared("\(previews.count) AI revision \(previews.count == 1 ? "preview is" : "previews are") ready for teacher review.\(failureSuffix)\(staleSuffix)")
             return .none
 
         case let .reportBulkAIPolishFailed(message):
+            guard state.isBulkAIRevisionRunning else {
+                return .none
+            }
             state.isBulkAIRevisionRunning = false
             state.operationStatus = .failed("Bulk AI revision did not change the project: \(message)")
             return .none
@@ -425,6 +525,10 @@ extension AppFeature {
                   let report = project.reports.first(where: { $0.studentId == studentId && $0.subject == subject })
             else {
                 state.operationStatus = .failed("The draft is no longer open, so the AI revision was not applied.")
+                return .none
+            }
+            guard !report.isLocked else {
+                state.operationStatus = .failed("Unlock this draft before accepting its AI revision preview.")
                 return .none
             }
             guard stableTextFingerprint(report.exportText) == pending.originalTextFingerprint else {
@@ -480,7 +584,7 @@ extension AppFeature {
                 state.operationStatus = .failed("No AI revision preview is waiting for this draft.")
                 return .none
             }
-            clearPendingAIRevision(&state, studentId: studentId, subject: subject)
+            invalidateAIReviewState(&state, studentID: studentId, subject: subject)
             state.operationStatus = .cancelled("AI revision discarded. The local draft was not changed.")
             return .none
 
@@ -571,8 +675,10 @@ extension AppFeature {
             return .none
 
         case let .reportLocalSafetyCheckFailed(studentId, subject, message):
-            state.latestReportCheck = nil
-            clearPendingAIRevision(&state, studentId: studentId, subject: subject)
+            if state.latestReportCheck?.studentId == studentId,
+               state.latestReportCheck?.subject == subject {
+                state.latestReportCheck = nil
+            }
             state.operationStatus = .failed("Local safety check did not change the draft: \(message)")
             return .none
 
@@ -583,6 +689,10 @@ extension AppFeature {
             }
             guard !state.isBulkAIRevisionRunning else {
                 state.operationStatus = .failed("Cancel or finish the running bulk AI revision before requesting an AI critique.")
+                return .none
+            }
+            guard state.activeAIRequest == nil else {
+                state.operationStatus = .failed("Wait for the current on-device AI request to finish before requesting a critique.")
                 return .none
             }
             guard case .checked(.available) = state.aiAvailabilityStatus else {
@@ -605,6 +715,12 @@ extension AppFeature {
                 return .none
             }
             state.latestReportCheck = nil
+            state.activeAIRequest = ActiveAIRequest(
+                projectID: project.metadata.id,
+                studentID: studentId,
+                subject: subject,
+                kind: .critique
+            )
             state.operationStatus = .busy("Requesting an on-device AI critique for teacher review.")
             let request = AIReportCritiqueRequest(text: report.exportText, context: context)
             return .run { send in
@@ -612,11 +728,15 @@ extension AppFeature {
                     let result = try await aiClient.critiqueReport(request)
                     await send(.reportAICritiqueCompleted(studentId, subject, result))
                 } catch {
-                    await send(.reportAICritiqueFailed(studentId, subject, error.localizedDescription))
+                    await send(.reportAICritiqueFailed(studentId, subject, userVisibleErrorMessage(error)))
                 }
             }
 
         case let .reportAICritiqueCompleted(studentId, subject, result):
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .critique) else {
+                state.operationStatus = .failed("The AI critique returned after its original project or draft was no longer active. The result was discarded.")
+                return .none
+            }
             guard validationMatchesCurrentDraft(state, studentId: studentId, subject: subject, validation: result.validation) else {
                 state.latestReportCheck = nil
                 state.operationStatus = .failed(staleValidationCompletionMessage(kind: "AI critique"))
@@ -648,53 +768,78 @@ extension AppFeature {
             return .none
 
         case let .reportAICritiqueFailed(studentId, subject, message):
-            state.latestReportCheck = nil
-            clearPendingAIRevision(&state, studentId: studentId, subject: subject)
+            guard finishActiveAIRequest(&state, studentID: studentId, subject: subject, kind: .critique) else {
+                return .none
+            }
+            if state.latestReportCheck?.studentId == studentId,
+               state.latestReportCheck?.subject == subject {
+                state.latestReportCheck = nil
+            }
             state.operationStatus = .failed("AI critique did not change the draft: \(message)")
             return .none
 
         case let .projectAIToneProfileChanged(profile):
-            updateSelectedProject(&state) { project in
+            guard updateSelectedProject(&state, mutate: { project in
                 var settings = project.metadata.aiSettings ?? ProjectAISettings()
                 settings.defaultToneProfile = profile
                 project.metadata.aiSettings = settings
+            }) else {
+                state.operationStatus = .cancelled("The project AI tone default already matches that choice, or no project is open.")
+                return .none
             }
+            invalidateAllAIReviewState(&state)
             state.operationStatus = .dirty("Project AI tone defaults changed. Save to persist them on this device.")
             return .none
 
         case let .projectAITargetLengthChanged(target):
-            updateSelectedProject(&state) { project in
+            guard updateSelectedProject(&state, mutate: { project in
                 var settings = project.metadata.aiSettings ?? ProjectAISettings()
                 settings.targetLength = target
                 project.metadata.aiSettings = settings
+            }) else {
+                state.operationStatus = .cancelled("The project AI length default already matches that choice, or no project is open.")
+                return .none
             }
+            invalidateAllAIReviewState(&state)
             state.operationStatus = .dirty("Project AI length default changed. Save to persist it on this device.")
             return .none
 
         case let .projectAICustomInstructionChanged(instruction):
-            updateSelectedProject(&state) { project in
+            guard updateSelectedProject(&state, mutate: { project in
                 var settings = project.metadata.aiSettings ?? ProjectAISettings()
                 settings.customInstruction = instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : instruction
                 project.metadata.aiSettings = settings
+            }) else {
+                state.operationStatus = .cancelled("The project AI instruction did not change, or no project is open.")
+                return .none
             }
+            invalidateAllAIReviewState(&state)
             state.operationStatus = .dirty("Project AI instruction changed. Save to persist it on this device.")
             return .none
 
         case let .projectAIForbiddenMentionsChanged(mentions):
-            updateSelectedProject(&state) { project in
+            guard updateSelectedProject(&state, mutate: { project in
                 var settings = project.metadata.aiSettings ?? ProjectAISettings()
                 settings.forbiddenMentions = cleanedMentionList(mentions)
                 project.metadata.aiSettings = settings
+            }) else {
+                state.operationStatus = .cancelled("The project AI do-not-mention defaults did not change, or no project is open.")
+                return .none
             }
+            invalidateAllAIReviewState(&state)
             state.operationStatus = .dirty("Project AI do-not-mention defaults changed. Save to persist them on this device.")
             return .none
 
         case let .projectAIRequiredMentionsChanged(mentions):
-            updateSelectedProject(&state) { project in
+            guard updateSelectedProject(&state, mutate: { project in
                 var settings = project.metadata.aiSettings ?? ProjectAISettings()
                 settings.requiredMentions = cleanedMentionList(mentions)
                 project.metadata.aiSettings = settings
+            }) else {
+                state.operationStatus = .cancelled("The project AI required-mention defaults did not change, or no project is open.")
+                return .none
             }
+            invalidateAllAIReviewState(&state)
             state.operationStatus = .dirty("Project AI required-mention defaults changed. Save to persist them on this device.")
             return .none
 
@@ -703,59 +848,80 @@ extension AppFeature {
                 state.operationStatus = .failed("Project AI defaults are already balanced.")
                 return .none
             }
-            updateSelectedProject(&state) { project in
+            guard updateSelectedProject(&state, mutate: { project in
                 project.metadata.aiSettings = nil
-            }
+            }) else { return .none }
+            invalidateAllAIReviewState(&state)
             state.operationStatus = .dirty("Project AI defaults reset to balanced settings. Save to persist the reset.")
             return .none
 
         case let .reportAIToneProfileChanged(studentId, subject, profile):
             let baseOptions = selectedReportAIOptions(state, studentId: studentId, subject: subject)
-            updateReport(&state, studentId: studentId, subject: subject) { report in
+            guard updateReport(&state, studentId: studentId, subject: subject, mutate: { report in
                 var options = report.aiOptionsOverride ?? baseOptions
                 options.toneProfile = profile
                 report.aiOptionsOverride = options
+            }) else {
+                state.operationStatus = .cancelled("This draft's AI tone override did not change, or the draft is no longer open.")
+                return .none
             }
+            invalidateAIReviewState(&state, studentID: studentId, subject: subject)
             state.operationStatus = .dirty("This draft's AI tone override changed. Save to persist it on this device.")
             return .none
 
         case let .reportAITargetLengthChanged(studentId, subject, target):
             let baseOptions = selectedReportAIOptions(state, studentId: studentId, subject: subject)
-            updateReport(&state, studentId: studentId, subject: subject) { report in
+            guard updateReport(&state, studentId: studentId, subject: subject, mutate: { report in
                 var options = report.aiOptionsOverride ?? baseOptions
                 options.targetLength = target
                 report.aiOptionsOverride = options
+            }) else {
+                state.operationStatus = .cancelled("This draft's AI length override did not change, or the draft is no longer open.")
+                return .none
             }
+            invalidateAIReviewState(&state, studentID: studentId, subject: subject)
             state.operationStatus = .dirty("This draft's AI length override changed. Save to persist it on this device.")
             return .none
 
         case let .reportAICustomInstructionChanged(studentId, subject, instruction):
             let baseOptions = selectedReportAIOptions(state, studentId: studentId, subject: subject)
-            updateReport(&state, studentId: studentId, subject: subject) { report in
+            guard updateReport(&state, studentId: studentId, subject: subject, mutate: { report in
                 var options = report.aiOptionsOverride ?? baseOptions
                 options.customInstruction = instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : instruction
                 report.aiOptionsOverride = options
+            }) else {
+                state.operationStatus = .cancelled("This draft's AI instruction did not change, or the draft is no longer open.")
+                return .none
             }
+            invalidateAIReviewState(&state, studentID: studentId, subject: subject)
             state.operationStatus = .dirty("This draft's AI instruction override changed. Save to persist it on this device.")
             return .none
 
         case let .reportAIForbiddenMentionsChanged(studentId, subject, mentions):
             let baseOptions = selectedReportAIOptions(state, studentId: studentId, subject: subject)
-            updateReport(&state, studentId: studentId, subject: subject) { report in
+            guard updateReport(&state, studentId: studentId, subject: subject, mutate: { report in
                 var options = report.aiOptionsOverride ?? baseOptions
                 options.forbiddenMentions = cleanedMentionList(mentions)
                 report.aiOptionsOverride = options
+            }) else {
+                state.operationStatus = .cancelled("This draft's do-not-mention constraints did not change, or the draft is no longer open.")
+                return .none
             }
+            invalidateAIReviewState(&state, studentID: studentId, subject: subject)
             state.operationStatus = .dirty("This draft's do-not-mention constraints changed. Save to persist them on this device.")
             return .none
 
         case let .reportAIRequiredMentionsChanged(studentId, subject, mentions):
             let baseOptions = selectedReportAIOptions(state, studentId: studentId, subject: subject)
-            updateReport(&state, studentId: studentId, subject: subject) { report in
+            guard updateReport(&state, studentId: studentId, subject: subject, mutate: { report in
                 var options = report.aiOptionsOverride ?? baseOptions
                 options.requiredMentions = cleanedMentionList(mentions)
                 report.aiOptionsOverride = options
+            }) else {
+                state.operationStatus = .cancelled("This draft's required-mention constraints did not change, or the draft is no longer open.")
+                return .none
             }
+            invalidateAIReviewState(&state, studentID: studentId, subject: subject)
             state.operationStatus = .dirty("This draft's required-mention constraints changed. Save to persist them on this device.")
             return .none
 
@@ -765,16 +931,24 @@ extension AppFeature {
                 return .none
             }
             let options = selectedReportAIOptions(state, studentId: studentId, subject: subject)
-            updateSelectedProject(&state) { project in
+            guard updateSelectedProject(&state, mutate: { project in
                 project.metadata.aiSettings = ProjectAISettings(reportOptions: options)
+            }) else {
+                state.operationStatus = .cancelled("The project AI defaults already match this draft's settings.")
+                return .none
             }
+            invalidateAllAIReviewState(&state)
             state.operationStatus = .dirty("This draft's AI settings were saved as project defaults. Save to persist them on this device.")
             return .none
 
         case let .reportAIOptionsReset(studentId, subject):
-            updateReport(&state, studentId: studentId, subject: subject) { report in
+            guard updateReport(&state, studentId: studentId, subject: subject, mutate: { report in
                 report.aiOptionsOverride = nil
+            }) else {
+                state.operationStatus = .cancelled("This draft already uses the project AI defaults, or the draft is no longer open.")
+                return .none
             }
+            invalidateAIReviewState(&state, studentID: studentId, subject: subject)
             state.operationStatus = .dirty("This draft now uses the project AI defaults. Save to persist the reset.")
             return .none
 
@@ -782,6 +956,55 @@ extension AppFeature {
             return .none
         }
     }
+}
+
+private func isAIWorkflowContinuation(_ action: AppFeature.Action) -> Bool {
+    switch action {
+    case .reportAIPolishCompleted(_, _, _, _),
+         .reportAIPolishFailed(_, _, _),
+         .reportAIToneAdjustCompleted(_, _, _, _),
+         .reportAIToneAdjustFailed(_, _, _),
+         .reportAIDraftFromEvidenceCompleted(_, _, _, _),
+         .reportAIDraftFromEvidenceFailed(_, _, _),
+         .reportAICritiqueCompleted(_, _, _),
+         .reportAICritiqueFailed(_, _, _),
+         .reportBulkAIPolishProgress(_),
+         .reportBulkAIPolishCompleted(_, _),
+         .reportBulkAIPolishFailed(_),
+         .reportBulkAIPolishCancelTapped:
+        return true
+    default:
+        return false
+    }
+}
+
+private func finishActiveAIRequest(
+    _ state: inout AppFeature.State,
+    studentID: String,
+    subject: String,
+    kind: AppFeature.AIRequestKind
+) -> Bool {
+    guard let request = state.activeAIRequest,
+          request.studentID == studentID,
+          request.subject == subject,
+          request.kind == kind
+    else {
+        return false
+    }
+    state.activeAIRequest = nil
+    return state.selectedProject?.metadata.id == request.projectID
+}
+
+private func bulkCompletionMatchesCurrentDraft(
+    _ state: AppFeature.State,
+    completed: AppFeature.CompletedAIRevision
+) -> Bool {
+    guard let report = state.selectedProject?.reports.first(where: {
+        $0.studentId == completed.studentId && $0.subject == completed.subject
+    }) else {
+        return false
+    }
+    return !report.isLocked && isCurrentDraftUnchanged(report, since: completed.originalText)
 }
 
 private func matchingPendingRevision(

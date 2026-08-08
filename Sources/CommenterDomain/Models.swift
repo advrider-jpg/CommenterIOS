@@ -793,13 +793,26 @@ public struct GeneratedReport: Codable, Equatable, Sendable {
     public var studentId: String
     public var subject: String
     public var concreteSubject: String?
-    public var text: String
+    public var text: String {
+        didSet {
+            if text != oldValue, manualEdit == nil {
+                reviewedAt = nil
+            }
+        }
+    }
     public var variantIds: [String]
     public var trace: String?
     public var isLocked: Bool
-    public var manualEdit: String?
+    public var manualEdit: String? {
+        didSet {
+            if manualEdit != oldValue {
+                reviewedAt = nil
+            }
+        }
+    }
     public var generatedAt: Int64
     public var resultFingerprint: String?
+    public var reviewedAt: Int64?
     public var generationMode: ReportGenerationMode?
     public var aiTrace: AIReportTrace?
     public var reviewState: ReportReviewState?
@@ -822,6 +835,7 @@ public struct GeneratedReport: Codable, Equatable, Sendable {
         manualEdit: String? = nil,
         generatedAt: Int64,
         resultFingerprint: String? = nil,
+        reviewedAt: Int64? = nil,
         generationMode: ReportGenerationMode? = nil,
         aiTrace: AIReportTrace? = nil,
         reviewState: ReportReviewState? = nil,
@@ -843,6 +857,7 @@ public struct GeneratedReport: Codable, Equatable, Sendable {
         self.manualEdit = manualEdit
         self.generatedAt = generatedAt
         self.resultFingerprint = resultFingerprint
+        self.reviewedAt = reviewedAt
         self.generationMode = generationMode
         self.aiTrace = aiTrace
         self.reviewState = reviewState
@@ -857,6 +872,18 @@ public struct GeneratedReport: Codable, Equatable, Sendable {
 
     public var effectiveGenerationMode: ReportGenerationMode {
         generationMode ?? .deterministic
+    }
+
+    public mutating func applyManualEdit(_ text: String?) {
+        manualEdit = text
+    }
+
+    public mutating func markTeacherReviewed(at timestampMilliseconds: Int64) {
+        reviewedAt = timestampMilliseconds > 0 ? timestampMilliseconds : nil
+    }
+
+    public mutating func invalidateTeacherReview() {
+        reviewedAt = nil
     }
 }
 

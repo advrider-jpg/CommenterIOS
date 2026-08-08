@@ -41,9 +41,13 @@ public struct ProjectStoreClient: Sendable {
     public var importResultsFile: @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview
     public var importBackup: @Sendable (_ url: URL, _ password: String?) async throws -> Project
     public var prepareBackup: @Sendable (_ project: Project) async throws -> URL
+    public var prepareEncryptedBackup: @Sendable (_ project: Project, _ password: String) async throws -> URL
+    public var prepareImportTemplate: @Sendable (_ kind: CSVTemplateKind, _ format: ImportExportFormat) async throws -> URL
     public var prepareReportExport: @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL
+    public var prepareInvalidProjectSupportCopy: @Sendable (_ recordID: String) async throws -> InvalidProjectSupportCopy
+    public var removeInvalidProject: @Sendable (_ recordID: String) async throws -> ProjectListDiagnostics
     public var discardPreparedFile: @Sendable (_ url: URL) async throws -> Void
-    public var purgeStalePreparedFiles: @Sendable () async -> Void
+    public var purgeStalePreparedFiles: @Sendable () async throws -> Void
 
     public init(
         listProjects: @escaping @Sendable () async throws -> [ProjectSummary],
@@ -56,9 +60,21 @@ public struct ProjectStoreClient: Sendable {
         importResultsFile: @escaping @Sendable (_ url: URL, _ project: Project) async throws -> PreparedProjectImportPreview,
         importBackup: @escaping @Sendable (_ url: URL, _ password: String?) async throws -> Project,
         prepareBackup: @escaping @Sendable (_ project: Project) async throws -> URL,
+        prepareEncryptedBackup: @escaping @Sendable (_ project: Project, _ password: String) async throws -> URL = { _, _ in
+            throw ProjectStoreError.unavailable("Password-protected backup preparation was not provided.")
+        },
+        prepareImportTemplate: @escaping @Sendable (_ kind: CSVTemplateKind, _ format: ImportExportFormat) async throws -> URL = { _, _ in
+            throw ProjectStoreError.unavailable("Import-template preparation was not provided.")
+        },
         prepareReportExport: @escaping @Sendable (_ project: Project, _ format: ImportExportFormat) async throws -> URL,
+        prepareInvalidProjectSupportCopy: @escaping @Sendable (_ recordID: String) async throws -> InvalidProjectSupportCopy = { _ in
+            throw ProjectStoreError.unavailable("Damaged saved-work support copy handling was not provided.")
+        },
+        removeInvalidProject: @escaping @Sendable (_ recordID: String) async throws -> ProjectListDiagnostics = { _ in
+            throw ProjectStoreError.unavailable("Damaged saved-work removal handling was not provided.")
+        },
         discardPreparedFile: @escaping @Sendable (_ url: URL) async throws -> Void = { _ in },
-        purgeStalePreparedFiles: @escaping @Sendable () async -> Void = {}
+        purgeStalePreparedFiles: @escaping @Sendable () async throws -> Void = {}
     ) {
         self.listProjects = listProjects
         self.listProjectDiagnostics = listProjectDiagnostics ?? {
@@ -72,7 +88,11 @@ public struct ProjectStoreClient: Sendable {
         self.importResultsFile = importResultsFile
         self.importBackup = importBackup
         self.prepareBackup = prepareBackup
+        self.prepareEncryptedBackup = prepareEncryptedBackup
+        self.prepareImportTemplate = prepareImportTemplate
         self.prepareReportExport = prepareReportExport
+        self.prepareInvalidProjectSupportCopy = prepareInvalidProjectSupportCopy
+        self.removeInvalidProject = removeInvalidProject
         self.discardPreparedFile = discardPreparedFile
         self.purgeStalePreparedFiles = purgeStalePreparedFiles
     }
@@ -158,9 +178,23 @@ extension ProjectStoreClient: DependencyKey {
         },
         prepareBackup: { project in
             let directory = try prepareProtectedTemporaryExportDirectory()
-            let prepared = try prepareProjectBackupFile(project: project, directory: directory).url
-            try? applyTemporaryFileProtection(to: prepared)
-            return prepared
+            return try prepareProjectBackupFile(project: project, directory: directory).url
+        },
+        prepareEncryptedBackup: { project, password in
+            let directory = try prepareProtectedTemporaryExportDirectory()
+            return try prepareEncryptedProjectBackupFile(
+                project: project,
+                password: password,
+                directory: directory
+            ).url
+        },
+        prepareImportTemplate: { kind, format in
+            let directory = try prepareProtectedTemporaryExportDirectory()
+            return try prepareImportTemplateFile(
+                kind: kind,
+                format: format,
+                directory: directory
+            ).url
         },
         prepareReportExport: { project, format in
             let directory = try prepareProtectedTemporaryExportDirectory()
@@ -173,14 +207,47 @@ extension ProjectStoreClient: DependencyKey {
             case .csv, .backupJSON:
                 throw ReportExportPreparationError.unsupportedFormat(format)
             }
-            try? applyTemporaryFileProtection(to: prepared)
             return prepared
         },
+        prepareInvalidProjectSupportCopy: { recordID in
+            let store = try FileProjectStore.applicationSupport()
+            return try store.prepareInvalidProjectSupportCopy(recordID: recordID)
+        },
+        removeInvalidProject: { recordID in
+            let store = try FileProjectStore.applicationSupport()
+            _ = try store.removeInvalidProject(recordID: recordID)
+            let diagnostics = try await store.listProjectsWithDiagnostics()
+            return ProjectListDiagnostics(
+                projects: diagnostics.projects.map(projectSummary).sorted { $0.updatedAt > $1.updatedAt },
+                invalidProjects: diagnostics.invalidProjects
+            )
+        },
         discardPreparedFile: { url in
-            try discardOwnedTemporaryExport(url)
+            if isOwnedTemporaryExport(url) {
+                try discardOwnedTemporaryExport(url)
+                return
+            }
+            let store = try FileProjectStore.applicationSupport()
+            try store.discardInvalidProjectSupportCopy(at: url)
         },
         purgeStalePreparedFiles: {
-            purgeOldTemporaryExports(olderThanSeconds: 60 * 60 * 12)
+            var cleanupFailures: [String] = []
+            do {
+                try purgeOldTemporaryExports(olderThanSeconds: 60 * 60 * 12)
+            } catch {
+                cleanupFailures.append(userVisibleErrorMessage(error))
+            }
+            do {
+                let store = try FileProjectStore.applicationSupport()
+                try store.purgeStaleInvalidProjectSupportCopies()
+            } catch {
+                cleanupFailures.append(userVisibleErrorMessage(error))
+            }
+            if !cleanupFailures.isEmpty {
+                throw ProjectStoreError.unavailable(
+                    "Some old prepared files could not be removed. " + cleanupFailures.joined(separator: " ")
+                )
+            }
         }
     )
 
@@ -213,6 +280,9 @@ extension ProjectStoreClient: DependencyKey {
         prepareBackup: { _ in
             throw ProjectStoreError.unavailable("Project store test dependency was not provided.")
         },
+        prepareImportTemplate: { _, format in
+            throw ImportExportError.unavailable(format: format, reason: "Project store test dependency was not provided.")
+        },
         prepareReportExport: { _, format in
             throw ImportExportError.unavailable(format: format, reason: "Project store test dependency was not provided.")
         },
@@ -236,7 +306,7 @@ private func temporaryExportDirectory() -> URL {
 private func prepareProtectedTemporaryExportDirectory() throws -> URL {
     let directory = temporaryExportDirectory()
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    try? applyTemporaryFileProtection(to: directory)
+    try applyTemporaryFileProtection(to: directory)
     return directory
 }
 
@@ -256,20 +326,21 @@ private func discardOwnedTemporaryExport(_ url: URL) throws {
     }
 }
 
-private func purgeOldTemporaryExports(olderThanSeconds: TimeInterval) {
+private func purgeOldTemporaryExports(olderThanSeconds: TimeInterval) throws {
     let directory = temporaryExportDirectory()
-    guard let urls = try? FileManager.default.contentsOfDirectory(
+    guard FileManager.default.fileExists(atPath: directory.path) else { return }
+    let urls = try FileManager.default.contentsOfDirectory(
         at: directory,
         includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
         options: [.skipsHiddenFiles]
-    ) else { return }
+    )
 
     let cutoff = Date().addingTimeInterval(-olderThanSeconds)
     for url in urls {
         guard isOwnedTemporaryExport(url) else { continue }
-        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        let modified = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate ?? .distantPast
         if modified < cutoff {
-            try? FileManager.default.removeItem(at: url)
+            try discardOwnedTemporaryExport(url)
         }
     }
 }

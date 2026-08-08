@@ -4,7 +4,38 @@ import CommenterPersistence
 import XCTest
 
 final class BackupEnvelopeTests: XCTestCase {
-    func testBackupV2IncludesChecksumAndRejectsTampering() throws {
+    func testBackupSizeCapsAndMessagesMatchCurrentWebContract() {
+        XCTAssertEqual(ProjectLimits.backupBytes, 16 * 1024 * 1024)
+        XCTAssertEqual(encryptedBackupBytes, 23_418_198)
+        XCTAssertEqual(formatBackupByteLimitForDisplay(ProjectLimits.backupBytes), "16 MB")
+        XCTAssertEqual(formatBackupByteLimitForDisplay(encryptedBackupBytes), "about 22.3 MB")
+        XCTAssertEqual(
+            BackupError.backupSaveOversized(maximumBytes: ProjectLimits.backupBytes).errorDescription,
+            "This backup copy is larger than 16 MB and was not saved."
+        )
+        XCTAssertEqual(
+            BackupError.backupReadOversized(maximumBytes: ProjectLimits.backupBytes).errorDescription,
+            "This backup copy is larger than 16 MB and was not read."
+        )
+        XCTAssertEqual(
+            BackupError.encryptedBackupSaveOversized(maximumBytes: encryptedBackupBytes).errorDescription,
+            "The backup copy is larger than the configured save limit (about 22.3 MB) and was not saved."
+        )
+        XCTAssertEqual(
+            BackupError.encryptedBackupReadOversized(maximumBytes: encryptedBackupBytes).errorDescription,
+            "The backup copy is larger than the configured read limit (about 22.3 MB) and was not read."
+        )
+        XCTAssertEqual(
+            BackupError.openedBackupOversized(maximumBytes: ProjectLimits.backupBytes).errorDescription,
+            "This opened backup copy is larger than 16 MB and was not opened."
+        )
+        XCTAssertEqual(
+            BackupError.encryptedCouldNotVerify.errorDescription,
+            "This password-protected backup copy could not be verified. It may be incomplete or changed."
+        )
+    }
+
+    func testCurrentBackupIncludesV4BundleChecksumAndRejectsTampering() throws {
         let serialized = try serializeProjectBackup(project: fixtureProject(), createdAt: Date(timeIntervalSince1970: 0))
         let data = try XCTUnwrap(serialized.data(using: .utf8))
         var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -14,6 +45,7 @@ final class BackupEnvelopeTests: XCTestCase {
         let checksum = try XCTUnwrap(payload["checksum"] as? [String: Any])
         XCTAssertEqual(checksum["algorithm"] as? String, "sha256")
         XCTAssertNotNil(checksum["projectFingerprint"] as? String)
+        XCTAssertNotNil(checksum["bundleFingerprint"] as? String)
 
         var project = try XCTUnwrap(payload["project"] as? [String: Any])
         var metadata = try XCTUnwrap(project["metadata"] as? [String: Any])
@@ -41,6 +73,82 @@ final class BackupEnvelopeTests: XCTestCase {
         XCTAssertEqual(restored.metadata.id, "p1")
         XCTAssertEqual(restored.results.first?.textType, "persuasive text")
         XCTAssertEqual(restored.results.first?.learningContext, "advertising unit")
+    }
+
+    func testBackupParserAcceptsVerifiedWebV4WithoutUnsupportedSideStores() throws {
+        let serialized = try webV4Backup()
+
+        let restored = try parseProjectBackup(serialized: serialized)
+
+        XCTAssertEqual(restored.metadata.id, "p1")
+        XCTAssertEqual(restored.results.first?.textType, "persuasive text")
+    }
+
+    func testBackupParserRejectsWebV4SideStoresInsteadOfDroppingThem() throws {
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try webV4Backup().utf8)) as? [String: Any])
+        payload["stickyNotes"] = [[
+            "id": "note-1",
+            "projectId": "p1",
+            "text": "Keep this saved-work note"
+        ]]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: data, as: UTF8.self))) { error in
+            XCTAssertEqual(error as? BackupError, .unsupportedBundledData(["sticky notes"]))
+            XCTAssertTrue(error.localizedDescription.contains("was not imported"))
+        }
+    }
+
+    func testBackupParserNeverDropsSideStoresFromOlderOrMalformedEnvelopes() throws {
+        let current = try serializeProjectBackup(project: fixtureProject(), createdAt: Date(timeIntervalSince1970: 0))
+        var olderPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(current.utf8)) as? [String: Any])
+        olderPayload["version"] = 2
+        var olderChecksum = try XCTUnwrap(olderPayload["checksum"] as? [String: Any])
+        olderChecksum.removeValue(forKey: "bundleFingerprint")
+        olderPayload["checksum"] = olderChecksum
+        olderPayload["customComments"] = [["id": "saved-comment-1"]]
+        let olderData = try JSONSerialization.data(withJSONObject: olderPayload)
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: olderData, as: UTF8.self))) { error in
+            XCTAssertEqual(error as? BackupError, .unsupportedBundledData(["saved comments"]))
+        }
+
+        var malformedPayload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try webV4Backup().utf8)) as? [String: Any])
+        malformedPayload["teacherProfile"] = NSNull()
+        let malformedData = try JSONSerialization.data(withJSONObject: malformedPayload)
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: malformedData, as: UTF8.self))) { error in
+            XCTAssertEqual(error as? BackupError, .couldNotOpen)
+        }
+    }
+
+    func testBackupParserRejectsWebReportingPeriodInsteadOfSilentlyDroppingIt() throws {
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try webV4Backup().utf8)) as? [String: Any])
+        var project = try XCTUnwrap(payload["project"] as? [String: Any])
+        var metadata = try XCTUnwrap(project["metadata"] as? [String: Any])
+        metadata["reportingPeriod"] = [
+            "cadence": "term",
+            "year": 2026,
+            "ordinal": 3,
+            "label": "Term 3 2026"
+        ]
+        project["metadata"] = metadata
+        payload["project"] = project
+        let data = try JSONSerialization.data(withJSONObject: payload)
+
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: data, as: UTF8.self))) { error in
+            XCTAssertEqual(error as? BackupError, .unsupportedBundledData(["structured reporting-period settings"]))
+        }
+    }
+
+    func testBackupParserRejectsTamperedWebV4BundleFingerprint() throws {
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try webV4Backup().utf8)) as? [String: Any])
+        var checksum = try XCTUnwrap(payload["checksum"] as? [String: Any])
+        checksum["bundleFingerprint"] = String(repeating: "0", count: 64)
+        payload["checksum"] = checksum
+        let data = try JSONSerialization.data(withJSONObject: payload)
+
+        XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: data, as: UTF8.self))) { error in
+            XCTAssertEqual(error as? BackupError, .couldNotVerify)
+        }
     }
 
     func testBackupParserRejectsInvalidRawProjectBeforeReconciliation() throws {
@@ -76,12 +184,12 @@ final class BackupEnvelopeTests: XCTestCase {
             XCTAssertEqual(error as? BackupError, .encryptedPasswordRequired)
             XCTAssertEqual(
                 (error as? BackupError)?.errorDescription,
-                "This is an encrypted project backup. Enter the backup password to import it."
+                "This is a password-protected backup copy. Enter the backup password to open it."
             )
         }
     }
 
-    func testEncryptedBackupRoundTripsThroughV3EnvelopeShape() throws {
+    func testEncryptedBackupRoundTripsThroughCurrentEnvelopeShape() throws {
         let password = "correct horse battery"
         let encrypted = try serializeEncryptedProjectBackup(
             project: fixtureProject(),
@@ -153,7 +261,7 @@ final class BackupEnvelopeTests: XCTestCase {
         let data = try JSONSerialization.data(withJSONObject: payload)
 
         XCTAssertThrowsError(try parseProjectBackup(serialized: String(decoding: data, as: UTF8.self), password: "correct horse battery")) { error in
-            XCTAssertEqual(error as? BackupError, .couldNotVerify)
+            XCTAssertEqual(error as? BackupError, .encryptedCouldNotVerify)
         }
     }
 
@@ -203,7 +311,7 @@ final class BackupEnvelopeTests: XCTestCase {
         }
     }
 
-    func testEncryptedBackupPasswordValidationMatchesV3Policy() {
+    func testEncryptedBackupPasswordValidationMatchesCurrentWebPolicy() {
         XCTAssertEqual(validateBackupPasswordForEncryption("short").ok, false)
         XCTAssertEqual(validateBackupPasswordForEncryption("only spaces     ").ok, true)
         XCTAssertEqual(validateBackupPasswordForEncryption("            ").message, "Use a password that is not only spaces.")
@@ -244,6 +352,24 @@ final class BackupEnvelopeTests: XCTestCase {
             learningContext: "advertising unit"
         )
         return Project(metadata: metadata, roster: [student], results: [result], reports: [])
+    }
+
+    private func webV4Backup() throws -> String {
+        let v2 = try serializeProjectBackup(project: fixtureProject(), createdAt: Date(timeIntervalSince1970: 0))
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(v2.utf8)) as? [String: Any])
+        var checksum = try XCTUnwrap(payload["checksum"] as? [String: Any])
+        let projectFingerprint = try XCTUnwrap(checksum["projectFingerprint"] as? String)
+        checksum["bundleFingerprint"] = try sha256Hex(stableJSONString(.object([
+            "projectFingerprint": .string(projectFingerprint),
+            "customComments": .array([]),
+            "customCommentUsage": .array([]),
+            "stickyNotes": .array([]),
+            "teacherProfile": .null
+        ])))
+        payload["version"] = 4
+        payload["checksum"] = checksum
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        return String(decoding: data, as: UTF8.self)
     }
 
     private func minimalEncryptedPayload(ciphertext: String) -> String {

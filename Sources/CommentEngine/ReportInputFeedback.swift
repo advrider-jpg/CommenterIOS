@@ -23,7 +23,7 @@ private let feedbackMaxReportContextFieldLength = 120
 private let feedbackTemplateTokenPattern = #"\[[^\]]+\]|\{[^}]+\}"#
 private let feedbackLeadingPronounPattern = #"^(he|she|they|i|we)\b"#
 private let feedbackSubordinateClausePattern = #"^(because|when|while|although|if|as)\b"#
-private let feedbackFiniteSentenceStartPattern = #"^(he|she|they|i|we|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(wrote|writes|created|creates|solved|solves|used|uses|explained|explains|described|describes|completed|completes|showed|shows|demonstrated|demonstrates|is|are|was|were|has|have)\b"#
+private let feedbackFiniteSentenceStartPattern = #"^(he|she|they|i|we|[A-Z][A-Za-z'’-]+(?:\s+[A-Z][A-Za-z'’-]+)?)\s+(am|are|is|was|were|has|have|had|do|does|did|can|could|will|would|shall|should|may|might|must|wrote|writes|write|created|creates|create|solved|solves|solve|used|uses|use|made|makes|make|completed|completes|complete|demonstrated|demonstrates|demonstrate|explained|explains|explain|described|describes|describe|identified|identifies|identify|analysed|analyses|analyse|analyzed|analyzes|analyze|applied|applies|apply|checked|checks|check|showed|shows|show|read|reads|worked|works|work|participated|participates|participate|contributed|contributes|contribute|planned|plans|plan|kept|keeps|keep|listened|listens|listen|focused|focuses|focus|improved|improves|improve|attempted|attempts|attempt|organised|organises|organise|organized|organizes|organize)\b"#
 
 public func reportContextPhraseFeedback(value: String?, label: String, example: String) -> ReportInputFeedback? {
     let raw = value ?? ""
@@ -37,7 +37,7 @@ public func reportContextPhraseFeedback(value: String?, label: String, example: 
     if raw.range(of: feedbackTemplateTokenPattern, options: .regularExpression) != nil {
         return ReportInputFeedback(tone: .error, message: "\(label) must not contain template placeholders such as [context] or {Name}.")
     }
-    if normalized.count > feedbackMaxReportContextFieldLength {
+    if normalized.utf16.count > feedbackMaxReportContextFieldLength {
         return ReportInputFeedback(tone: .error, message: "\(label) must be \(feedbackMaxReportContextFieldLength) characters or fewer.")
     }
     if matchesFeedback(feedbackLeadingPronounPattern, normalized) || matchesFeedback(feedbackFiniteSentenceStartPattern, normalized) {

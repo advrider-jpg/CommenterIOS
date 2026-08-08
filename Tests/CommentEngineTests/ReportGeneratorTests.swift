@@ -75,6 +75,19 @@ final class ReportGeneratorTests: XCTestCase {
         XCTAssertEqual(generator.usageSnapshot(), ["v1": 1])
     }
 
+    func testOutOfRangeUniquenessNumbersFallBackWithoutIntegerOverflow() throws {
+        var data = fixtureData()
+        data.uniquenessGuard = [
+            UniquenessGuard(rule: "MaxUsagePerClass", value: Double.greatestFiniteMagnitude),
+            UniquenessGuard(rule: "MinVariantDistance", value: Double.greatestFiniteMagnitude)
+        ]
+        var generator = try ReportGenerator(data: data, projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
+
+        XCTAssertEqual(report.variantIds, ["v1"])
+    }
+
     func testRepairsAndAppendsEvidenceWhenItIsNotSafeAsSpecificTask() throws {
         var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
         var sourceResult = result()
@@ -148,8 +161,12 @@ final class ReportGeneratorTests: XCTestCase {
             generatedAt: 1
         )
 
-        XCTAssertEqual(report.text, "Ava writes clearly in English. Ava uses feedback. Ava would benefit from support with planning carefully.")
-        XCTAssertTrue((report.trace ?? "").contains("Teacher/student note emphasis included."))
+        XCTAssertEqual(
+            report.text,
+            "Ava uses feedback.\n\nAva writes clearly in English. Ava would benefit from support with planning carefully."
+        )
+        XCTAssertTrue((report.trace ?? "").contains("Student report emphasis included."))
+        XCTAssertTrue((report.trace ?? "").contains("Result report emphasis included."))
 
         sourceResult.reportEmphasisNote = "Keep [Student Name] placeholder."
         XCTAssertThrowsError(try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 2)) { error in
@@ -170,7 +187,7 @@ final class ReportGeneratorTests: XCTestCase {
 
         XCTAssertEqual(
             report.text,
-            "Ava writes clearly in English. In Inferencing, they demonstrate solid understanding. Ava is developing respectful discussion habits in English by waiting to be called on before speaking. Ava participates confidently in English and contributes thoughtful ideas during discussions."
+            "Ava writes clearly in English. In Inferencing, they demonstrate solid understanding.\n\nAva is developing respectful discussion habits in English by waiting to be called on before speaking. Ava participates confidently in English and contributes thoughtful ideas during discussions."
         )
     }
 
@@ -206,7 +223,7 @@ final class ReportGeneratorTests: XCTestCase {
                 "Ava is a diligent learner who approaches Mathematics with enthusiasm.",
                 "Ava solves problems in Mathematics. Ava shows solid skills in Fluency.",
                 "Ava demonstrates a growth mindset and checks working carefully.",
-                "To continue developing, Ava will focus on justify reasoning as well as check working and show steps."
+                "To continue developing, Ava should justify reasoning and should check working and show steps."
             ].joined(separator: "\n\n")
         )
     }
@@ -276,9 +293,187 @@ final class ReportGeneratorTests: XCTestCase {
             report.text,
             [
                 "Ava writes clearly in English. Ava has shown strength in Inferencing, Vocabulary, and Punctuation.",
-                "Next steps for Ava include use evidence from text, edit for clarity, and vary sentence structure."
+                "Next steps for Ava are to use evidence from text, to edit for clarity, and to vary sentence structure."
             ].joined(separator: "\n\n")
         )
+    }
+
+    func testLearningFocusFailsClosedInsteadOfUsingUnrelatedWording() throws {
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+        var sourceResult = result()
+        sourceResult.focusStrand = "Reading"
+
+        XCTAssertThrowsError(
+            try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+        ) { error in
+            guard case let .unavailableSubject(message) = error as? ReportGenerationError else {
+                return XCTFail("Expected unavailable focus wording")
+            }
+            XCTAssertTrue(message.contains("Reading"))
+        }
+    }
+
+    func testLearningFocusMapsToDetailedCurriculumComponentStrand() throws {
+        let data = CommentEngineData(
+            componentBank: [
+                Component(
+                    keyID: "writing-strength",
+                    subject: "English",
+                    type: .strength,
+                    level: "Year 5",
+                    band: "At Standard",
+                    text: "{StudentName} creates well-structured texts in {Subject}.",
+                    strand: "Creating texts"
+                )
+            ],
+            recipeBank: [Recipe(recipeID: "r1", pattern: "{Strength}")],
+            assembledVariants: [
+                AssembledVariant(
+                    variantID: "writing-v1",
+                    keyID: "writing-strength",
+                    text: "{StudentName} creates well-structured texts in {Subject}."
+                )
+            ],
+            uniquenessGuard: []
+        )
+        var generator = try ReportGenerator(data: data, projectMetadata: metadata())
+
+        let report = try generator.generateReport(
+            student: student(),
+            subject: "English",
+            result: result(),
+            generatedAt: 1
+        )
+
+        XCTAssertEqual(report.variantIds, ["writing-v1"])
+        XCTAssertEqual(report.text, "Ava creates well-structured texts in English.")
+    }
+
+    func testLanguageUnsafeCandidateIsSkippedWhenSafeWordingExists() throws {
+        let data = CommentEngineData(
+            componentBank: [
+                Component(keyID: "unsafe", subject: "English", type: .strength, level: "Year 5", band: "At Standard", text: "{StudentName} {StudentName} writes clearly.", strand: "Writing"),
+                Component(keyID: "safe", subject: "English", type: .strength, level: "Year 5", band: "At Standard", text: "{StudentName} writes clearly.", strand: "Writing")
+            ],
+            recipeBank: [Recipe(recipeID: "r1", pattern: "{Strength}")],
+            assembledVariants: [
+                AssembledVariant(variantID: "unsafe-v1", keyID: "unsafe", text: "{StudentName} {StudentName} writes clearly."),
+                AssembledVariant(variantID: "safe-v1", keyID: "safe", text: "{StudentName} writes clearly.")
+            ],
+            uniquenessGuard: []
+        )
+        var generator = try ReportGenerator(data: data, projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
+
+        XCTAssertEqual(report.variantIds, ["safe-v1"])
+        XCTAssertEqual(report.text, "Ava writes clearly.")
+        XCTAssertTrue((report.trace ?? "").contains("Rejected by local language checks: 1"))
+    }
+
+    func testBlockedCurrentWordingAndVariantAreNotRegenerated() throws {
+        var wordingBlocked = try ReportGenerator(
+            data: fixtureData(),
+            projectMetadata: metadata(),
+            blockedReportTexts: [" Ava writes clearly in English. "]
+        )
+        let alternate = try wordingBlocked.generateReport(
+            student: student(),
+            subject: "English",
+            result: result(),
+            generatedAt: 1
+        )
+        XCTAssertEqual(alternate.variantIds, ["v2"])
+
+        var variantBlocked = try ReportGenerator(
+            data: fixtureData(),
+            projectMetadata: metadata(),
+            blockedVariantIds: ["v1"]
+        )
+        let differentVariant = try variantBlocked.generateReport(
+            student: student(),
+            subject: "English",
+            result: result(),
+            generatedAt: 1
+        )
+        XCTAssertEqual(differentVariant.variantIds, ["v2"])
+    }
+
+    func testAcceptedWordingIsBlockedForTheRestOfTheGenerationRun() throws {
+        let data = CommentEngineData(
+            componentBank: [
+                Component(keyID: "same-one", subject: "English", type: .strength, level: "Year 5", band: "At Standard", text: "{StudentName} writes clearly in {Subject}.", strand: "Writing"),
+                Component(keyID: "same-two", subject: "English", type: .strength, level: "Year 5", band: "At Standard", text: "{StudentName} writes clearly in {Subject}.", strand: "Writing"),
+                Component(keyID: "different", subject: "English", type: .strength, level: "Year 5", band: "At Standard", text: "{StudentName} explains ideas in {Subject}.", strand: "Writing")
+            ],
+            recipeBank: [Recipe(recipeID: "r1", pattern: "{Strength}")],
+            assembledVariants: [
+                AssembledVariant(variantID: "v1", keyID: "same-one", text: "{StudentName} writes clearly in {Subject}."),
+                AssembledVariant(variantID: "v2", keyID: "same-two", text: "{StudentName} writes clearly in {Subject}."),
+                AssembledVariant(variantID: "v3", keyID: "different", text: "{StudentName} explains ideas in {Subject}.")
+            ],
+            uniquenessGuard: [UniquenessGuard(rule: "MaxUsagePerClass", value: 1)]
+        )
+        var generator = try ReportGenerator(data: data, projectMetadata: metadata())
+
+        let first = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 1)
+        let second = try generator.generateReport(student: student(), subject: "English", result: result(), generatedAt: 2)
+
+        XCTAssertEqual(first.variantIds, ["v1"])
+        XCTAssertNil(first.reviewedAt)
+        XCTAssertEqual(second.variantIds, ["v3"])
+        XCTAssertNotEqual(second.text, first.text)
+    }
+
+    func testSeparateNextStepParagraphDoesNotRequireOrDuplicateNextStepComponent() throws {
+        let data = CommentEngineData(
+            componentBank: [
+                Component(keyID: "strength", subject: "English", type: .strength, level: "Year 5", band: "At Standard", text: "{StudentName} writes clearly.", strand: "Writing")
+            ],
+            recipeBank: [Recipe(recipeID: "r1", pattern: "{Strength} {NextStep}")],
+            assembledVariants: [],
+            uniquenessGuard: []
+        )
+        var sourceResult = result()
+        sourceResult.nextStepGoals = ["use evidence from text"]
+        var generator = try ReportGenerator(data: data, projectMetadata: metadata())
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(
+            report.text,
+            "Ava writes clearly.\n\nA helpful next step for Ava is to use evidence from text."
+        )
+        XCTAssertEqual(report.text.components(separatedBy: "use evidence from text").count - 1, 1)
+    }
+
+    func testDisabledDispositionsSectionActuallyOmitsReportFlags() throws {
+        var sourceMetadata = metadata()
+        sourceMetadata.reportLayout = ReportLayout(
+            enabled: true,
+            order: [.subject, .dispositions],
+            include: [.subject: true, .dispositions: false]
+        )
+        var sourceResult = result()
+        sourceResult.flags = ["PARTICIPATION_ENGAGEMENT": true]
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: sourceMetadata)
+
+        let report = try generator.generateReport(student: student(), subject: "English", result: sourceResult, generatedAt: 1)
+
+        XCTAssertEqual(report.text, "Ava writes clearly in English.")
+        XCTAssertFalse(report.text.contains("participates"))
+    }
+
+    func testRejectsResultBelongingToDifferentStudentOrSubject() throws {
+        var generator = try ReportGenerator(data: fixtureData(), projectMetadata: metadata())
+        var mismatched = result()
+        mismatched.studentId = "someone-else"
+
+        XCTAssertThrowsError(
+            try generator.generateReport(student: student(), subject: "English", result: mismatched, generatedAt: 1)
+        ) { error in
+            XCTAssertEqual(error as? ReportGenerationError, .mismatchedResult)
+        }
     }
 
     func testUnsafeEvidenceTextBlocksGeneration() throws {

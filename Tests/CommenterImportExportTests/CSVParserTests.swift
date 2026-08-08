@@ -45,6 +45,10 @@ final class CSVParserTests: XCTestCase {
             XCTAssertEqual(error as? CSVParserError, .blankHeader(sourceLabel: "Roster"))
         }
 
+        XCTAssertThrowsError(try CSVParser.parseTabularRows([["!!!"], ["value"]], sourceLabel: "Roster")) { error in
+            XCTAssertEqual(error as? CSVParserError, .blankHeader(sourceLabel: "Roster"))
+        }
+
         XCTAssertThrowsError(try CSVParser.parseCSV("First Name,First-Name\nAva,Ng")) { error in
             XCTAssertEqual(error as? CSVParserError, .duplicateHeader(sourceLabel: "CSV file", header: "First-Name"))
         }
@@ -56,9 +60,45 @@ final class CSVParserTests: XCTestCase {
         XCTAssertThrowsError(try CSVParser.parseCSV("First Name,Last Name\n\"unterminated")) { error in
             XCTAssertEqual(error as? CSVParserError, .unterminatedQuotedField)
         }
+
+        XCTAssertThrowsError(try CSVParser.parseCSV("First Name,Last Name\nAva,\"Ng\"trailing")) { error in
+            XCTAssertEqual(error as? CSVParserError, .malformed)
+        }
+    }
+
+    func testRejectsUnboundedColumnAndCellTextInputs() {
+        let tooManyHeaders = (0...CSVParser.maxImportColumns).map { "Column \($0)" }
+        let tooManyValues = Array(repeating: "value", count: tooManyHeaders.count)
+        XCTAssertThrowsError(try CSVParser.parseTabularRows([tooManyHeaders, tooManyValues], sourceLabel: "Roster")) { error in
+            XCTAssertEqual(
+                error as? CSVParserError,
+                .tooManyColumns(sourceLabel: "Roster", count: CSVParser.maxImportColumns + 1, maximum: CSVParser.maxImportColumns)
+            )
+        }
+
+        XCTAssertThrowsError(try CSVParser.parseTabularRows(
+            [["Name"], [String(repeating: "x", count: CSVParser.maxCellTextCharacters + 1)]],
+            sourceLabel: "Roster"
+        )) { error in
+            XCTAssertEqual(
+                error as? CSVParserError,
+                .cellTextTooLong(sourceLabel: "Roster", row: 2, maximum: CSVParser.maxCellTextCharacters)
+            )
+        }
+
+        XCTAssertThrowsError(try CSVParser.parseTabularRows(
+            [["Name"], [String(repeating: "😀", count: (CSVParser.maxCellTextCharacters / 2) + 1)]],
+            sourceLabel: "Roster"
+        )) { error in
+            XCTAssertEqual(
+                error as? CSVParserError,
+                .cellTextTooLong(sourceLabel: "Roster", row: 2, maximum: CSVParser.maxCellTextCharacters)
+            )
+        }
     }
 
     func testRejectsMissingDataRowsAndRowsBeyondConfiguredImportLimit() {
+        XCTAssertEqual(CSVParser.maxImportRows, 500)
         XCTAssertThrowsError(try CSVParser.parseCSV("First Name,Last Name\n\n")) { error in
             XCTAssertEqual(error as? CSVParserError, .missingDataRows(sourceLabel: "CSV file"))
         }
@@ -83,10 +123,14 @@ final class CSVParserTests: XCTestCase {
         XCTAssertEqual(CSVParser.findKey(in: parsed.rows[0], matching: "AchievementLevel"), "Achievement Level")
         XCTAssertEqual(CSVParser.value(in: parsed.rows[0], matching: "notes"), "Ready")
 
-        let csv = CSVParser.toCSV(rows: [["Name": "=SUM(A1:A2)", "Notes": "Line one\nLine two"]], headers: ["Name", "Notes"])
-        XCTAssertTrue(csv.hasPrefix("Name,Notes"))
+        let csv = try CSVParser.toCSV(rows: [["=Name": "=SUM(A1:A2)", "Notes": "Line one\nLine two"]], headers: ["=Name", "Notes"])
+        XCTAssertTrue(csv.hasPrefix("'=Name,Notes"))
         XCTAssertTrue(csv.contains("'=SUM(A1:A2)"))
         XCTAssertTrue(csv.contains("Line one"))
         XCTAssertTrue(csv.contains("Line two"))
+
+        XCTAssertThrowsError(try CSVParser.toCSV(rows: [["Name": "Ava"]], headers: [])) { error in
+            XCTAssertEqual(error as? CSVParserError, .couldNotEncode)
+        }
     }
 }

@@ -8,34 +8,37 @@ public func availableTeacherSubjects() -> [String] {
     teacherSubjectKeysInCurriculumOrder()
 }
 
-func updateSelectedProject(_ state: inout AppFeature.State, mutate: (inout Project) -> Void) {
-    guard var project = state.selectedProject else { return }
+@discardableResult
+func updateSelectedProject(_ state: inout AppFeature.State, mutate: (inout Project) -> Void) -> Bool {
+    guard var project = state.selectedProject else { return false }
+    let originalProject = project
     mutate(&project)
+    guard project != originalProject else { return false }
     state.selectedProject = project
     state.selectedProjectReadiness = getProjectReadiness(project)
     state.pendingImport = nil
-    state.preparedFile = nil
-    state.pendingAIRevision = nil
-    state.pendingAIRevisions = []
-    state.latestReportCheck = nil
+    markPreparedFileStale(&state)
     markImportStatesStaleAfterManualEdit(&state)
     state.hasUnsavedProjectChanges = true
     state.operationStatus = .dirty("Unsaved changes. Save to persist them on this device.")
+    return true
 }
 
-func updateStudent(_ state: inout AppFeature.State, id: String, mutate: (inout Student) -> Void) {
+@discardableResult
+func updateStudent(_ state: inout AppFeature.State, id: String, mutate: (inout Student) -> Void) -> Bool {
     updateSelectedProject(&state) { project in
         guard let index = project.roster.firstIndex(where: { $0.id == id }) else { return }
         mutate(&project.roster[index])
     }
 }
 
+@discardableResult
 func updateResult(
     _ state: inout AppFeature.State,
     studentId: String,
     subject: String,
     mutate: (inout AchievementResult) -> Void
-) {
+) -> Bool {
     updateSelectedProject(&state) { project in
         if let index = project.results.firstIndex(where: { $0.studentId == studentId && $0.subject == subject }) {
             mutate(&project.results[index])
@@ -47,12 +50,13 @@ func updateResult(
     }
 }
 
+@discardableResult
 func updateReport(
     _ state: inout AppFeature.State,
     studentId: String,
     subject: String,
     mutate: (inout GeneratedReport) -> Void
-) {
+) -> Bool {
     updateSelectedProject(&state) { project in
         guard let index = project.reports.firstIndex(where: { $0.studentId == studentId && $0.subject == subject }) else { return }
         mutate(&project.reports[index])
@@ -60,17 +64,53 @@ func updateReport(
 }
 
 func acceptVerifiedProject(_ state: inout AppFeature.State, project: Project, message: String) {
+    if state.preparedFile?.projectID != project.metadata.id || hasUnsavedChanges(state) {
+        markPreparedFileStale(&state)
+    }
     state.projectStorageStatus = .loaded
     state.selectedProject = project
     state.selectedProjectReadiness = getProjectReadiness(project)
     state.pendingImport = nil
-    state.preparedFile = nil
     state.hasUnsavedProjectChanges = false
     state.operationStatus = .saved(message)
     state.workflowMessage = message
     state.projects.removeAll { $0.id == project.metadata.id }
     state.projects.append(projectSummary(project))
     state.projects = sortedProjects(state.projects)
+}
+
+func markPreparedFileStale(_ state: inout AppFeature.State) {
+    guard state.preparedFile?.purpose == .projectOutput else { return }
+    state.preparedFile?.isStale = true
+}
+
+func invalidateAIReviewState(
+    _ state: inout AppFeature.State,
+    studentID: String? = nil,
+    subject: String? = nil
+) {
+    func matches(_ candidateStudentID: String, _ candidateSubject: String) -> Bool {
+        (studentID == nil || studentID == candidateStudentID)
+            && (subject == nil || subject == candidateSubject)
+    }
+
+    if let pending = state.pendingAIRevision, matches(pending.studentId, pending.subject) {
+        state.pendingAIRevision = nil
+    }
+    state.pendingAIRevisions.removeAll { matches($0.studentId, $0.subject) }
+    if let latest = state.latestReportCheck, matches(latest.studentId, latest.subject) {
+        state.latestReportCheck = nil
+    }
+}
+
+func invalidateAllAIReviewState(_ state: inout AppFeature.State) {
+    state.pendingAIRevision = nil
+    state.pendingAIRevisions = []
+    state.latestReportCheck = nil
+}
+
+func isAIWorkRunning(_ state: AppFeature.State) -> Bool {
+    state.activeAIRequest != nil || state.isBulkAIRevisionRunning
 }
 
 func sortedProjects(_ projects: [ProjectSummary]) -> [ProjectSummary] {
@@ -96,10 +136,10 @@ func projectStorageLoadedMessage(projectCount: Int, invalidProjectCount: Int = 0
 func generationSuccessMessage(_ result: CommentGenerationResult) -> String {
     let generatedLabel = result.generatedCount == 1 ? "1 draft comment" : "\(result.generatedCount) draft comments"
     guard result.skippedLockedCount > 0 else {
-        return "\(generatedLabel) generated deterministically, saved, and verified."
+        return "\(generatedLabel) generated deterministically, saved, and verified. Read each new draft and mark it Done before export."
     }
     let lockedLabel = result.skippedLockedCount == 1 ? "1 locked draft" : "\(result.skippedLockedCount) locked drafts"
-    return "\(generatedLabel) generated deterministically, \(lockedLabel) left unchanged, saved, and verified."
+    return "\(generatedLabel) generated deterministically, \(lockedLabel) left unchanged, saved, and verified. Read each new draft and mark it Done before export."
 }
 
 func projectSummary(_ project: Project) -> ProjectSummary {

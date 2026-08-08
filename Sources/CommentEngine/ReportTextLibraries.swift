@@ -111,17 +111,27 @@ let mathProficiencyTemplatesDouble = [
 
 let nextStepTemplatesSingle = [
     "A helpful next step for {Name} is to {goal}.",
-    "Moving forward, {Name} will benefit from focusing on {goal}.",
-    "{Name} is encouraged to work on {goal} as a next step.",
-    "To continue progressing, {Name} should focus on {goal}."
+    "Moving forward, {Name} is encouraged to {goal}.",
+    "To continue progressing, {Name} should {goal}.",
+    "{Name} will benefit from opportunities to {goal}."
 ]
 
 let nextStepTemplatesDouble = [
-    "Moving forward, {Name} is encouraged to {goal1} and {goal2}.",
-    "Next steps for {Name} include {goal1} and {goal2}.",
-    "To continue developing, {Name} will focus on {goal1} as well as {goal2}.",
-    "{Name} is working towards {goal1} and {goal2}."
+    "Moving forward, {Name} is encouraged to {goal1}, as well as to {goal2}.",
+    "Next steps for {Name} are to {goal1} and to {goal2}.",
+    "To continue developing, {Name} should {goal1} and should {goal2}.",
+    "{Name} will benefit from opportunities to {goal1} and to {goal2}."
 ]
+
+func formatNextStepGoalForReport(_ goal: String) -> String {
+    let normalized = goal
+        .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    if normalized.lowercased() == "expand elaborations (add detail)" {
+        return "add more detail to elaborations"
+    }
+    return normalized
+}
 
 func mindsetToFragment(_ toggle: String) -> String {
     [

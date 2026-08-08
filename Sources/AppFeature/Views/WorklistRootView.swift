@@ -16,11 +16,14 @@ struct WorklistRootView: View {
     let pendingAIRevision: AppFeature.PendingAIRevision?
     let pendingAIRevisions: [AppFeature.PendingAIRevision]
     let isBulkAIRevisionRunning: Bool
+    let activeAIRequest: AppFeature.ActiveAIRequest?
     let latestReportCheck: AppFeature.ReportCheckResult?
     let rosterImportState: AppFeature.TabularImportState
     let resultsImportState: AppFeature.TabularImportState
     let lastPreparedFiles: [ImportExportFormat: AppFeature.PreparedFileRecord]
     let datasetStatus: AppFeature.DatasetStatus
+    let taskFocus: AppFeature.WorklistFocus
+    let onTaskFocusChanged: (AppFeature.WorklistFocus) -> Void
     let onGoToProjects: () -> Void
     let onProjectNameChanged: (String) -> Void
     let onProjectTermChanged: (String) -> Void
@@ -54,6 +57,7 @@ struct WorklistRootView: View {
     let onGenerate: () -> Void
     let onManualEditChanged: (String, String, String) -> Void
     let onLockChanged: (String, String, Bool) -> Void
+    let onMarkReportDone: (String, String) -> Void
     let onApproveReportForExport: (String, String) -> Void
     let onAIPolishReport: (String, String) -> Void
     let onAIToneAdjustReport: (String, String) -> Void
@@ -80,7 +84,9 @@ struct WorklistRootView: View {
     let onReportAIOptionsReset: (String, String) -> Void
     let onImportRoster: () -> Void
     let onImportResults: () -> Void
+    let onPrepareImportTemplate: (CSVTemplateKind, ImportExportFormat) -> Void
     let onPrepareBackup: () -> Void
+    let onPrepareEncryptedBackup: () -> Void
     let onPrepareExport: (ImportExportFormat) -> Void
     let onSavePreparedFile: () -> Void
     let onSharePreparedFile: () -> Void
@@ -90,8 +96,6 @@ struct WorklistRootView: View {
     let onCancelImportPreview: () -> Void
 
     @State private var activeStudentEditorRoute: StudentEditorRoute?
-    @State private var taskFocus: WorklistTaskFocus = .all
-
     var body: some View {
         NavigationStack {
             List {
@@ -143,6 +147,7 @@ struct WorklistRootView: View {
                         onInternalNoteChanged: onStudentInternalNoteChanged,
                         onAttitudeDescriptorChanged: onStudentAttitudeDescriptorChanged,
                         onImportRoster: onImportRoster,
+                        onPrepareTemplate: { onPrepareImportTemplate(.roster, $0) },
                         onOpenStudentEditor: { activeStudentEditorRoute = StudentEditorRoute(studentId: $0) },
                         isDisabled: isEditingLocked
                     )
@@ -173,6 +178,7 @@ struct WorklistRootView: View {
                         onMathMindsetTogglesChanged: onResultMathMindsetTogglesChanged,
                         onNextStepGoalsChanged: onResultNextStepGoalsChanged,
                         onImportResults: onImportResults,
+                        onPrepareTemplate: { onPrepareImportTemplate(.achievementResults, $0) },
                         isDisabled: isEditingLocked
                     )
                     .worklistStationerySectionRows()
@@ -192,6 +198,7 @@ struct WorklistRootView: View {
                         onGenerate: onGenerate,
                         onManualEditChanged: onManualEditChanged,
                         onLockChanged: onLockChanged,
+                        onMarkReportDone: onMarkReportDone,
                         onApproveReportForExport: onApproveReportForExport,
                         onAIPolishReport: onAIPolishReport,
                         onAIToneAdjustReport: onAIToneAdjustReport,
@@ -232,13 +239,13 @@ struct WorklistRootView: View {
                     BackupSection(
                         record: lastPreparedFiles[.backupJSON],
                         onPrepareBackup: onPrepareBackup,
+                        onPrepareEncryptedBackup: onPrepareEncryptedBackup,
                         isDisabled: isEditingLocked || hasUnsavedChanges,
                         disabledReason: backupDisabledReason
                     )
                     .worklistStationerySectionRows()
                     PreparedFileSection(
-                        preparedFile: hasUnsavedChanges ? nil : preparedFile,
-                        hasHiddenStalePreparedFile: hasUnsavedChanges && preparedFile != nil,
+                        preparedFile: preparedFile,
                         onSavePreparedFile: onSavePreparedFile,
                         onSharePreparedFile: onSharePreparedFile,
                         onDismissPreparedFile: onDismissPreparedFile,
@@ -357,8 +364,11 @@ struct WorklistRootView: View {
     private var taskFocusSection: some View {
         Section {
             NotebookCard {
-                Picker("Task focus", selection: $taskFocus) {
-                    ForEach(WorklistTaskFocus.allCases) { focus in
+                Picker(
+                    "Task focus",
+                    selection: Binding(get: { taskFocus }, set: onTaskFocusChanged)
+                ) {
+                    ForEach(AppFeature.WorklistFocus.allCases) { focus in
                         Label(focus.title, systemImage: focus.systemImage).tag(focus)
                     }
                 }
@@ -383,7 +393,7 @@ struct WorklistRootView: View {
     }
 
     private var isEditingLocked: Bool {
-        isWorkflowBusy || pendingImport != nil
+        isWorkflowBusy || pendingImport != nil || activeAIRequest != nil || isBulkAIRevisionRunning
     }
 
     private var isWorkflowBusy: Bool {
@@ -445,15 +455,7 @@ struct WorklistRootView: View {
     }
 }
 
-private enum WorklistTaskFocus: String, CaseIterable, Identifiable {
-    case all
-    case setup
-    case results
-    case drafts
-    case files
-
-    var id: String { rawValue }
-
+private extension AppFeature.WorklistFocus {
     var title: String {
         switch self {
         case .all: return "All"

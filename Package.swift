@@ -79,6 +79,7 @@ let package = Package(
                 "CommenterImportExport",
                 "CommenterReportSafety",
                 "CommenterAI",
+                "CommenterAppIntents",
                 "DesignSystem",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ]
@@ -133,6 +134,10 @@ let package = Package(
         .testTarget(
             name: "CommenterPersistenceTests",
             dependencies: ["CommenterPersistence", "CommenterDomain"]
+        ),
+        .testTarget(
+            name: "CommenterAppIntentsTests",
+            dependencies: ["CommenterAppIntents"]
         )
     ]
 )

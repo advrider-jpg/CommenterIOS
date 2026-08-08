@@ -1,5 +1,10 @@
 # Initial Backlog
 
+> Historical bootstrap checklist. It records the original implementation plan,
+> not the live product-completeness verdict. Use `docs/ledgers/PROJECT_LEDGER.md`
+> for current product posture and `docs/ledgers/VALIDATION_LEDGER.md` for dated
+> evidence. Unchecked items below remain unclaimed until their own work is done.
+
 ## Epic 0 - Repo Bootstrap
 
 - [x] Scaffold initial SwiftUI/TCA Swift package app.

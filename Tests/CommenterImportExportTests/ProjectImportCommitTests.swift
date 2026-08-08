@@ -73,6 +73,34 @@ final class ProjectImportCommitTests: XCTestCase {
         }
     }
 
+    func testDuplicatePreparedRowsAreRejectedWithoutAFalseImportedCount() throws {
+        let original = fixtureProject()
+        let duplicateStudent = Student(id: "s1", firstName: "Different", lastName: "Student", yearLevel: .year5)
+        XCTAssertThrowsError(try projectByApplyingRosterImport([duplicateStudent], to: original, nowMilliseconds: 2)) { error in
+            XCTAssertEqual(error as? ProjectImportCommitError, .duplicateRosterImport)
+        }
+
+        let first = AchievementResult(studentId: "s1", subject: "English", achievementLevel: .aboveStandard)
+        let second = AchievementResult(studentId: "s1", subject: "English", achievementLevel: .developing)
+        XCTAssertThrowsError(try projectByApplyingResultsImport([first, second], to: original, nowMilliseconds: 2)) { error in
+            XCTAssertEqual(error as? ProjectImportCommitError, .duplicateResultsImport)
+        }
+
+        XCTAssertEqual(original.roster.count, 1)
+        XCTAssertEqual(original.results[0].achievementLevel, .atStandard)
+        XCTAssertEqual(original.metadata.updatedAt, 1)
+    }
+
+    func testRosterCommitAllowsDifferentStudentsWithTheSameNameAndYear() throws {
+        let original = fixtureProject()
+        let sameName = Student(id: "s2", firstName: "Ava", lastName: "Ng", yearLevel: .year5)
+
+        let change = try projectByApplyingRosterImport([sameName], to: original, nowMilliseconds: 2)
+
+        XCTAssertEqual(change.importedCount, 1)
+        XCTAssertEqual(change.project.roster.map(\.id), ["s1", "s2"])
+    }
+
     func testExistingInvalidProjectIsRejectedBeforeApplyingImport() {
         var invalidProject = fixtureProject()
         invalidProject.results.append(AchievementResult(studentId: "missing", subject: "English", achievementLevel: .atStandard))
@@ -129,6 +157,28 @@ final class ProjectImportCommitTests: XCTestCase {
         XCTAssertEqual(preview.change.project.metadata.updatedAt, 99)
         XCTAssertEqual(original.results.count, 1)
         XCTAssertNil(original.results.first { $0.subject == "Mathematics" })
+    }
+
+    func testResultsImportPreviewPreservesExistingFieldsOmittedFromSparseCSV() throws {
+        var original = fixtureProject()
+        original.results[0].evidenceText = "Existing evidence"
+        original.results[0].internalTeacherNote = "Keep this private note"
+        original.results[0].commentsText = "Keep this legacy internal comment"
+        original.results[0].flags = ["teacher-reviewed": true]
+        let url = try writeTemporaryFile(
+            name: "results.csv",
+            data: Data("First Name,Last Name,Subject,Achievement Level\nAva,Ng,English,Above Standard".utf8)
+        )
+
+        let preview = try prepareResultsImportPreview(from: url, project: original, nowMilliseconds: 99)
+        let result = try XCTUnwrap(preview.change.project.results.first)
+
+        XCTAssertEqual(result.achievementLevel, .aboveStandard)
+        XCTAssertEqual(result.evidenceText, "Existing evidence")
+        XCTAssertEqual(result.internalTeacherNote, "Keep this private note")
+        XCTAssertEqual(result.commentsText, "Keep this legacy internal comment")
+        XCTAssertEqual(result.flags, ["teacher-reviewed": true])
+        XCTAssertEqual(original.results[0].achievementLevel, .atStandard)
     }
 
     func testRosterImportPreviewRejectsNoOpCSVBeforeTeacherConfirmation() throws {

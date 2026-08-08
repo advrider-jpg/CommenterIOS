@@ -28,14 +28,11 @@ public struct ReportReviewRow: Equatable, Sendable {
         "Student Name",
         "Year Level",
         "Subject",
-        "Specific Subject",
+        "Learning Focus",
         "Achievement Level",
-        "Report Text",
-        "Manual Edit Used",
-        "AI Review Status",
-        "Generated Date",
-        "Project Name",
-        "Term"
+        "Report Comment",
+        "Reporting Period Name",
+        "Reporting Period"
     ]
 
     public var studentName: String
@@ -44,9 +41,6 @@ public struct ReportReviewRow: Equatable, Sendable {
     public var specificSubject: String
     public var achievementLevel: String
     public var reportText: String
-    public var manualEditUsed: String
-    public var aiReviewStatus: String
-    public var generatedDate: String
     public var projectName: String
     public var term: String
 
@@ -57,9 +51,6 @@ public struct ReportReviewRow: Equatable, Sendable {
         specificSubject: String,
         achievementLevel: String,
         reportText: String,
-        manualEditUsed: String,
-        aiReviewStatus: String,
-        generatedDate: String,
         projectName: String,
         term: String
     ) {
@@ -69,9 +60,6 @@ public struct ReportReviewRow: Equatable, Sendable {
         self.specificSubject = specificSubject
         self.achievementLevel = achievementLevel
         self.reportText = reportText
-        self.manualEditUsed = manualEditUsed
-        self.aiReviewStatus = aiReviewStatus
-        self.generatedDate = generatedDate
         self.projectName = projectName
         self.term = term
     }
@@ -84,9 +72,6 @@ public struct ReportReviewRow: Equatable, Sendable {
             specificSubject,
             achievementLevel,
             reportText,
-            manualEditUsed,
-            aiReviewStatus,
-            generatedDate,
             projectName,
             term
         ]
@@ -179,30 +164,11 @@ public func reportReviewRows(project: Project, studentId: String? = nil) throws 
                 specificSubject: spreadsheetSafeText(result.focusStrand ?? ""),
                 achievementLevel: spreadsheetSafeText(result.achievementLevel?.rawValue ?? ""),
                 reportText: spreadsheetSafeText(try exportReportText(report)),
-                manualEditUsed: report.manualEdit?.isEmpty == false ? "Yes" : "No",
-                aiReviewStatus: spreadsheetSafeText(aiReviewStatus(report)),
-                generatedDate: generatedDateString(report.generatedAt),
                 projectName: spreadsheetSafeText(project.metadata.name),
                 term: spreadsheetSafeText(project.metadata.term)
             )
         }
     }
-}
-
-private func aiReviewStatus(_ report: GeneratedReport) -> String {
-    guard report.requiresTeacherApprovalForExport else {
-        return "Deterministic only"
-    }
-    let currentFingerprint = stableTextFingerprint(report.exportText)
-    if report.reviewState?.status == .approved,
-       report.reviewState?.approvalFingerprint == currentFingerprint,
-       report.approvedTextFingerprint == currentFingerprint {
-        return "AI approved"
-    }
-    if report.lastValidation?.status == .blocked {
-        return "AI validation blocked"
-    }
-    return "AI needs review"
 }
 
 public func prepareReportPacket(project: Project, studentId: String? = nil) throws -> PreparedReportPacket {
@@ -242,13 +208,22 @@ public func reportExportFilename(project: Project, format: ImportExportFormat, s
     guard [.docx, .xlsx, .xls].contains(format) else {
         throw ReportExportPreparationError.unsupportedFormat(format)
     }
-    let base = safeFileName(project.metadata.name, fallback: "ReportWriter")
+    let base = safeFileName(project.metadata.name, fallback: "ReportWriter", maximumUTF8Bytes: 100)
     let suffix: String
     if let studentId {
         guard let student = project.roster.first(where: { $0.id == studentId }) else {
             throw ReportExportPreparationError.notReady(["The selected student was not found in this project."])
         }
-        suffix = "_\(safeFileName(student.firstName, fallback: "Student"))"
+        let studentSlug = reportFilenameStudentSlug(student)
+        let matchingStudents = project.roster.filter {
+            reportFilenameStudentSlug($0).caseInsensitiveCompare(studentSlug) == .orderedSame
+        }
+        if matchingStudents.count > 1,
+           let rosterIndex = project.roster.firstIndex(where: { $0.id == student.id }) {
+            suffix = "_\(studentSlug)_\(rosterIndex + 1)"
+        } else {
+            suffix = "_\(studentSlug)"
+        }
     } else {
         suffix = ""
     }
@@ -293,6 +268,30 @@ private func validatedReportExportScope(project: Project, studentId: String?) th
     if subjects.isEmpty {
         issues.append("There are no selected subjects to export.")
     }
+    let exportTextFields: [(label: String, value: String)] = [
+        ("Project name", project.metadata.name),
+        ("Term", project.metadata.term)
+    ] + students.flatMap { student in
+        [
+            ("Student first name", student.firstName),
+            ("Student last name", student.lastName)
+        ]
+    } + subjects.map { subject in
+        ("Subject name", displaySubjectName(subject))
+    } + students.flatMap { student in
+        subjects.flatMap { subject -> [(label: String, value: String)] in
+            guard let result = project.results.first(where: { $0.studentId == student.id && $0.subject == subject }) else {
+                return []
+            }
+            return [
+                ("Specific subject", result.focusStrand ?? ""),
+                ("Achievement level", result.achievementLevel?.rawValue ?? "")
+            ]
+        }
+    }
+    if let invalid = exportTextFields.first(where: { containsUnsupportedXMLCharacter($0.value) }) {
+        issues.append("\(invalid.label) contains a control character that cannot be written to a report file. Remove that character before exporting.")
+    }
     students.forEach { student in
         subjects.forEach { subject in
             let readiness = getReportReadiness(project: project, studentId: student.id, subject: subject)
@@ -308,12 +307,30 @@ private func validatedReportExportScope(project: Project, studentId: String?) th
 }
 
 private func exportReportText(_ report: GeneratedReport) throws -> String {
-    let text = report.manualEdit?.isEmpty == false ? report.manualEdit ?? "" : report.text
+    let text = report.manualEdit ?? report.text
+    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        throw ReportExportPreparationError.notReady(["\(displaySubjectName(report.subject)) report does not contain export-ready text."])
+    }
+    if containsUnsupportedXMLCharacter(text) {
+        throw ReportExportPreparationError.notReady(["\(displaySubjectName(report.subject)) report contains a control character that cannot be written to a report file. Remove that character before exporting."])
+    }
     let placeholders = findUnresolvedPlaceholders(text)
     if !placeholders.isEmpty {
         throw ReportExportPreparationError.notReady(["\(displaySubjectName(report.subject)) report contains template text that must be replaced."])
     }
     return text
+}
+
+private func containsUnsupportedXMLCharacter(_ value: String) -> Bool {
+    value.unicodeScalars.contains { scalar in
+        let codePoint = scalar.value
+        return codePoint != 0x09
+            && codePoint != 0x0a
+            && codePoint != 0x0d
+            && !(0x20...0xd7ff).contains(codePoint)
+            && !(0xe000...0xfffd).contains(codePoint)
+            && !(0x10000...0x10ffff).contains(codePoint)
+    }
 }
 
 private func displayStudentName(project: Project, student: Student) -> String {
@@ -345,14 +362,7 @@ private func plural(_ count: Int, _ singular: String) -> String {
     "\(count) \(count == 1 ? singular : "\(singular)s")"
 }
 
-private func generatedDateString(_ milliseconds: Int64) -> String {
-    guard milliseconds > 0 else { return "" }
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: Date(timeIntervalSince1970: Double(milliseconds) / 1000))
-}
-
-private func safeFileName(_ value: String, fallback: String) -> String {
+private func safeFileName(_ value: String, fallback: String, maximumUTF8Bytes: Int) -> String {
     let allowedPunctuation = CharacterSet(charactersIn: " _-")
     let filtered = value.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.map { scalar -> Character in
         if CharacterSet.alphanumerics.contains(scalar) || allowedPunctuation.contains(scalar) {
@@ -360,12 +370,26 @@ private func safeFileName(_ value: String, fallback: String) -> String {
         }
         return "_"
     }
-    let collapsed = String(String(filtered)
+    let collapsed = String(filtered)
         .replacingOccurrences(of: #"_+"#, with: "_", options: .regularExpression)
-        .prefix(120))
         .trimmingCharacters(in: .whitespacesAndNewlines)
-    if collapsed.range(of: #"[A-Za-z0-9]"#, options: .regularExpression) == nil {
+    var bounded = ""
+    var byteCount = 0
+    for character in collapsed {
+        let characterBytes = String(character).utf8.count
+        guard byteCount + characterBytes <= maximumUTF8Bytes else { break }
+        bounded.append(character)
+        byteCount += characterBytes
+    }
+    bounded = bounded.trimmingCharacters(in: .whitespacesAndNewlines)
+    if bounded.rangeOfCharacter(from: .alphanumerics) == nil {
         return fallback
     }
-    return collapsed
+    return bounded
+}
+
+private func reportFilenameStudentSlug(_ student: Student) -> String {
+    let year = student.yearLevel.rawValue.replacingOccurrences(of: " ", with: "_")
+    return safeFileName("\(fullStudentName(student))_\(year)", fallback: "Student", maximumUTF8Bytes: 80)
+        .replacingOccurrences(of: #"\s+"#, with: "_", options: .regularExpression)
 }

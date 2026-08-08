@@ -7,6 +7,8 @@ struct ProjectsRootView: View {
     let status: AppFeature.ProjectStorageStatus
     let projects: [ProjectSummary]
     let operationStatus: AppFeature.OperationStatus
+    let hasUnsavedProjectChanges: Bool
+    let isAIWorkRunning: Bool
     let onCreateProject: () -> Void
     let onOpenProject: (String) -> Void
     let onImportBackup: () -> Void
@@ -92,6 +94,7 @@ struct ProjectsRootView: View {
     }
 
     private var canStartProjectStorageAction: Bool {
+        guard !hasUnsavedProjectChanges, !isAIWorkRunning else { return false }
         if case .loaded = status {
             return true
         }
@@ -124,6 +127,12 @@ struct ProjectsRootView: View {
     }
 
     private var projectActionUnavailableMessage: String {
+        if hasUnsavedProjectChanges {
+            return "Save the open project before creating or importing another project so no teacher edits are stranded."
+        }
+        if isAIWorkRunning {
+            return "Wait for the current on-device AI request to finish, or cancel the bulk request, before starting another project action."
+        }
         switch status {
         case .notLoaded, .loading:
             return "Local project storage is still being checked."

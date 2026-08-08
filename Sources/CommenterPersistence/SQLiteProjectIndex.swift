@@ -2,6 +2,10 @@ import CommenterDomain
 import Foundation
 import GRDB
 
+private struct SQLiteBeforeCommitError: Error {
+    var underlying: Error
+}
+
 struct SQLiteProjectIndex {
     let indexURL: URL
 
@@ -88,12 +92,36 @@ struct SQLiteProjectIndex {
         }
     }
 
+    func deleteProject(
+        atProjectPath projectPath: URL,
+        beforeCommit: () throws -> Void = {}
+    ) throws {
+        try initialize()
+        try withDatabaseQueue { queue in
+            try queue.inTransaction(.immediate) { db in
+                try db.execute(
+                    sql: "DELETE FROM usage_ledger WHERE project_id IN (SELECT id FROM projects WHERE path = ?);",
+                    arguments: [projectPath.path]
+                )
+                try db.execute(sql: "DELETE FROM projects WHERE path = ?;", arguments: [projectPath.path])
+                do {
+                    try beforeCommit()
+                } catch {
+                    throw SQLiteBeforeCommitError(underlying: error)
+                }
+                return .commit
+            }
+        }
+    }
+
     private func withDatabaseQueue<T>(_ body: (DatabaseQueue) throws -> T) throws -> T {
         do {
             let queue = try DatabaseQueue(path: indexURL.path)
             return try body(queue)
         } catch let error as ProjectStoreError {
             throw error
+        } catch let error as SQLiteBeforeCommitError {
+            throw error.underlying
         } catch {
             throw ProjectStoreError.sqlite(sqliteMessage(error))
         }

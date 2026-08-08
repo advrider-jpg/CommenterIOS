@@ -50,12 +50,10 @@ public enum ReportSafetyValidator {
         findings.append(contentsOf: forbiddenMentionFindings(text, context: context))
         findings.append(contentsOf: requiredMentionFindings(text, context: context))
         findings.append(contentsOf: sensitiveFindings(text, context: context))
-        if !findings.contains(where: { $0.severity == .block }) {
-            findings.append(contentsOf: unsupportedFactFindings(text, context: context))
-            findings.append(contentsOf: toneFindings(text, context: context))
-            findings.append(contentsOf: lengthFindings(text, context: context))
-            findings.append(contentsOf: layoutFindings(text))
-        }
+        findings.append(contentsOf: unsupportedFactFindings(text, context: context))
+        findings.append(contentsOf: toneFindings(text, context: context))
+        findings.append(contentsOf: lengthFindings(text, context: context))
+        findings.append(contentsOf: layoutFindings(text))
 
         let status: ReportValidationStatus
         if findings.contains(where: { $0.severity == .block }) {
@@ -144,7 +142,10 @@ private func nameFindings(_ text: String, context: ReportValidationContext) -> [
         ))
     }
 
-    if context.projectMetadata.useFirstNameOnly, !lastName.isEmpty, containsWholePhrase(lastName, in: text) {
+    let selectedFullName = displayName(context.student, useFirstNameOnly: false)
+    let selectedLastNameAppears = containsWholePhraseCaseSensitive(lastName, in: text) ||
+        (!selectedFullName.isEmpty && containsWholePhrase(selectedFullName, in: text))
+    if context.projectMetadata.useFirstNameOnly, !lastName.isEmpty, selectedLastNameAppears {
         findings.append(ReportValidationFinding(
             id: "",
             severity: .block,
@@ -155,11 +156,18 @@ private func nameFindings(_ text: String, context: ReportValidationContext) -> [
         ))
     }
 
-    context.knownStudents
+    unique(context.knownStudents
         .filter { $0.id != context.student.id }
-        .flatMap { other in [displayName(other, useFirstNameOnly: false), other.firstName, other.lastName] }
-        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty && containsWholePhrase($0, in: text) }
+        .flatMap { other -> [String] in
+            let fullName = displayName(other, useFirstNameOnly: false)
+            let individualNames = [other.firstName, other.lastName]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && containsWholePhraseCaseSensitive($0, in: text) }
+            if !fullName.isEmpty, containsWholePhrase(fullName, in: text) {
+                return [fullName]
+            }
+            return individualNames
+        })
         .forEach { otherName in
             findings.append(ReportValidationFinding(
                 id: "",
@@ -191,7 +199,10 @@ private func pronounFindings(_ text: String, context: ReportValidationContext) -
     let observed = Set(matches(pattern: #"\b(?:he|she|they|him|her|them|his|their)\b"#, in: text, options: [.caseInsensitive]).map { $0.lowercased() })
     guard !observed.isEmpty else { return [] }
 
-    let expectedWords = Set([expected.subject, expected.object, expected.possessive])
+    // The deterministic Commenter corpus uses singular they consistently. Neutral
+    // pronouns are therefore valid for every student, while a conflicting gendered
+    // pronoun remains a blocker.
+    let expectedWords = Set([expected.subject, expected.object, expected.possessive, "they", "them", "their"])
     let mismatches = observed.subtracting(expectedWords).sorted()
     return mismatches.map {
         ReportValidationFinding(
@@ -266,7 +277,16 @@ private func toneFindings(_ text: String, context: ReportValidationContext) -> [
 
 private func lengthFindings(_ text: String, context: ReportValidationContext) -> [ReportValidationFinding] {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    if trimmed.count > context.maximumCharacters {
+    if trimmed.isEmpty {
+        return [ReportValidationFinding(
+            id: "",
+            severity: .block,
+            category: .length,
+            message: "The report is empty.",
+            suggestedFix: "Create or restore report text before approval or export."
+        )]
+    }
+    if trimmed.utf16.count > context.maximumCharacters {
         return [ReportValidationFinding(
             id: "",
             severity: .block,
@@ -275,7 +295,7 @@ private func lengthFindings(_ text: String, context: ReportValidationContext) ->
             suggestedFix: "Shorten the report before export."
         )]
     }
-    if !trimmed.isEmpty, words(in: trimmed).count < 8 {
+    if words(in: trimmed).count < 8 {
         return [ReportValidationFinding(
             id: "",
             severity: .warning,
@@ -358,8 +378,15 @@ private func expectedPronounSet(_ student: Student) -> (subject: String, object:
 private func containsWholePhrase(_ phrase: String, in text: String) -> Bool {
     let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return false }
-    let pattern = #"(?<![A-Za-z])"# + NSRegularExpression.escapedPattern(for: trimmed) + #"(?![A-Za-z])"#
+    let pattern = #"(?<![\p{L}\p{N}])"# + NSRegularExpression.escapedPattern(for: trimmed) + #"(?![\p{L}\p{N}])"#
     return text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+}
+
+private func containsWholePhraseCaseSensitive(_ phrase: String, in text: String) -> Bool {
+    let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return false }
+    let pattern = #"(?<![\p{L}\p{N}])"# + NSRegularExpression.escapedPattern(for: trimmed) + #"(?![\p{L}\p{N}])"#
+    return text.range(of: pattern, options: [.regularExpression]) != nil
 }
 
 private func matches(pattern: String, in text: String, options: NSRegularExpression.Options = []) -> [String] {

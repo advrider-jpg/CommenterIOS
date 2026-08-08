@@ -16,8 +16,6 @@ func hiddenAIExportStrings(_ report: GeneratedReport) -> [String?] {
     if let validation = report.lastValidation {
         values.append(validation.textFingerprint)
         values.append(contentsOf: validation.findings.map(\.id))
-        values.append(contentsOf: validation.findings.map(\.excerpt))
-        values.append(contentsOf: validation.findings.map(\.suggestedFix))
     }
     if let review = report.reviewState {
         values.append(review.reviewerDisplayName)
@@ -31,7 +29,6 @@ func hiddenAIExportStrings(_ report: GeneratedReport) -> [String?] {
     values.append(report.validationWarningReview?.notes)
     values.append(report.aiOptionsOverride?.customInstruction)
     values.append(contentsOf: report.aiOptionsOverride?.forbiddenMentions ?? [])
-    values.append(contentsOf: report.aiOptionsOverride?.requiredMentions ?? [])
     values.append(contentsOf: report.latestAIReviewNotes ?? [])
     values.append(contentsOf: report.revisionHistory?.map(\.id) ?? [])
     values.append(contentsOf: report.revisionHistory?.map(\.traceId) ?? [])
