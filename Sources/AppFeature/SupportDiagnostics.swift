@@ -97,7 +97,6 @@ public func supportDiagnosticsText(
     lines.append("")
     lines.append("Project storage status: \(projectStorageStatusDescription(state.projectStorageStatus))")
     lines.append("Project storage message: \(diagnosticSupportMessage(state.projectStorageMessage, project: state.selectedProject, redaction: redaction))")
-    lines.append("On-device AI status: \(aiAvailabilityDescription(state.aiAvailabilityStatus))")
     lines.append("Projects on device: \(CommenterFormatters.integer(state.projects.count, locale: locale))")
     if !state.invalidProjectRecords.isEmpty {
         lines.append("Invalid local project records:")
@@ -119,23 +118,6 @@ public func supportDiagnosticsText(
         lines.append("Selected subjects: \(CommenterFormatters.integer(project.metadata.selectedSubjects.count, locale: locale))")
         lines.append("Results count: \(CommenterFormatters.integer(project.results.count, locale: locale))")
         lines.append("Draft reports count: \(CommenterFormatters.integer(project.reports.count, locale: locale))")
-        let aiReviewCount = project.reports.filter { report in
-            guard report.requiresTeacherApprovalForExport else { return false }
-            let currentFingerprint = stableTextFingerprint(report.exportText)
-            return report.reviewState?.status != .approved ||
-                report.reviewState?.approvalFingerprint != currentFingerprint ||
-                report.approvedTextFingerprint != currentFingerprint
-        }.count
-        lines.append("AI drafts needing review: \(CommenterFormatters.integer(aiReviewCount, locale: locale))")
-        let reportOverrideCount = project.reports.filter { $0.aiOptionsOverride != nil }.count
-        lines.append("AI draft-specific setting overrides: \(CommenterFormatters.integer(reportOverrideCount, locale: locale))")
-        if let settings = project.metadata.aiSettings {
-            lines.append("AI project tone default: \(schoolVoiceDescription(settings.defaultToneProfile.schoolVoice))")
-            lines.append("AI project target length: \(settings.targetLength.rawValue)")
-            lines.append("AI custom instruction stored: \(settings.customInstruction == nil ? "no" : "yes")")
-        } else {
-            lines.append("AI project defaults: balanced")
-        }
         if let readiness = state.selectedProjectReadiness {
             lines.append("Export readiness: \(readiness.ready) of \(readiness.expected)")
             if !readiness.blocked.isEmpty {
@@ -145,22 +127,6 @@ public func supportDiagnosticsText(
     } else {
         lines.append("")
         lines.append("Open project: none")
-    }
-
-    if let pending = state.pendingAIRevision {
-        lines.append("Pending AI preview: \(diagnosticIdentifier(pending.studentId, prefix: "student", redaction: redaction)) / \(pending.subject) / \(pending.validation.status.rawValue)")
-    }
-    if state.aiReviewQueueCount > 0 {
-        lines.append("AI review queue: \(CommenterFormatters.integer(state.aiReviewQueueCount, locale: locale))")
-    }
-    if state.isBulkAIRevisionRunning {
-        lines.append("Bulk AI revision: running")
-    }
-    if !state.pendingAIRevisions.isEmpty {
-        lines.append("Queued AI previews: \(CommenterFormatters.integer(state.pendingAIRevisions.count, locale: locale))")
-    }
-    if let check = state.latestReportCheck {
-        lines.append("Latest report check: \(diagnosticIdentifier(check.studentId, prefix: "student", redaction: redaction)) / \(check.subject) / \(check.validation.status.rawValue)")
     }
 
     if !state.lastPreparedFiles.isEmpty {
@@ -251,21 +217,6 @@ func diagnosticReadinessMessage(_ message: String, project: Project, redaction: 
     return redacted
 }
 
-public func aiAvailabilityDescription(_ status: AppFeature.AIAvailabilityStatus) -> String {
-    switch status {
-    case .notChecked:
-        return "Not checked"
-    case .checking:
-        return "Checking local Apple Intelligence availability"
-    case .checked(.available):
-        return "Available on this device"
-    case let .checked(.unavailable(reason)):
-        return "Unavailable - \(reason.rawValue)"
-    case let .failed(message):
-        return "Failed - \(message)"
-    }
-}
-
 public func projectStorageStatusDescription(_ status: AppFeature.ProjectStorageStatus) -> String {
     switch status {
     case .notLoaded:
@@ -301,21 +252,6 @@ public func projectYearLabel(_ yearLevel: ProjectYearLevel) -> String {
         return "Year 6"
     case .mixed:
         return "Mixed"
-    }
-}
-
-private func schoolVoiceDescription(_ voice: SchoolVoice) -> String {
-    switch voice {
-    case .standard:
-        return "standard"
-    case .warmPrimary:
-        return "warm primary"
-    case .formalReport:
-        return "formal report"
-    case .conciseSystem:
-        return "concise system"
-    case .strengthsBased:
-        return "strengths based"
     }
 }
 

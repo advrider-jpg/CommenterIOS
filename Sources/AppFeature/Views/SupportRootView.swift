@@ -1,4 +1,5 @@
 import CommentEngine
+import CommenterAI
 import CommenterDomain
 import CommenterImportExport
 import CommenterPersistence
@@ -74,6 +75,7 @@ struct SupportRootView: View {
                 SupportDiagnosticRow("App", value: buildInfo.displayName)
                 SupportDiagnosticRow("Version", value: buildInfo.version)
                 SupportDiagnosticRow("Build", value: buildInfo.build)
+                SupportDiagnosticRow("Apple Intelligence", value: state.aiAvailability?.displayText ?? "Checking…")
                 SupportDiagnosticRow("Network services", value: "Not configured", valueTone: .local)
                 SupportDiagnosticRow("Analytics and telemetry", value: "Not configured", valueTone: .local)
             }
@@ -356,13 +358,11 @@ struct SupportRootView: View {
                 SupportBodyText("Project names, roster data, results, draft comments, backups, and report files stay on this device unless you choose a native file export or share destination.")
                 SupportBodyText("Report Writer does not configure accounts, cloud sync, analytics, telemetry, remote AI, or backend project persistence in this MVP.")
                 SupportBodyText("Clipboard diagnostics are redacted by default. Report Writer removes prepared temporary files after save, share, cancellation, or dismissal, and shows a cleanup error if removal does not succeed.")
-                if let privacyPolicyURL = AppPrivacyPolicy.url() {
-                    Link(destination: privacyPolicyURL) {
-                        Label("Open Privacy Policy", systemImage: "hand.raised")
-                            .font(.footnote.weight(.semibold))
-                    }
-                    .accessibilityIdentifier("privacy-policy-link")
+                Link(destination: AppPrivacyPolicy.url) {
+                    Label("Open Privacy Policy", systemImage: "hand.raised")
+                        .font(.footnote.weight(.semibold))
                 }
+                .accessibilityIdentifier("privacy-policy-link")
             }
         }
     }
@@ -491,9 +491,7 @@ struct SupportRootView: View {
     private var canPrepareInvalidSupportCopy: Bool {
         guard case .loaded = state.projectStorageStatus,
               state.preparedFile == nil,
-              state.pendingImport == nil,
-              state.activeAIRequest == nil,
-              !state.isBulkAIRevisionRunning
+              state.pendingImport == nil
         else { return false }
         if case .busy = state.operationStatus { return false }
         return true
@@ -501,9 +499,7 @@ struct SupportRootView: View {
 
     private var canRemoveInvalidProject: Bool {
         guard case .loaded = state.projectStorageStatus,
-              state.pendingImport == nil,
-              state.activeAIRequest == nil,
-              !state.isBulkAIRevisionRunning
+              state.pendingImport == nil
         else { return false }
         if case .busy = state.operationStatus { return false }
         return true

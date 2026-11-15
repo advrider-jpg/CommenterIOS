@@ -6,7 +6,6 @@ This checklist records the non-code release gates that must be completed outside
 
 - Set the final Apple Developer Team ID in the `CommenterIOS` app target.
 - Confirm the final bundle identifier in Xcode and App Store Connect.
-- Set `REPORT_WRITER_PRIVACY_POLICY_URL` to the public HTTPS privacy-policy URL before archiving.
 - Archive a Release build for `generic/platform=iOS` with code signing enabled.
 - Export the archive using App Store distribution options.
 - Upload to App Store Connect or TestFlight and resolve all validation warnings.

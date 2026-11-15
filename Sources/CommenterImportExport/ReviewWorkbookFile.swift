@@ -187,13 +187,10 @@ private func forbiddenWorkbookExportStrings(project: Project) -> [String] {
     var values: [String?] = []
     values.append(contentsOf: project.roster.map(\.internalTeacherNote))
     values.append(contentsOf: project.results.map(\.internalTeacherNote))
-    values.append(project.metadata.aiSettings?.customInstruction)
-    values.append(contentsOf: project.metadata.aiSettings?.forbiddenMentions ?? [])
     for report in project.reports {
         values.append(contentsOf: report.variantIds.map(Optional.some))
         values.append(report.trace)
         values.append(report.resultFingerprint)
-        values.append(contentsOf: hiddenAIExportStrings(report))
     }
     let publicValues = publicExportValues(project)
     return uniqueForbiddenStrings(values).filter { !publicValues.contains($0) }

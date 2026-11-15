@@ -9,12 +9,10 @@ final class CommenterAppIntentsTests: XCTestCase {
             router.consume(pending)
         }
 
-        await CommenterAppIntentRouter.request(.aiReviewQueue)
+        await CommenterAppIntentRouter.request(.reportPreparation)
 
-        XCTAssertEqual(router.pendingDestination, .aiReviewQueue)
+        XCTAssertEqual(router.pendingDestination, .reportPreparation)
         router.consume(.reportPreparation)
-        XCTAssertEqual(router.pendingDestination, .aiReviewQueue)
-        router.consume(.aiReviewQueue)
         XCTAssertNil(router.pendingDestination)
     }
 }

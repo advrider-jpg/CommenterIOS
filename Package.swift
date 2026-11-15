@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.2
 
 import PackageDescription
 
@@ -6,30 +6,25 @@ let package = Package(
     name: "CommenterIOS",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14)
+        .iOS(.v27)
     ],
     products: [
         .library(name: "CommenterDomain", targets: ["CommenterDomain"]),
         .library(name: "CommentEngine", targets: ["CommentEngine"]),
         .library(name: "CommenterPersistence", targets: ["CommenterPersistence"]),
         .library(name: "CommenterImportExport", targets: ["CommenterImportExport"]),
-        .library(name: "CommenterReportSafety", targets: ["CommenterReportSafety"]),
         .library(name: "CommenterAI", targets: ["CommenterAI"]),
         .library(name: "CommenterAppIntents", targets: ["CommenterAppIntents"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
-        .library(name: "AppFeature", targets: ["AppFeature"]),
-        .library(name: "CommenterAITestSupport", targets: ["CommenterAITestSupport"]),
-        .library(name: "CommenterTestSupport", targets: ["CommenterTestSupport"]),
-        .executable(name: "CommenterIOSApp", targets: ["CommenterIOSApp"])
+        .library(name: "AppFeature", targets: ["AppFeature"])
     ],
     dependencies: [
-        .package(url: "https://github.com/CoreOffice/CoreXLSX.git", exact: "0.14.1"),
-        .package(url: "https://github.com/CoreOffice/OLEKit.git", exact: "0.2.0"),
-        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "7.10.0"),
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.11"),
-        .package(url: "https://github.com/dehesa/CodableCSV.git", exact: "0.6.7"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", exact: "1.17.0")
+        .package(url: "https://github.com/CoreOffice/CoreXLSX.git", .upToNextMinor(from: "0.14.2")),
+        .package(url: "https://github.com/CoreOffice/OLEKit.git", .upToNextMinor(from: "0.3.1")),
+        .package(url: "https://github.com/groue/GRDB.swift.git", .upToNextMinor(from: "7.12.0")),
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", .upToNextMinor(from: "0.9.20")),
+        .package(url: "https://github.com/dehesa/CodableCSV.git", .upToNextMinor(from: "0.6.7")),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", .upToNextMinor(from: "1.26.2"))
     ],
     targets: [
         .target(name: "CommenterDomain"),
@@ -57,14 +52,7 @@ let package = Package(
                 .product(name: "ZIPFoundation", package: "ZIPFoundation")
             ]
         ),
-        .target(
-            name: "CommenterReportSafety",
-            dependencies: ["CommenterDomain"]
-        ),
-        .target(
-            name: "CommenterAI",
-            dependencies: ["CommenterDomain", "CommenterReportSafety"]
-        ),
+        .target(name: "CommenterAI"),
         .target(
             name: "CommenterAppIntents",
             dependencies: ["CommenterDomain"]
@@ -77,7 +65,6 @@ let package = Package(
                 "CommentEngine",
                 "CommenterPersistence",
                 "CommenterImportExport",
-                "CommenterReportSafety",
                 "CommenterAI",
                 "CommenterAppIntents",
                 "DesignSystem",
@@ -87,15 +74,6 @@ let package = Package(
         .target(
             name: "CommenterTestSupport",
             dependencies: ["CommenterDomain", "CommentEngine"]
-        ),
-        .target(
-            name: "CommenterAITestSupport",
-            dependencies: ["CommenterAI", "CommenterDomain", "CommenterReportSafety"]
-        ),
-        .executableTarget(
-            name: "CommenterIOSApp",
-            dependencies: ["AppFeature"],
-            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "CommenterDomainTests",
@@ -110,23 +88,13 @@ let package = Package(
             dependencies: ["CommenterImportExport", "CommenterPersistence", "CommentEngine", "CommenterDomain"]
         ),
         .testTarget(
-            name: "CommenterReportSafetyTests",
-            dependencies: ["CommenterReportSafety", "CommenterDomain"]
-        ),
-        .testTarget(
-            name: "CommenterAITests",
-            dependencies: ["CommenterAI", "CommenterAITestSupport", "CommenterDomain"]
-        ),
-        .testTarget(
             name: "AppFeatureTests",
             dependencies: [
                 "AppFeature",
                 "CommenterAI",
-                "CommenterAITestSupport",
                 "CommentEngine",
                 "CommenterDomain",
                 "CommenterImportExport",
-                "CommenterReportSafety",
                 "CommenterPersistence",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ]

@@ -91,18 +91,6 @@ public func validateStoredProjectShape(_ project: Project) -> StoredProjectValid
         if let reviewedAt = report.reviewedAt, reviewedAt < 0 {
             issues.append("A report's teacher-review timestamp is invalid.")
         }
-        let currentText = report.manualEdit ?? report.text
-        if let currentFingerprint = report.currentTextFingerprint,
-           currentFingerprint != stableTextFingerprint(currentText) {
-            issues.append("A report's current-text fingerprint does not match its saved text.")
-        }
-        if report.reviewState?.status == .approved {
-            let currentFingerprint = stableTextFingerprint(currentText)
-            if report.reviewState?.approvalFingerprint != currentFingerprint ||
-                report.approvedTextFingerprint != currentFingerprint {
-                issues.append("An approved report does not match its teacher approval fingerprint.")
-            }
-        }
     }
 
     issues.append(contentsOf: validateProjectSizeLimits(project).map(\.message))

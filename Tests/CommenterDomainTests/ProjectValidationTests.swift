@@ -132,27 +132,9 @@ final class ProjectValidationTests: XCTestCase {
         XCTAssertTrue(validateStoredProjectShape(project).ok)
     }
 
-    func testStoredValidationRejectsStaleCurrentAndApprovalFingerprints() {
-        var project = fixtureProject()
-        project.reports[0].currentTextFingerprint = "stale-current"
-        project.reports[0].reviewState = ReportReviewState(
-            status: .approved,
-            reviewedAt: 2,
-            approvedAt: 2,
-            approvalFingerprint: "stale-approval"
-        )
-        project.reports[0].approvedTextFingerprint = "stale-approved-text"
-
-        let result = validateStoredProjectShape(project)
-
-        XCTAssertTrue(result.issues.contains("A report's current-text fingerprint does not match its saved text."))
-        XCTAssertTrue(result.issues.contains("An approved report does not match its teacher approval fingerprint."))
-    }
-
     func testStoredValidationTreatsAnExplicitlyEmptyManualEditAsCurrentText() {
         var project = fixtureProject()
         project.reports[0].manualEdit = ""
-        project.reports[0].currentTextFingerprint = stableTextFingerprint("")
 
         XCTAssertTrue(validateStoredProjectShape(project).ok)
     }

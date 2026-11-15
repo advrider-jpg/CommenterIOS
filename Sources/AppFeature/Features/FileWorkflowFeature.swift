@@ -242,7 +242,6 @@ extension AppFeature {
                 state.resultsImportState = .success(count: committedImport?.acceptedRows ?? 0, source: importSourceLabel(committedImport?.sourceFormat))
             }
             markPreparedFileStale(&state)
-            invalidateAllAIReviewState(&state)
             acceptVerifiedProject(&state, project: project, message: message)
             state.projects.removeAll { $0.id == project.metadata.id }
             state.projects.append(projectSummary(project))
@@ -614,10 +613,6 @@ private func canStartFileWorkflow(
     }
     guard state.pendingImport == nil else {
         state.operationStatus = .failed("Confirm or cancel the pending import before starting \(label).")
-        return false
-    }
-    guard !isAIWorkRunning(state) else {
-        state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before starting \(label).")
         return false
     }
     if requiresSavedProject, hasUnsavedChanges(state) {
