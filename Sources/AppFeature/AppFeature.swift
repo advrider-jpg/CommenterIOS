@@ -14,7 +14,7 @@ public struct AppFeature: Sendable {
         public var worklistFocus: WorklistFocus = .all
         public var datasetStatus: DatasetStatus = .notLoaded
         public var projectStorageStatus: ProjectStorageStatus = .notLoaded
-        public var aiAvailabilityStatus: AIAvailabilityStatus = .notChecked
+        public var aiAvailability: AIAvailability?
         public var projects: [ProjectSummary] = []
         public var invalidProjectRecords: [InvalidProjectRecord] = []
         public var selectedProject: Project?
@@ -31,24 +31,11 @@ public struct AppFeature: Sendable {
         public var encryptedBackupErrorMessage: String?
         public var isEncryptedBackupPreparationPresented = false
         public var encryptedBackupPreparationErrorMessage: String?
-        public var pendingAIRevision: PendingAIRevision?
-        public var pendingAIRevisions: [PendingAIRevision] = []
-        public var activeAIRequest: ActiveAIRequest?
-        public var isBulkAIRevisionRunning = false
-        public var latestReportCheck: ReportCheckResult?
         public var rosterImportState: TabularImportState = .neverImported
         public var resultsImportState: TabularImportState = .neverImported
         public var lastPreparedFiles: [ImportExportFormat: PreparedFileRecord] = [:]
 
         public init() {}
-
-        public var aiReviewQueueCount: Int {
-            var keys = Set(pendingAIRevisions.map { "\($0.studentId)::\($0.subject)" })
-            if let pendingAIRevision {
-                keys.insert("\(pendingAIRevision.studentId)::\(pendingAIRevision.subject)")
-            }
-            return keys.count
-        }
     }
 
     public enum Tab: String, CaseIterable, Equatable, Sendable {
@@ -68,7 +55,6 @@ public struct AppFeature: Sendable {
     }
 
     public enum AppIntentRoute: Equatable, Sendable {
-        case aiReviewQueue
         case reportPreparation
     }
 
@@ -90,13 +76,6 @@ public struct AppFeature: Sendable {
         case preparingFile
         case importing
         case generating
-        case failed(String)
-    }
-
-    public enum AIAvailabilityStatus: Equatable, Sendable {
-        case notChecked
-        case checking
-        case checked(AIModelAvailability)
         case failed(String)
     }
 
@@ -182,99 +161,6 @@ public struct AppFeature: Sendable {
         }
     }
 
-    public struct PendingAIRevision: Identifiable, Equatable, Sendable {
-        public var id: String
-        public var studentId: String
-        public var subject: String
-        public var originalText: String
-        public var originalTextFingerprint: String
-        public var proposedText: String
-        public var changeSummary: String
-        public var validation: ReportValidationSummary
-        public var trace: AIReportTrace
-        public var reviewWarnings: [String]
-
-        public init(
-            id: String,
-            studentId: String,
-            subject: String,
-            originalText: String,
-            proposedText: String,
-            changeSummary: String,
-            validation: ReportValidationSummary,
-            trace: AIReportTrace,
-            reviewWarnings: [String] = []
-        ) {
-            self.id = id
-            self.studentId = studentId
-            self.subject = subject
-            self.originalText = originalText
-            self.originalTextFingerprint = stableTextFingerprint(originalText)
-            self.proposedText = proposedText
-            self.changeSummary = changeSummary
-            self.validation = validation
-            self.trace = trace
-            self.reviewWarnings = reviewWarnings
-        }
-    }
-
-    public struct ReportCheckResult: Equatable, Sendable {
-        public var id: String
-        public var studentId: String
-        public var subject: String
-        public var validation: ReportValidationSummary
-        public var reviewNotes: [String]
-
-        public init(
-            id: String,
-            studentId: String,
-            subject: String,
-            validation: ReportValidationSummary,
-            reviewNotes: [String] = []
-        ) {
-            self.id = id
-            self.studentId = studentId
-            self.subject = subject
-            self.validation = validation
-            self.reviewNotes = reviewNotes
-        }
-    }
-
-    public struct CompletedAIRevision: Equatable, Sendable {
-        public var studentId: String
-        public var subject: String
-        public var originalText: String
-        public var result: AIReportRevisionResult
-
-        public init(studentId: String, subject: String, originalText: String, result: AIReportRevisionResult) {
-            self.studentId = studentId
-            self.subject = subject
-            self.originalText = originalText
-            self.result = result
-        }
-    }
-
-    public enum AIRequestKind: String, Equatable, Sendable {
-        case polish
-        case toneAdjustment
-        case evidenceDraft
-        case critique
-    }
-
-    public struct ActiveAIRequest: Equatable, Sendable {
-        public var projectID: String
-        public var studentID: String
-        public var subject: String
-        public var kind: AIRequestKind
-
-        public init(projectID: String, studentID: String, subject: String, kind: AIRequestKind) {
-            self.projectID = projectID
-            self.studentID = studentID
-            self.subject = subject
-            self.kind = kind
-        }
-    }
-
     public enum ImportWorkflowKind: Equatable, Sendable {
         case roster
         case results
@@ -334,8 +220,7 @@ public struct AppFeature: Sendable {
         case appIntentRouteReceived(AppIntentRoute)
         case datasetLoaded(DatasetSnapshot)
         case datasetFailed(String)
-        case aiAvailabilityLoaded(AIModelAvailability)
-        case aiAvailabilityFailed(String)
+        case aiAvailabilityLoaded(AIAvailability)
         case projectStoreLoaded(ProjectListDiagnostics)
         case projectStoreFailed(String)
         case stalePreparedFilePurgeFailed(String)
@@ -387,43 +272,6 @@ public struct AppFeature: Sendable {
         case reportManualEditChanged(String, String, String)
         case reportLockChanged(String, String, Bool)
         case reportMarkedDone(String, String)
-        case reportApprovedForExport(String, String)
-        case reportAIPolishTapped(String, String)
-        case reportAIPolishCompleted(String, String, String, AIReportRevisionResult)
-        case reportAIPolishFailed(String, String, String)
-        case reportAIToneAdjustTapped(String, String)
-        case reportAIToneAdjustCompleted(String, String, String, AIReportRevisionResult)
-        case reportAIToneAdjustFailed(String, String, String)
-        case reportAIDraftFromEvidenceTapped(String, String)
-        case reportAIDraftFromEvidenceCompleted(String, String, String, AIReportDraftResult)
-        case reportAIDraftFromEvidenceFailed(String, String, String)
-        case reportBulkAIPolishTapped
-        case reportBulkAIPolishProgress(CompletedAIRevision)
-        case reportBulkAIPolishCompleted([CompletedAIRevision], [String])
-        case reportBulkAIPolishFailed(String)
-        case reportBulkAIPolishCancelTapped
-        case reportAIRevisionAccepted(String, String)
-        case reportAIRevisionRejected(String, String)
-        case reportLocalSafetyCheckTapped(String, String)
-        case reportLocalSafetyCheckCompleted(String, String, AIReportCritiqueResult)
-        case reportLocalSafetyCheckFailed(String, String, String)
-        case reportValidationWarningsReviewed(String, String)
-        case reportAICritiqueTapped(String, String)
-        case reportAICritiqueCompleted(String, String, AIReportCritiqueResult)
-        case reportAICritiqueFailed(String, String, String)
-        case projectAIToneProfileChanged(AIToneProfile)
-        case projectAITargetLengthChanged(ReportLengthTarget)
-        case projectAICustomInstructionChanged(String)
-        case projectAIForbiddenMentionsChanged([String])
-        case projectAIRequiredMentionsChanged([String])
-        case projectAISettingsResetBalanced
-        case reportAIToneProfileChanged(String, String, AIToneProfile)
-        case reportAITargetLengthChanged(String, String, ReportLengthTarget)
-        case reportAICustomInstructionChanged(String, String, String)
-        case reportAIForbiddenMentionsChanged(String, String, [String])
-        case reportAIRequiredMentionsChanged(String, String, [String])
-        case reportAIOptionsSavedAsProjectDefaults(String, String)
-        case reportAIOptionsReset(String, String)
         case rosterImportPicked(URL)
         case resultsImportPicked(URL)
         case backupImportPicked(URL)

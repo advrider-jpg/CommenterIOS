@@ -202,7 +202,7 @@ public func normalizeReportContextField(_ value: String?) -> String? {
 }
 
 private let studentNamePlaceholders: Set<String> = ["[student name]", "[studentname]", "[student]", "[name]"]
-private let contextPlaceholderKeys: [String: KeyPath<PlaceholderContext, String?>] = [
+private let contextPlaceholderKeys: [String: KeyPath<PlaceholderContext, String?> & Sendable] = [
     "[specific task]": \.specificTask,
     "[text type]": \.textType,
     "[unit/topic]": \.unitTopic,

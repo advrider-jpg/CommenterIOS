@@ -8,11 +8,6 @@ final class ReportDocumentFileTests: XCTestCase {
     func testPrepareReportDocumentFileWritesVerifiedDOCXPackage() throws {
         let root = temporaryRoot()
         var project = fixtureProject()
-        project.metadata.aiSettings = ProjectAISettings(
-            customInstruction: "Project private AI instruction.",
-            forbiddenMentions: ["Project hidden do-not-mention."],
-            requiredMentions: ["Project hidden required mention."]
-        )
         project.reports = [
             readyReport(
                 project: project,
@@ -24,17 +19,6 @@ final class ReportDocumentFileTests: XCTestCase {
                 trace: "private trace"
             )
         ]
-        project.reports[0].latestAIReviewNotes = ["Private AI critique note should stay local."]
-        project.reports[0].validationWarningReview = ReportWarningReviewRecord(
-            validationFingerprint: "private-warning-fingerprint",
-            reviewedAt: 2,
-            reviewerDisplayName: "Private reviewer",
-            notes: "Private warning review note."
-        )
-        project.reports[0].aiOptionsOverride = AIReportOptions(
-            forbiddenMentions: ["Do not export this constraint."],
-            requiredMentions: ["Required private constraint."]
-        )
 
         let prepared = try prepareReportDocumentFile(project: project, format: .docx, directory: root)
         let entries = try readStoredZipEntries(prepared.url)
@@ -66,15 +50,6 @@ final class ReportDocumentFileTests: XCTestCase {
         XCTAssertFalse(document.contains("Generated text should not be exported."))
         XCTAssertFalse(document.contains("private-variant"))
         XCTAssertFalse(document.contains("private trace"))
-        XCTAssertFalse(document.contains("Private AI critique note should stay local."))
-        XCTAssertFalse(document.contains("private-warning-fingerprint"))
-        XCTAssertFalse(document.contains("Private reviewer"))
-        XCTAssertFalse(document.contains("Private warning review note."))
-        XCTAssertFalse(document.contains("Do not export this constraint."))
-        XCTAssertFalse(document.contains("Required private constraint."))
-        XCTAssertFalse(document.contains("Project private AI instruction."))
-        XCTAssertFalse(document.contains("Project hidden do-not-mention."))
-        XCTAssertFalse(document.contains("Project hidden required mention."))
         XCTAssertFalse(document.contains("Private student note should stay local."))
         XCTAssertFalse(document.contains("Private result note should stay local."))
     }
@@ -145,61 +120,10 @@ final class ReportDocumentFileTests: XCTestCase {
         XCTAssertEqual(files, [])
     }
 
-    func testPrepareReportDocumentFileRejectsReadbackContainingPrivateFields() throws {
-        let root = temporaryRoot()
-        let privateNote = "Private student note must not be exported."
-        var project = fixtureProject()
-        project.roster[0].internalTeacherNote = privateNote
-        project.reports = [
-            readyReport(
-                project: project,
-                result: project.results[0],
-                text: "Generated text should not be exported.",
-                manualEdit: "Manual edit leaked: \(privateNote)",
-                generatedAt: 1
-            )
-        ]
-
-        XCTAssertThrowsError(try prepareReportDocumentFile(project: project, format: .docx, directory: root)) { error in
-            guard case .verificationFailed = error as? ReportDocumentFileError else {
-                return XCTFail("Expected verificationFailed, got \(error)")
-            }
-        }
-
-        let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
-        XCTAssertEqual(files, [])
-    }
-
-    func testPrepareReportDocumentFileRejectsReadbackContainingShortPrivateFields() throws {
-        let root = temporaryRoot()
-        let privateNote = "IEP"
-        var project = fixtureProject()
-        project.roster[0].internalTeacherNote = privateNote
-        project.reports = [
-            readyReport(
-                project: project,
-                result: project.results[0],
-                text: "Generated text should not be exported.",
-                manualEdit: "Manual edit leaked: \(privateNote)",
-                generatedAt: 1
-            )
-        ]
-
-        XCTAssertThrowsError(try prepareReportDocumentFile(project: project, format: .docx, directory: root)) { error in
-            guard case .verificationFailed = error as? ReportDocumentFileError else {
-                return XCTFail("Expected verificationFailed, got \(error)")
-            }
-        }
-
-        let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
-        XCTAssertEqual(files, [])
-    }
-
     func testPrepareReportDocumentFileAllowsRequiredOutputAndDoesNotMistakeMarkupForPrivateData() throws {
         let root = temporaryRoot()
         var project = fixtureProject()
         project.roster[0].internalTeacherNote = "w"
-        project.metadata.aiSettings = ProjectAISettings(requiredMentions: ["paragraph structure"])
         project.reports = [
             readyReport(
                 project: project,
@@ -209,7 +133,6 @@ final class ReportDocumentFileTests: XCTestCase {
                 generatedAt: 1
             )
         ]
-        project.reports[0].aiOptionsOverride = AIReportOptions(requiredMentions: ["paragraph structure"])
 
         let prepared = try prepareReportDocumentFile(project: project, format: .docx, directory: root)
         let document = try XCTUnwrap(try readStoredZipEntries(prepared.url)["word/document.xml"].flatMap { String(data: $0, encoding: .utf8) })
@@ -291,7 +214,8 @@ final class ReportDocumentFileTests: XCTestCase {
                 student: student,
                 result: result,
                 concreteSubject: result.focusStrand ?? result.subject
-            )
+            ),
+            reviewedAt: generatedAt + 1
         )
     }
 

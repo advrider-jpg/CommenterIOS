@@ -10,8 +10,6 @@ public enum ReportReadinessStatus: String, Codable, Equatable, Sendable {
     case unresolvedPlaceholder = "unresolved-placeholder"
     case languageQualityIssue = "language-quality-issue"
     case needsTeacherCheck = "needs-teacher-check"
-    case aiNeedsReview = "ai-needs-review"
-    case aiValidationBlocked = "ai-validation-blocked"
     case staleReport = "stale-report"
     case ready
     case lockedReady = "locked-ready"
@@ -235,65 +233,7 @@ public func getReportReadiness(project: Project, studentId: String, subject: Str
         )
     }
 
-    if report.requiresTeacherApprovalForExport {
-        let currentFingerprint = stableTextFingerprint(text)
-        guard let validation = report.lastValidation,
-              validation.textFingerprint == currentFingerprint
-        else {
-            return ReportReadiness(
-                status: .aiNeedsReview,
-                studentId: studentId,
-                subject: subject,
-                studentName: resultReadiness.studentName,
-                message: "\(resultReadiness.studentName)'s \(subject) AI draft must be validated and teacher-reviewed in its current form before export.",
-                result: result,
-                report: report
-            )
-        }
-        if validation.status == .blocked {
-            return ReportReadiness(
-                status: .aiValidationBlocked,
-                studentId: studentId,
-                subject: subject,
-                studentName: resultReadiness.studentName,
-                message: "\(resultReadiness.studentName)'s \(subject) AI draft is blocked by validation and needs teacher correction.",
-                result: result,
-                report: report
-            )
-        }
-        if validation.status == .passedWithWarnings {
-            guard let warningReview = report.validationWarningReview,
-                  warningReview.validationFingerprint == currentFingerprint,
-                  warningReview.reviewedAt >= validation.validatedAt
-            else {
-                return ReportReadiness(
-                    status: .aiNeedsReview,
-                    studentId: studentId,
-                    subject: subject,
-                    studentName: resultReadiness.studentName,
-                    message: "\(resultReadiness.studentName)'s \(subject) AI draft has validation warnings that the teacher must review before export.",
-                    result: result,
-                    report: report
-                )
-            }
-        }
-        guard report.reviewState?.status == .approved,
-              report.reviewState?.approvalFingerprint == currentFingerprint,
-              report.approvedTextFingerprint == currentFingerprint
-        else {
-            return ReportReadiness(
-                status: .aiNeedsReview,
-                studentId: studentId,
-                subject: subject,
-                studentName: resultReadiness.studentName,
-                message: "\(resultReadiness.studentName)'s \(subject) AI draft needs teacher review and approval before export.",
-                result: result,
-                report: report
-            )
-        }
-    }
-
-    if !report.requiresTeacherApprovalForExport, (report.reviewedAt ?? 0) <= 0 {
+    if (report.reviewedAt ?? 0) <= 0 {
         return ReportReadiness(
             status: .needsTeacherCheck,
             studentId: studentId,
@@ -338,10 +278,6 @@ public func readinessLabel(_ status: ReportReadinessStatus) -> String {
         return "Language check needed"
     case .needsTeacherCheck:
         return "Draft"
-    case .aiNeedsReview:
-        return "AI review needed"
-    case .aiValidationBlocked:
-        return "AI validation blocked"
     case .ready:
         return "Ready"
     case .lockedReady:
@@ -358,15 +294,6 @@ public func readinessLabel(_ status: ReportReadinessStatus) -> String {
 public extension GeneratedReport {
     var exportText: String {
         manualEdit ?? text
-    }
-
-    var requiresTeacherApprovalForExport: Bool {
-        switch effectiveGenerationMode {
-        case .aiPolishedDeterministic, .aiToneAdjusted, .aiDraftFromEvidence, .hybrid:
-            return true
-        case .deterministic, .manuallyEdited:
-            return aiTrace != nil
-        }
     }
 }
 

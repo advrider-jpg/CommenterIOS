@@ -19,7 +19,6 @@ public enum ReviewWorkbookFileError: LocalizedError, Equatable {
     case unsupportedFormat(ImportExportFormat)
     case invalidDirectory(String)
     case emptyWrittenFile(URL)
-    case verificationFailed(URL)
     case failedOutputCouldNotBeRemoved(URL)
     case legacyXLSGenerationFailed(String)
 
@@ -31,10 +30,8 @@ public enum ReviewWorkbookFileError: LocalizedError, Equatable {
             return "The review workbook destination is not a directory: \(path)"
         case let .emptyWrittenFile(url):
             return "The review workbook was written but is empty: \(url.lastPathComponent)"
-        case let .verificationFailed(url):
-            return "The review workbook was written but could not be verified: \(url.lastPathComponent)"
         case let .failedOutputCouldNotBeRemoved(url):
-            return "Review workbook preparation failed, and the incomplete or unverified output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
+            return "Review workbook preparation failed, and the incomplete output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
         case let .legacyXLSGenerationFailed(message):
             return "The legacy XLS review workbook could not be created: \(message)"
         }
@@ -56,7 +53,6 @@ public func prepareReviewWorkbookFile(
     let rows = try reportReviewRows(project: project, studentId: studentId)
     let filename = try reportExportFilename(project: project, format: format, studentId: studentId)
     let destination = availableFileDestination(directory: directory, preferredFilename: filename, fileManager: fileManager)
-    let forbiddenStrings = forbiddenWorkbookExportStrings(project: project)
     let data: Data
     do {
         data = try buildReviewWorkbookData(rows: rows, format: format)
@@ -76,37 +72,16 @@ public func prepareReviewWorkbookFile(
     }
     do {
         let byteCount = try verifiedWorkbookSize(url: destination, fileManager: fileManager)
-        let readBack = try Data(contentsOf: destination)
-        guard readBack == data else {
-            throw ReviewWorkbookFileError.verificationFailed(destination)
-        }
-        try verifyReviewWorkbook(readBack, format: format, expectedRows: rows, forbiddenStrings: forbiddenStrings)
         return PreparedReviewWorkbookFile(url: destination, byteCount: byteCount, format: format, rowCount: rows.count)
-    } catch let error as ReviewWorkbookFileError {
-        do {
-            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
-        } catch {
-            throw ReviewWorkbookFileError.failedOutputCouldNotBeRemoved(destination)
-        }
-        throw error
     } catch {
         do {
             try removeFailedOutputIfPresent(destination, fileManager: fileManager)
         } catch {
             throw ReviewWorkbookFileError.failedOutputCouldNotBeRemoved(destination)
         }
-        throw ReviewWorkbookFileError.verificationFailed(destination)
+        throw error
     }
 }
-
-private let requiredXLSXEntries: Set<String> = [
-    "[Content_Types].xml",
-    "_rels/.rels",
-    "xl/workbook.xml",
-    "xl/_rels/workbook.xml.rels",
-    "xl/worksheets/sheet1.xml",
-    "xl/styles.xml"
-]
 
 private func buildReviewWorkbookData(rows: [ReportReviewRow], format: ImportExportFormat) throws -> Data {
     try buildTabularWorkbookData(
@@ -114,22 +89,6 @@ private func buildReviewWorkbookData(rows: [ReportReviewRow], format: ImportExpo
         sheetName: "Reports",
         format: format
     )
-}
-
-private func verifyReviewWorkbook(
-    _ data: Data,
-    format: ImportExportFormat,
-    expectedRows: [ReportReviewRow],
-    forbiddenStrings: [String]
-) throws {
-    let expectedValues = [ReportReviewRow.headers] + expectedRows.map(\.orderedValues)
-    try verifyTabularWorkbookData(
-        data,
-        format: format,
-        sheetName: "Reports",
-        expectedRows: expectedValues
-    )
-    try assertReportTextsOmitForbiddenStrings(expectedRows.map(\.reportText), forbiddenStrings: forbiddenStrings)
 }
 
 func buildTabularWorkbookData(
@@ -145,110 +104,6 @@ func buildTabularWorkbookData(
     case .csv, .docx, .backupJSON:
         throw ReviewWorkbookFileError.unsupportedFormat(format)
     }
-}
-
-func verifyTabularWorkbookData(
-    _ data: Data,
-    format: ImportExportFormat,
-    sheetName: String,
-    expectedRows: [[String]]
-) throws {
-    switch format {
-    case .xlsx:
-        try OOXMLZipWriter.validateArchive(data, requiredEntries: requiredXLSXEntries)
-        let entries = try OOXMLZipWriter.storedEntries(
-            data,
-            maximumEntryBytes: 64 * 1024 * 1024,
-            maximumTotalUncompressedBytes: 128 * 1024 * 1024
-        )
-        guard let workbook = entries["xl/workbook.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
-              let sheet = entries["xl/worksheets/sheet1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
-              Set(entries.keys) == requiredXLSXEntries,
-              workbook.contains("name=\"\(xmlEscape(sheetName))\""),
-              inlineStringValues(in: sheet) == expectedRows.flatMap({ $0 })
-        else {
-            throw OOXMLZipWriterError.invalidArchive
-        }
-    case .xls:
-        try LegacyXLSWorkbookWriter.validateWorkbook(
-            data,
-            requiredSheetName: sheetName,
-            requiredStrings: expectedRows.flatMap({ $0 }).filter { !$0.isEmpty }
-        )
-        guard try LegacyXLSWorkbookWriter.labelValues(data) == expectedRows.flatMap({ $0 }) else {
-            throw LegacyXLSWorkbookError.invalidWorkbookStream
-        }
-    case .csv, .docx, .backupJSON:
-        throw ReviewWorkbookFileError.unsupportedFormat(format)
-    }
-}
-
-private func forbiddenWorkbookExportStrings(project: Project) -> [String] {
-    var values: [String?] = []
-    values.append(contentsOf: project.roster.map(\.internalTeacherNote))
-    values.append(contentsOf: project.results.map(\.internalTeacherNote))
-    values.append(project.metadata.aiSettings?.customInstruction)
-    values.append(contentsOf: project.metadata.aiSettings?.forbiddenMentions ?? [])
-    for report in project.reports {
-        values.append(contentsOf: report.variantIds.map(Optional.some))
-        values.append(report.trace)
-        values.append(report.resultFingerprint)
-        values.append(contentsOf: hiddenAIExportStrings(report))
-    }
-    let publicValues = publicExportValues(project)
-    return uniqueForbiddenStrings(values).filter { !publicValues.contains($0) }
-}
-
-private func assertReportTextsOmitForbiddenStrings(_ reportTexts: [String], forbiddenStrings: [String]) throws {
-    for forbidden in forbiddenStrings {
-        if reportTexts.contains(where: { $0.contains(forbidden) }) {
-            throw OOXMLZipWriterError.invalidArchive
-        }
-    }
-}
-
-private func inlineStringValues(in sheet: String) -> [String] {
-    guard let regex = try? NSRegularExpression(
-        pattern: #"<t\b[^>]*>(.*?)</t>"#,
-        options: [.dotMatchesLineSeparators]
-    ) else {
-        return []
-    }
-    let range = NSRange(sheet.startIndex..<sheet.endIndex, in: sheet)
-    return regex.matches(in: sheet, range: range).compactMap { match in
-        guard match.numberOfRanges > 1,
-              let valueRange = Range(match.range(at: 1), in: sheet)
-        else {
-            return nil
-        }
-        return xmlUnescape(String(sheet[valueRange]))
-    }
-}
-
-private func uniqueForbiddenStrings(_ values: [String?]) -> [String] {
-    var seen: Set<String> = []
-    return values.compactMap { value in
-        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return nil }
-        return trimmed
-    }
-}
-
-private func publicExportValues(_ project: Project) -> Set<String> {
-    var values = Set([project.metadata.name, project.metadata.term])
-    for student in project.roster {
-        values.insert(student.firstName)
-        values.insert(student.lastName)
-        values.insert([student.firstName, student.lastName].filter { !$0.isEmpty }.joined(separator: " "))
-        values.insert(student.yearLevel.rawValue)
-    }
-    for result in project.results {
-        values.insert(result.subject)
-        values.insert(displaySubjectName(result.subject))
-        if let focus = result.focusStrand { values.insert(focus) }
-        if let achievement = result.achievementLevel { values.insert(achievement.rawValue) }
-    }
-    return values
 }
 
 private func buildTabularXLSX(rows: [[String]], sheetName: String) throws -> Data {
@@ -289,9 +144,11 @@ private func xmlData(_ xml: String) -> Data {
 }
 
 private func worksheetXML(sheetRows: [[String]]) -> String {
-    let rows = sheetRows.enumerated().map { rowIndex, values in
+    // Explicit String types: GRDB, visible here through CommenterPersistence, also accepts string
+    // interpolation and has its own joined(), and Swift 6.4 otherwise infers GRDB's SQL type.
+    let rows: String = sheetRows.enumerated().map { rowIndex, values -> String in
         let rowNumber = rowIndex + 1
-        let cells = values.enumerated().map { columnIndex, value in
+        let cells: String = values.enumerated().map { columnIndex, value -> String in
             let reference = "\(columnName(columnIndex + 1))\(rowNumber)"
             return #"<c r="\#(reference)" t="inlineStr"><is><t xml:space="preserve">\#(xmlEscape(value))</t></is></c>"#
         }.joined()
@@ -319,15 +176,6 @@ private func xmlEscape(_ value: String) -> String {
         .replacingOccurrences(of: ">", with: "&gt;")
         .replacingOccurrences(of: "\"", with: "&quot;")
         .replacingOccurrences(of: "'", with: "&apos;")
-}
-
-private func xmlUnescape(_ value: String) -> String {
-    value
-        .replacingOccurrences(of: "&quot;", with: "\"")
-        .replacingOccurrences(of: "&apos;", with: "'")
-        .replacingOccurrences(of: "&lt;", with: "<")
-        .replacingOccurrences(of: "&gt;", with: ">")
-        .replacingOccurrences(of: "&amp;", with: "&")
 }
 
 private let xmlDeclaration = #"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#

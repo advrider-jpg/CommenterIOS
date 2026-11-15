@@ -8,16 +8,10 @@ struct WorklistRootView: View {
     let project: Project?
     let readiness: ProjectReadiness?
     let status: AppFeature.ProjectStorageStatus
-    let aiAvailabilityStatus: AppFeature.AIAvailabilityStatus
     let operationStatus: AppFeature.OperationStatus
     let hasUnsavedProjectChanges: Bool
     let preparedFile: AppFeature.PreparedFile?
     let pendingImport: AppFeature.PendingImport?
-    let pendingAIRevision: AppFeature.PendingAIRevision?
-    let pendingAIRevisions: [AppFeature.PendingAIRevision]
-    let isBulkAIRevisionRunning: Bool
-    let activeAIRequest: AppFeature.ActiveAIRequest?
-    let latestReportCheck: AppFeature.ReportCheckResult?
     let rosterImportState: AppFeature.TabularImportState
     let resultsImportState: AppFeature.TabularImportState
     let lastPreparedFiles: [ImportExportFormat: AppFeature.PreparedFileRecord]
@@ -58,30 +52,6 @@ struct WorklistRootView: View {
     let onManualEditChanged: (String, String, String) -> Void
     let onLockChanged: (String, String, Bool) -> Void
     let onMarkReportDone: (String, String) -> Void
-    let onApproveReportForExport: (String, String) -> Void
-    let onAIPolishReport: (String, String) -> Void
-    let onAIToneAdjustReport: (String, String) -> Void
-    let onAIDraftFromEvidenceReport: (String, String) -> Void
-    let onBulkAIPolishReports: () -> Void
-    let onCancelBulkAIPolish: () -> Void
-    let onAcceptAIRevision: (String, String) -> Void
-    let onRejectAIRevision: (String, String) -> Void
-    let onLocalSafetyCheck: (String, String) -> Void
-    let onValidationWarningsReviewed: (String, String) -> Void
-    let onAICritiqueReport: (String, String) -> Void
-    let onAIToneProfileChanged: (AIToneProfile) -> Void
-    let onAITargetLengthChanged: (ReportLengthTarget) -> Void
-    let onAICustomInstructionChanged: (String) -> Void
-    let onAIForbiddenMentionsChanged: ([String]) -> Void
-    let onAIRequiredMentionsChanged: ([String]) -> Void
-    let onAISettingsResetBalanced: () -> Void
-    let onReportAIToneProfileChanged: (String, String, AIToneProfile) -> Void
-    let onReportAITargetLengthChanged: (String, String, ReportLengthTarget) -> Void
-    let onReportAICustomInstructionChanged: (String, String, String) -> Void
-    let onReportAIForbiddenMentionsChanged: (String, String, [String]) -> Void
-    let onReportAIRequiredMentionsChanged: (String, String, [String]) -> Void
-    let onReportAIOptionsSavedAsProjectDefaults: (String, String) -> Void
-    let onReportAIOptionsReset: (String, String) -> Void
     let onImportRoster: () -> Void
     let onImportResults: () -> Void
     let onPrepareImportTemplate: (CSVTemplateKind, ImportExportFormat) -> Void
@@ -188,41 +158,11 @@ struct WorklistRootView: View {
                         project: project,
                         readiness: readiness,
                         datasetStatus: datasetStatus,
-                        aiAvailabilityStatus: aiAvailabilityStatus,
-                        operationStatus: operationStatus,
-                        pendingAIRevision: pendingAIRevision,
-                        pendingAIRevisions: pendingAIRevisions,
-                        isBulkAIRevisionRunning: isBulkAIRevisionRunning,
-                        latestReportCheck: latestReportCheck,
                         isGenerating: isGeneratingReports,
                         onGenerate: onGenerate,
                         onManualEditChanged: onManualEditChanged,
                         onLockChanged: onLockChanged,
                         onMarkReportDone: onMarkReportDone,
-                        onApproveReportForExport: onApproveReportForExport,
-                        onAIPolishReport: onAIPolishReport,
-                        onAIToneAdjustReport: onAIToneAdjustReport,
-                        onAIDraftFromEvidenceReport: onAIDraftFromEvidenceReport,
-                        onBulkAIPolishReports: onBulkAIPolishReports,
-                        onCancelBulkAIPolish: onCancelBulkAIPolish,
-                        onAcceptAIRevision: onAcceptAIRevision,
-                        onRejectAIRevision: onRejectAIRevision,
-                        onLocalSafetyCheck: onLocalSafetyCheck,
-                        onValidationWarningsReviewed: onValidationWarningsReviewed,
-                        onAICritiqueReport: onAICritiqueReport,
-                        onAIToneProfileChanged: onAIToneProfileChanged,
-                        onAITargetLengthChanged: onAITargetLengthChanged,
-                        onAICustomInstructionChanged: onAICustomInstructionChanged,
-                        onAIForbiddenMentionsChanged: onAIForbiddenMentionsChanged,
-                        onAIRequiredMentionsChanged: onAIRequiredMentionsChanged,
-                        onAISettingsResetBalanced: onAISettingsResetBalanced,
-                        onReportAIToneProfileChanged: onReportAIToneProfileChanged,
-                        onReportAITargetLengthChanged: onReportAITargetLengthChanged,
-                        onReportAICustomInstructionChanged: onReportAICustomInstructionChanged,
-                        onReportAIForbiddenMentionsChanged: onReportAIForbiddenMentionsChanged,
-                        onReportAIRequiredMentionsChanged: onReportAIRequiredMentionsChanged,
-                        onReportAIOptionsSavedAsProjectDefaults: onReportAIOptionsSavedAsProjectDefaults,
-                        onReportAIOptionsReset: onReportAIOptionsReset,
                         isDisabled: isEditingLocked
                     )
                     .worklistStationerySectionRows()
@@ -393,7 +333,7 @@ struct WorklistRootView: View {
     }
 
     private var isEditingLocked: Bool {
-        isWorkflowBusy || pendingImport != nil || activeAIRequest != nil || isBulkAIRevisionRunning
+        isWorkflowBusy || pendingImport != nil
     }
 
     private var isWorkflowBusy: Bool {
@@ -485,7 +425,7 @@ private extension AppFeature.WorklistFocus {
         case .results:
             return "Showing result import and focused result entry."
         case .drafts:
-            return "Showing deterministic draft generation, review, and AI review tools."
+            return "Showing draft generation and review."
         case .files:
             return "Showing verified report export, backup, and prepared-file actions."
         }

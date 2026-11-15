@@ -204,39 +204,33 @@ public enum CSVParser {
         return configuration
     }
 
+    /// Converts every row break outside quotes to CRLF and drops blank or whitespace-only lines,
+    /// which spreadsheet apps often leave between or after rows. Line breaks inside quoted cells are kept.
     private static func normalizeUnquotedRowBreaks(_ text: String) -> String {
         var output = ""
-        var index = text.startIndex
+        var line = ""
         var insideQuotedField = false
 
-        while index < text.endIndex {
-            let character = text[index]
-            let next = text.index(after: index)
-
-            if character == "\"" {
-                if insideQuotedField, next < text.endIndex, text[next] == "\"" {
-                    output.append(character)
-                    output.append(text[next])
-                    index = text.index(after: next)
-                    continue
-                }
-                insideQuotedField.toggle()
-                output.append(character)
-            } else if !insideQuotedField, character == "\r" {
-                if next < text.endIndex, text[next] == "\n" {
-                    output.append("\r\n")
-                    index = text.index(after: next)
-                    continue
-                }
+        func endLine() {
+            if !line.allSatisfy(\.isWhitespace) {
+                output.append(line)
                 output.append("\r\n")
-            } else if !insideQuotedField, character == "\n" {
-                output.append("\r\n")
-            } else {
-                output.append(character)
             }
-
-            index = next
+            line = ""
         }
+
+        // Swift treats "\r\n" as one Character, so a CRLF pair arrives here as a single break.
+        for character in text {
+            if character == "\"" {
+                insideQuotedField.toggle()
+                line.append(character)
+            } else if !insideQuotedField, character == "\r\n" || character == "\r" || character == "\n" {
+                endLine()
+            } else {
+                line.append(character)
+            }
+        }
+        endLine()
 
         return output
     }

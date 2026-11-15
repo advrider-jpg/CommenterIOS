@@ -6,7 +6,6 @@ extension AppFeature {
         case .task:
             state.datasetStatus = .loading
             state.projectStorageStatus = .loading
-            state.aiAvailabilityStatus = .checking
             state.projectStorageMessage = "Checking local project storage."
             return .run { send in
                 do {
@@ -24,12 +23,16 @@ extension AppFeature {
                 } catch {
                     await send(.projectStoreFailed(userVisibleErrorMessage(error)))
                 }
-                await send(.aiAvailabilityLoaded(await aiClient.availability()))
+                await send(.aiAvailabilityLoaded(aiClient.availability()))
             }
 
         case let .tabSelected(tab):
             state.selectedTab = tab
-            return .none
+            // Apple Intelligence can finish downloading or be turned on while the app runs.
+            guard tab == .support else { return .none }
+            return .run { send in
+                await send(.aiAvailabilityLoaded(aiClient.availability()))
+            }
 
         case let .worklistFocusChanged(focus):
             state.worklistFocus = focus
@@ -38,20 +41,6 @@ extension AppFeature {
         case let .appIntentRouteReceived(route):
             state.selectedTab = .worklist
             switch route {
-            case .aiReviewQueue:
-                state.worklistFocus = .drafts
-                if state.selectedProject == nil {
-                    state.operationStatus = .cancelled("AI review opened, but no project is open. Open a project to review its AI previews.")
-                } else if state.aiReviewQueueCount == 0 {
-                    state.operationStatus = hasUnsavedChanges(state)
-                        ? .dirty("AI review opened. No AI previews are waiting, and the current project still has unsaved changes.")
-                        : .cancelled("AI review opened, but no AI previews are waiting for teacher review.")
-                } else if hasUnsavedChanges(state) {
-                    state.operationStatus = .dirty("AI review opened with \(state.aiReviewQueueCount) waiting \(state.aiReviewQueueCount == 1 ? "preview" : "previews"). Unsaved project changes still need to be saved.")
-                } else {
-                    state.operationStatus = .prepared("AI review opened with \(state.aiReviewQueueCount) waiting \(state.aiReviewQueueCount == 1 ? "preview" : "previews").")
-                }
-
             case .reportPreparation:
                 state.worklistFocus = .files
                 guard let readiness = state.selectedProjectReadiness else {
@@ -84,11 +73,7 @@ extension AppFeature {
             return .none
 
         case let .aiAvailabilityLoaded(availability):
-            state.aiAvailabilityStatus = .checked(availability)
-            return .none
-
-        case let .aiAvailabilityFailed(message):
-            state.aiAvailabilityStatus = .failed(message)
+            state.aiAvailability = availability
             return .none
 
         case let .projectStoreLoaded(diagnostics):
@@ -136,10 +121,7 @@ extension AppFeature {
                 state.operationStatus = .failed("Wait for local project storage to finish before preparing a damaged-record support copy.")
                 return .none
             }
-            guard state.pendingImport == nil,
-                  state.activeAIRequest == nil,
-                  !state.isBulkAIRevisionRunning
-            else {
+            guard state.pendingImport == nil else {
                 state.operationStatus = .failed("Finish or cancel the current project operation before preparing a damaged-record support copy.")
                 return .none
             }
@@ -181,10 +163,7 @@ extension AppFeature {
                 state.operationStatus = .failed("Wait for local project storage to finish before removing damaged saved work.")
                 return .none
             }
-            guard state.pendingImport == nil,
-                  state.activeAIRequest == nil,
-                  !state.isBulkAIRevisionRunning
-            else {
+            guard state.pendingImport == nil else {
                 state.operationStatus = .failed("Finish or cancel the current project operation before removing damaged saved work.")
                 return .none
             }

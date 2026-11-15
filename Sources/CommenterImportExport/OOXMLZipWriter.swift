@@ -6,7 +6,7 @@ enum OOXMLZipWriterError: LocalizedError, Equatable {
     case entryTooLarge(String)
     case archiveTooLarge
     case invalidArchive
-    case missingRequiredEntry(String)
+    case unreadableArchive(String)
 
     var errorDescription: String? {
         switch self {
@@ -18,8 +18,8 @@ enum OOXMLZipWriterError: LocalizedError, Equatable {
             return "The OOXML package is too large."
         case .invalidArchive:
             return "The OOXML package is not a readable ZIP archive."
-        case let .missingRequiredEntry(path):
-            return "The OOXML package is missing a required entry: \(path)"
+        case let .unreadableArchive(detail):
+            return "The OOXML package could not be read as a ZIP archive: \(detail)"
         }
     }
 }
@@ -68,20 +68,6 @@ enum OOXMLZipWriter {
         }
 
         return data
-    }
-
-    static func validateArchive(_ data: Data, requiredEntries: Set<String>) throws {
-        let entries = try storedEntries(
-            data,
-            maximumEntryBytes: 64 * 1024 * 1024,
-            maximumTotalUncompressedBytes: 128 * 1024 * 1024,
-            maximumEntryCount: max(requiredEntries.count, 1),
-            allowedPaths: { requiredEntries.contains($0) }
-        )
-        let missing = requiredEntries.subtracting(entries.keys)
-        if let missing = missing.sorted().first {
-            throw OOXMLZipWriterError.missingRequiredEntry(missing)
-        }
     }
 
     static func storedEntries(
@@ -140,7 +126,7 @@ enum OOXMLZipWriter {
         } catch let error as OOXMLZipWriterError {
             throw error
         } catch {
-            throw OOXMLZipWriterError.invalidArchive
+            throw OOXMLZipWriterError.unreadableArchive(String(describing: error))
         }
     }
 }

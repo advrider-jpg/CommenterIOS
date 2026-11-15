@@ -40,32 +40,6 @@ final class ReportExportPreparationTests: XCTestCase {
         XCTAssertFalse(ReportReviewRow.headers.contains("Generated Date"))
     }
 
-    func testPreparationBlocksAIReportsUntilApproved() throws {
-        var project = fixtureProject()
-        let text = "Ava writes clearly."
-        project.reports = [
-            readyReport(
-                project: project,
-                result: project.results[0],
-                text: text,
-                generationMode: .aiPolishedDeterministic,
-                reviewState: ReportReviewState(status: .needsTeacherReview),
-                currentTextFingerprint: stableTextFingerprint(text)
-            )
-        ]
-
-        XCTAssertThrowsError(try reportReviewRows(project: project)) { error in
-            XCTAssertTrue(String(describing: error).contains("AI draft needs teacher review"))
-        }
-
-        let fingerprint = stableTextFingerprint(text)
-        project.reports[0].reviewState = ReportReviewState(status: .approved, approvedAt: 2, approvalFingerprint: fingerprint)
-        project.reports[0].approvedTextFingerprint = fingerprint
-
-        let rows = try reportReviewRows(project: project)
-        XCTAssertEqual(rows[0].reportText, text)
-    }
-
     func testPreparationBlocksUnreadyReportsBeforeRowsOrPacketsAreReturned() throws {
         var project = fixtureProject()
         project.reports = [
@@ -92,10 +66,16 @@ final class ReportExportPreparationTests: XCTestCase {
         ]
 
         XCTAssertThrowsError(try reportReviewRows(project: project)) { error in
-            XCTAssertTrue(error.localizedDescription.contains("control character"))
+            guard case let ReportExportPreparationError.notReady(issues) = error else {
+                return XCTFail("Expected notReady, got \(error)")
+            }
+            XCTAssertTrue(issues.contains { $0.contains("control character") })
         }
         XCTAssertThrowsError(try prepareReportPacket(project: project)) { error in
-            XCTAssertTrue(error.localizedDescription.contains("control character"))
+            guard case let ReportExportPreparationError.notReady(issues) = error else {
+                return XCTFail("Expected notReady, got \(error)")
+            }
+            XCTAssertTrue(issues.contains { $0.contains("control character") })
         }
     }
 
@@ -251,10 +231,7 @@ final class ReportExportPreparationTests: XCTestCase {
         manualEdit: String? = nil,
         generatedAt: Int64 = 1,
         variantIds: [String] = [],
-        trace: String? = nil,
-        generationMode: ReportGenerationMode? = nil,
-        reviewState: ReportReviewState? = nil,
-        currentTextFingerprint: String? = nil
+        trace: String? = nil
     ) -> GeneratedReport {
         guard let student = project.roster.first(where: { $0.id == result.studentId }) else {
             XCTFail("Missing fixture student")
@@ -275,9 +252,7 @@ final class ReportExportPreparationTests: XCTestCase {
                 result: result,
                 concreteSubject: result.focusStrand ?? result.subject
             ),
-            generationMode: generationMode,
-            reviewState: reviewState,
-            currentTextFingerprint: currentTextFingerprint
+            reviewedAt: generatedAt + 1
         )
     }
 }

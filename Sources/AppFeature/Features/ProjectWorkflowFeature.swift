@@ -16,10 +16,6 @@ extension AppFeature {
                 state.operationStatus = .failed("Finish the current local operation before creating another project.")
                 return .none
             }
-            guard !isAIWorkRunning(state) else {
-                state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before creating another project.")
-                return .none
-            }
             guard !hasUnsavedChanges(state) else {
                 state.operationStatus = .failed("Save the open project before creating another project so no teacher edits are stranded.")
                 return .none
@@ -58,8 +54,8 @@ extension AppFeature {
                 state.operationStatus = .failed("Start a project creation flow before saving a new project.")
                 return .none
             }
-            guard !hasUnsavedChanges(state), !isAIWorkRunning(state) else {
-                state.operationStatus = .failed("Save the open project and finish any on-device AI request before creating another project.")
+            guard !hasUnsavedChanges(state) else {
+                state.operationStatus = .failed("Save the open project before creating another project.")
                 return .none
             }
             guard !draft.normalizedName.isEmpty else {
@@ -98,10 +94,6 @@ extension AppFeature {
                 state.operationStatus = .failed("Finish the current local operation before opening another project.")
                 return .none
             }
-            guard !isAIWorkRunning(state) else {
-                state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before opening a project.")
-                return .none
-            }
             if state.selectedProject?.metadata.id == id {
                 state.selectedTab = .worklist
                 return .none
@@ -129,9 +121,6 @@ extension AppFeature {
             state.selectedProjectReadiness = getProjectReadiness(project)
             state.pendingImport = nil
             state.activeImportKind = nil
-            state.activeAIRequest = nil
-            state.isBulkAIRevisionRunning = false
-            invalidateAllAIReviewState(&state)
             state.hasUnsavedProjectChanges = false
             state.workflowMessage = "\(project.metadata.name) is open."
             state.operationStatus = .saved("Project opened from verified local storage.")
@@ -156,10 +145,6 @@ extension AppFeature {
             }
             guard state.pendingImport == nil else {
                 state.operationStatus = .failed("Confirm or cancel the pending import before saving.")
-                return .none
-            }
-            guard !isAIWorkRunning(state) else {
-                state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before saving.")
                 return .none
             }
             state.projectStorageStatus = .saving
@@ -190,14 +175,6 @@ extension AppFeature {
                 state.operationStatus = .failed("Wait for the current local operation to finish before generating draft comments.")
                 return .none
             }
-            guard !isAIWorkRunning(state) else {
-                state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before generating draft comments.")
-                return .none
-            }
-            guard state.aiReviewQueueCount == 0 else {
-                state.operationStatus = .failed("Accept or reject the waiting AI previews before regenerating deterministic draft comments.")
-                return .none
-            }
             let prerequisites = generationPrerequisiteMessages(project: project, datasetStatus: state.datasetStatus)
             guard prerequisites.isEmpty else {
                 state.operationStatus = .failed("Draft comments cannot be generated yet: \(prerequisites.joined(separator: " "))")
@@ -218,7 +195,6 @@ extension AppFeature {
 
         case let .reportsGeneratedAndSaved(project, message):
             markPreparedFileStale(&state)
-            invalidateAllAIReviewState(&state)
             acceptVerifiedProject(&state, project: project, message: message)
             return .none
 
@@ -250,7 +226,6 @@ extension AppFeature {
                 state.hasUnsavedProjectChanges = false
                 state.workflowMessage = "Open or create a project to manage roster, subjects, results, drafts, backups, and exports."
                 state.selectedTab = .projects
-                invalidateAllAIReviewState(&state)
             }
             if state.preparedFile?.projectID == id {
                 markPreparedFileStale(&state)
@@ -294,10 +269,6 @@ extension AppFeature {
     ) -> Effect<Action> {
         guard case .loaded = state.projectStorageStatus else {
             state.operationStatus = .failed("Wait for the current local operation to finish before deleting this project.")
-            return .none
-        }
-        guard !isAIWorkRunning(state) else {
-            state.operationStatus = .failed("Wait for the current on-device AI request to finish, or cancel the bulk request, before deleting a project.")
             return .none
         }
         if let pendingImport = state.pendingImport {

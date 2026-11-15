@@ -45,7 +45,6 @@ public enum ImportTemplateFileError: LocalizedError, Equatable {
     case unsupportedFormat(ImportExportFormat)
     case invalidDirectory(String)
     case emptyWrittenFile(URL)
-    case verificationFailed(URL)
     case failedOutputCouldNotBeRemoved(URL)
     case generationFailed(String)
 
@@ -57,10 +56,8 @@ public enum ImportTemplateFileError: LocalizedError, Equatable {
             return "The import-template destination is not a directory: \(path)"
         case let .emptyWrittenFile(url):
             return "The import template was written but is empty: \(url.lastPathComponent)"
-        case let .verificationFailed(url):
-            return "The import template was written but could not be verified: \(url.lastPathComponent)"
         case let .failedOutputCouldNotBeRemoved(url):
-            return "Import-template preparation failed, and the incomplete or unverified output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
+            return "Import-template preparation failed, and the incomplete output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
         case let .generationFailed(message):
             return "The import template could not be created: \(message)"
         }
@@ -232,24 +229,6 @@ public func prepareImportTemplateFile(
     directory: URL,
     fileManager: FileManager = .default
 ) throws -> PreparedImportTemplateFile {
-    try prepareImportTemplateFile(
-        kind: kind,
-        format: format,
-        directory: directory,
-        fileManager: fileManager,
-        verifyReadBack: { data, destination in
-            try verifyImportTemplateData(data, kind: kind, format: format, destination: destination)
-        }
-    )
-}
-
-func prepareImportTemplateFile(
-    kind: CSVTemplateKind,
-    format: ImportExportFormat,
-    directory: URL,
-    fileManager: FileManager = .default,
-    verifyReadBack: (Data, URL) throws -> Void
-) throws -> PreparedImportTemplateFile {
     guard format == .csv || format == .xlsx || format == .xls else {
         throw ImportTemplateFileError.unsupportedFormat(format)
     }
@@ -295,29 +274,19 @@ func prepareImportTemplateFile(
         let attributes = try fileManager.attributesOfItem(atPath: destination.path)
         let byteCount = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
         guard byteCount > 0 else { throw ImportTemplateFileError.emptyWrittenFile(destination) }
-        let readBack = try Data(contentsOf: destination)
-        guard readBack == data else { throw ImportTemplateFileError.verificationFailed(destination) }
-        try verifyReadBack(readBack, destination)
         return PreparedImportTemplateFile(
             url: destination,
             byteCount: byteCount,
             kind: kind,
             format: format
         )
-    } catch let error as ImportTemplateFileError {
-        do {
-            try removeFailedOutputIfPresent(destination, fileManager: fileManager)
-        } catch {
-            throw ImportTemplateFileError.failedOutputCouldNotBeRemoved(destination)
-        }
-        throw error
     } catch {
         do {
             try removeFailedOutputIfPresent(destination, fileManager: fileManager)
         } catch {
             throw ImportTemplateFileError.failedOutputCouldNotBeRemoved(destination)
         }
-        throw ImportTemplateFileError.verificationFailed(destination)
+        throw error
     }
 }
 
@@ -331,33 +300,4 @@ private func ensureImportTemplateDirectory(_ directory: URL, fileManager: FileMa
         return
     }
     try createDirectoryApplyingDefaultProtection(directory, fileManager: fileManager)
-}
-
-private func verifyImportTemplateData(
-    _ data: Data,
-    kind: CSVTemplateKind,
-    format: ImportExportFormat,
-    destination: URL
-) throws {
-    switch format {
-    case .csv:
-        guard let text = String(data: data, encoding: .utf8) else {
-            throw ImportTemplateFileError.verificationFailed(destination)
-        }
-        let parsed = try CSVParser.parseCSV(text)
-        let expectedHeaders = kind == .roster ? CSVTemplates.rosterHeaders : CSVTemplates.achievementResultsHeaders
-        let expectedRows = kind == .roster ? CSVTemplates.rosterTemplateRows() : CSVTemplates.achievementResultsTemplateRows()
-        guard parsed.headers == expectedHeaders, parsed.rows == expectedRows else {
-            throw ImportTemplateFileError.verificationFailed(destination)
-        }
-    case .xlsx, .xls:
-        try verifyTabularWorkbookData(
-            data,
-            format: format,
-            sheetName: CSVTemplates.sheetName(kind: kind),
-            expectedRows: CSVTemplates.orderedRows(kind: kind)
-        )
-    case .docx, .backupJSON:
-        throw ImportTemplateFileError.unsupportedFormat(format)
-    }
 }

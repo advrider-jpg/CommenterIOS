@@ -19,7 +19,13 @@ final class ReportReadinessTests: XCTestCase {
         XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .missingReport)
 
         project.reports = [
-            GeneratedReport(studentId: "s1", subject: "English", text: "Ava writes about [context].", generatedAt: 1)
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: "Ava writes about [context].",
+                generatedAt: 1,
+                resultFingerprint: buildGenerationFingerprint(projectMetadata: project.metadata, student: project.roster[0], result: project.results[0], concreteSubject: "English")
+            )
         ]
 
         let readiness = getReportReadiness(project: project, studentId: "s1", subject: "English")
@@ -34,7 +40,8 @@ final class ReportReadinessTests: XCTestCase {
                 studentId: "s1",
                 subject: "English",
                 text: "Ava writes about [context] for [Student Name] and returns to [context].",
-                generatedAt: 1
+                generatedAt: 1,
+                resultFingerprint: buildGenerationFingerprint(projectMetadata: project.metadata, student: project.roster[0], result: project.results[0], concreteSubject: "English")
             )
         ]
 
@@ -234,69 +241,6 @@ final class ReportReadinessTests: XCTestCase {
         ]
 
         XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .staleReport)
-    }
-
-    func testAIReportRequiresCurrentValidationApprovalAndWarningReview() {
-        var project = fixtureProject()
-        let text = "Ava writes clearly."
-        let textFingerprint = stableTextFingerprint(text)
-        let resultFingerprint = buildGenerationFingerprint(
-            projectMetadata: project.metadata,
-            student: project.roster[0],
-            result: project.results[0],
-            concreteSubject: "English"
-        )
-        project.reports = [
-            GeneratedReport(
-                studentId: "s1",
-                subject: "English",
-                text: text,
-                generatedAt: 1,
-                resultFingerprint: resultFingerprint,
-                generationMode: .aiPolishedDeterministic,
-                reviewState: ReportReviewState(
-                    status: .approved,
-                    reviewedAt: 2,
-                    approvedAt: 2,
-                    approvalFingerprint: textFingerprint
-                ),
-                currentTextFingerprint: textFingerprint,
-                approvedTextFingerprint: textFingerprint
-            )
-        ]
-
-        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
-
-        project.reports[0].lastValidation = ReportValidationSummary(
-            status: .blocked,
-            findings: [],
-            validatedAt: 3,
-            textFingerprint: textFingerprint
-        )
-        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiValidationBlocked)
-
-        project.reports[0].lastValidation = ReportValidationSummary(
-            status: .passedWithWarnings,
-            findings: [],
-            validatedAt: 4,
-            textFingerprint: textFingerprint
-        )
-        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
-
-        project.reports[0].validationWarningReview = ReportWarningReviewRecord(
-            validationFingerprint: textFingerprint,
-            reviewedAt: 3
-        )
-        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
-
-        project.reports[0].validationWarningReview = ReportWarningReviewRecord(
-            validationFingerprint: textFingerprint,
-            reviewedAt: 5
-        )
-        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .ready)
-
-        project.reports[0].lastValidation?.textFingerprint = "stale-validation"
-        XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .aiNeedsReview)
     }
 
     func testProjectReadinessSummarizesExpectedMatrix() {
