@@ -88,7 +88,12 @@ public enum CSVParser {
             throw error
         }
 
-        let normalizedText = normalizeUnquotedRowBreaks(text)
+        var normalizedText = normalizeUnquotedRowBreaks(text)
+        // Spreadsheet apps often end a CSV with blank lines; drop only those trailing lines.
+        while let lastBreak = normalizedText.range(of: "\r\n", options: .backwards),
+              normalizedText[lastBreak.upperBound...].allSatisfy(\.isWhitespace) {
+            normalizedText.removeSubrange(lastBreak.lowerBound...)
+        }
         do {
             let parsed = try CSVReader.decode(input: normalizedText, configuration: csvReaderConfiguration())
             return try parseTabularRows(parsed.rows, sourceLabel: "CSV file", maxRows: maxRows)

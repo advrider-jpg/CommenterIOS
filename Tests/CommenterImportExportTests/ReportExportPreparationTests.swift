@@ -66,10 +66,16 @@ final class ReportExportPreparationTests: XCTestCase {
         ]
 
         XCTAssertThrowsError(try reportReviewRows(project: project)) { error in
-            XCTAssertTrue(error.localizedDescription.contains("control character"))
+            guard case let ReportExportPreparationError.notReady(issues) = error else {
+                return XCTFail("Expected notReady, got \(error)")
+            }
+            XCTAssertTrue(issues.contains { $0.contains("control character") })
         }
         XCTAssertThrowsError(try prepareReportPacket(project: project)) { error in
-            XCTAssertTrue(error.localizedDescription.contains("control character"))
+            guard case let ReportExportPreparationError.notReady(issues) = error else {
+                return XCTFail("Expected notReady, got \(error)")
+            }
+            XCTAssertTrue(issues.contains { $0.contains("control character") })
         }
     }
 
@@ -245,7 +251,8 @@ final class ReportExportPreparationTests: XCTestCase {
                 student: student,
                 result: result,
                 concreteSubject: result.focusStrand ?? result.subject
-            )
+            ),
+            reviewedAt: generatedAt + 1
         )
     }
 }

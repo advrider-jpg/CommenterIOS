@@ -287,7 +287,8 @@ final class ReviewWorkbookFileTests: XCTestCase {
                 student: student,
                 result: result,
                 concreteSubject: result.focusStrand ?? result.subject
-            )
+            ),
+            reviewedAt: generatedAt + 1
         )
     }
 

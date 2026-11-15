@@ -45,7 +45,7 @@ public enum ImportTemplateFileError: LocalizedError, Equatable {
     case unsupportedFormat(ImportExportFormat)
     case invalidDirectory(String)
     case emptyWrittenFile(URL)
-    case verificationFailed(URL)
+    case verificationFailed(URL, underlying: String?)
     case failedOutputCouldNotBeRemoved(URL)
     case generationFailed(String)
 
@@ -57,8 +57,9 @@ public enum ImportTemplateFileError: LocalizedError, Equatable {
             return "The import-template destination is not a directory: \(path)"
         case let .emptyWrittenFile(url):
             return "The import template was written but is empty: \(url.lastPathComponent)"
-        case let .verificationFailed(url):
-            return "The import template was written but could not be verified: \(url.lastPathComponent)"
+        case let .verificationFailed(url, underlying):
+            let detail = underlying.map { " (\($0))" } ?? ""
+            return "The import template was written but could not be verified: \(url.lastPathComponent)\(detail)"
         case let .failedOutputCouldNotBeRemoved(url):
             return "Import-template preparation failed, and the incomplete or unverified output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
         case let .generationFailed(message):
@@ -296,7 +297,7 @@ func prepareImportTemplateFile(
         let byteCount = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
         guard byteCount > 0 else { throw ImportTemplateFileError.emptyWrittenFile(destination) }
         let readBack = try Data(contentsOf: destination)
-        guard readBack == data else { throw ImportTemplateFileError.verificationFailed(destination) }
+        guard readBack == data else { throw ImportTemplateFileError.verificationFailed(destination, underlying: nil) }
         try verifyReadBack(readBack, destination)
         return PreparedImportTemplateFile(
             url: destination,
@@ -317,7 +318,7 @@ func prepareImportTemplateFile(
         } catch {
             throw ImportTemplateFileError.failedOutputCouldNotBeRemoved(destination)
         }
-        throw ImportTemplateFileError.verificationFailed(destination)
+        throw ImportTemplateFileError.verificationFailed(destination, underlying: error.localizedDescription)
     }
 }
 
@@ -342,13 +343,13 @@ private func verifyImportTemplateData(
     switch format {
     case .csv:
         guard let text = String(data: data, encoding: .utf8) else {
-            throw ImportTemplateFileError.verificationFailed(destination)
+            throw ImportTemplateFileError.verificationFailed(destination, underlying: nil)
         }
         let parsed = try CSVParser.parseCSV(text)
         let expectedHeaders = kind == .roster ? CSVTemplates.rosterHeaders : CSVTemplates.achievementResultsHeaders
         let expectedRows = kind == .roster ? CSVTemplates.rosterTemplateRows() : CSVTemplates.achievementResultsTemplateRows()
         guard parsed.headers == expectedHeaders, parsed.rows == expectedRows else {
-            throw ImportTemplateFileError.verificationFailed(destination)
+            throw ImportTemplateFileError.verificationFailed(destination, underlying: nil)
         }
     case .xlsx, .xls:
         try verifyTabularWorkbookData(

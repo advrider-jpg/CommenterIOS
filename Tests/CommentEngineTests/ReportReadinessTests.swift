@@ -19,7 +19,13 @@ final class ReportReadinessTests: XCTestCase {
         XCTAssertEqual(getReportReadiness(project: project, studentId: "s1", subject: "English").status, .missingReport)
 
         project.reports = [
-            GeneratedReport(studentId: "s1", subject: "English", text: "Ava writes about [context].", generatedAt: 1)
+            GeneratedReport(
+                studentId: "s1",
+                subject: "English",
+                text: "Ava writes about [context].",
+                generatedAt: 1,
+                resultFingerprint: buildGenerationFingerprint(projectMetadata: project.metadata, student: project.roster[0], result: project.results[0], concreteSubject: "English")
+            )
         ]
 
         let readiness = getReportReadiness(project: project, studentId: "s1", subject: "English")
@@ -34,7 +40,8 @@ final class ReportReadinessTests: XCTestCase {
                 studentId: "s1",
                 subject: "English",
                 text: "Ava writes about [context] for [Student Name] and returns to [context].",
-                generatedAt: 1
+                generatedAt: 1,
+                resultFingerprint: buildGenerationFingerprint(projectMetadata: project.metadata, student: project.roster[0], result: project.results[0], concreteSubject: "English")
             )
         ]
 

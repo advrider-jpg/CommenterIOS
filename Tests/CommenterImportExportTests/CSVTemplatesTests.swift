@@ -149,10 +149,11 @@ final class CSVTemplatesTests: XCTestCase {
             directory: root,
             verifyReadBack: { _, _ in throw ExpectedFailure.failed }
         )) { error in
-            XCTAssertEqual(
-                error as? ImportTemplateFileError,
-                .verificationFailed(root.appendingPathComponent("report_writer_report_details_template.csv"))
-            )
+            guard case let .verificationFailed(url, underlying)? = error as? ImportTemplateFileError else {
+                return XCTFail("Expected verificationFailed, got \(error)")
+            }
+            XCTAssertEqual(url, root.appendingPathComponent("report_writer_report_details_template.csv"))
+            XCTAssertNotNil(underlying)
         }
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: root.appendingPathComponent("report_writer_report_details_template.csv").path
