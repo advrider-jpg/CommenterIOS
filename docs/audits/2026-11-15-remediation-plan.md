@@ -153,11 +153,11 @@ public enum AppPrivacyPolicy {
 Its caller in the Support screen uses it directly. The build-setting step in `APP_STORE_RELEASE_CHECKLIST.md` is
 deleted.
 
-**Tests on the iPhone simulator (issue 2).** Add `CommenterIOS.xctestplan` listing the remaining package test
-targets (CommenterDomainTests, CommentEngineTests, CommenterImportExportTests, AppFeatureTests,
-CommenterPersistenceTests, CommenterAppIntentsTests) enabled and CommenterIOSScreenshotTests disabled; make it the
-scheme's default test plan. Delete `scripts/validate_xcode_scheme_scope.py` and
-`docs/validation/XCODE_SCHEME_SCOPE.md`.
+**Tests on the iPhone simulator (issue 2).** CI runs the package test targets with the package's own
+`CommenterIOS-Package` scheme on the simulator, from a copy of `Package.swift`, `Sources` and `Tests` (xcodebuild
+picks the app project when it sits beside `Package.swift`). The app scheme lists only CommenterIOSScreenshotTests.
+No test plan: a plan that pointed at the package's own test targets from the app project found no tests on Xcode 27.1.
+Delete `scripts/validate_xcode_scheme_scope.py` and `docs/validation/XCODE_SCHEME_SCOPE.md`.
 
 **Automated checks (issues 59, 55 part).** New `.github/workflows/ios-ci.yml`, in full:
 
@@ -229,14 +229,20 @@ jobs:
           path: build/DerivedData/SourcePackages
           key: spm-${{ hashFiles('Package.resolved') }}
       - name: Run unit tests on the iPhone simulator
+        # xcodebuild picks the app project when it sits beside Package.swift, so the package
+        # tests run from a copy of the package alone, using its own CommenterIOS-Package scheme.
         run: |
           set -euo pipefail
           mkdir -p build
-          xcodebuild test -project CommenterIOS.xcodeproj -scheme CommenterIOS \
-            -testPlan CommenterIOS -destination "$DESTINATION" -derivedDataPath "$DERIVED_DATA_PATH" \
-            -resultBundlePath build/UnitTests.xcresult \
+          pkg="$RUNNER_TEMP/package"
+          mkdir -p "$pkg"
+          cp -R Package.swift Sources Tests "$pkg/"
+          cd "$pkg"
+          xcodebuild test -scheme CommenterIOS-Package \
+            -destination "$DESTINATION" -derivedDataPath "$DERIVED_DATA_PATH" \
+            -resultBundlePath "$GITHUB_WORKSPACE/build/UnitTests.xcresult" \
             -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO \
-            2>&1 | tee build/unit-tests.log
+            2>&1 | tee "$GITHUB_WORKSPACE/build/unit-tests.log"
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -322,7 +328,7 @@ three kept skills, XcodeBuildMCP and gh-fix-ci (it stays because `PROJECT_RULES.
 
 | ID | Wave | Agent / model (why) | Reason for the split | Owned files | Done when |
 |---|---|---|---|---|---|
-| A1 | 1 | general-purpose / Sonnet 5.5 medium (many interacting project-file edits) | Toolchain files are disjoint from the AI deletion | `CommenterIOS.xcodeproj/**`, `CommenterIOS.xctestplan`, `App/**`, `AppPrivacyPolicy.swift`, `.github/**`, the two validator scripts and their docs | Every 4.1 toolchain, privacy and CI edit present; nothing else changed |
+| A1 | 1 | general-purpose / Sonnet 5.5 medium (many interacting project-file edits) | Toolchain files are disjoint from the AI deletion | `CommenterIOS.xcodeproj/**`, `App/**`, `AppPrivacyPolicy.swift`, `.github/**`, the two validator scripts and their docs | Every 4.1 toolchain, privacy and CI edit present; nothing else changed |
 | A2 | 1 | general-purpose / Sonnet 5.5 medium (deletion across many interlocking files) | AI code is its own slice | everything listed under "AI removed", `Sources/CommenterAI/AIAvailability.swift`, the Support row | Every listed AI file and case gone; scaffold present; no AI control left on any screen |
 | A3 | 1 | general-purpose / Haiku 5.5 high (deletions and one rewrite) | Documents only | the stale-document list, `docs/IOS_CI_SKILL_RECOMMENDATIONS.md`, `APP_STORE_RELEASE_CHECKLIST.md`, `skills-lock.json` | Files gone; a search for each deleted name finds nothing |
 | A4 | 2 | general-purpose / Sonnet 5.5 medium (test reasoning) | Tests depend on A2's deletions | `Tests/**`, `CSVParser.swift`, `CSVTemplates.swift`, `ReviewWorkbookFile.swift` | G2–G5 changes made as specified |
@@ -624,7 +630,7 @@ iPhone.
 
 | Old version (deleted) | Where it lives now | Replaced by | Readers switched in the same PR |
 |---|---|---|---|
-| macOS platform and `swift test` | `Package.swift`, `ios-ci.yml` | iOS-only package; test plan on the simulator | CI, README (PR 1) |
+| macOS platform and `swift test` | `Package.swift`, `ios-ci.yml` | iOS-only package; package scheme on the simulator | CI, README (PR 1) |
 | Package executable target | `Package.swift`, `Sources/CommenterIOSApp` | Xcode app target, files in `App/` | Xcode project, CI lint path (PR 1) |
 | Privacy URL build setting | `project.pbxproj`, `AppPrivacyPolicy` | Swift constant (placeholder) | Support screen (PR 1) |
 | Current AI features, prompt registry, AI review fields, safety validator | `CommenterAI`, `CommenterReportSafety`, `ProjectAIWorkflowFeature`, `Models.swift` | availability scaffold (Q1) | screens, readiness, export, App Intents, tests (PR 1) |

@@ -17,7 +17,7 @@ Building and testing needs macOS with Xcode 27 and an iOS 27 simulator. A Window
 | Purpose | Command |
 |---|---|
 | Resolve packages | `swift package resolve` |
-| Unit tests on the iPhone simulator | `xcodebuild test -project CommenterIOS.xcodeproj -scheme CommenterIOS -testPlan CommenterIOS -skip-testing:CommenterIOSScreenshotTests -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO` |
+| Unit tests on the iPhone simulator | From a folder holding only copies of `Package.swift`, `Sources` and `Tests` (xcodebuild otherwise picks the app project): `xcodebuild test -scheme CommenterIOS-Package -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO` |
 | Build the iOS app | `xcodebuild build -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO` |
 | Dataset copy matches CommenterV3 | `python scripts/validate_dataset_source_transform.py` |
 | Whitespace and line endings | `git diff --check` and `git ls-files --eol` |
