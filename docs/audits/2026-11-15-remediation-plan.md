@@ -146,8 +146,9 @@ this iPhone" or the reason. No AI control appears anywhere else.
 **Privacy link (issue 46).**
 ```swift
 public enum AppPrivacyPolicy {
-    // PLACEHOLDER (PROJECT_RULES.md, pre-production): replace before App Store submission.
-    public static let url = URL(string: "https://report-writer.invalid/privacy-policy")!
+    // PLACEHOLDER (PROJECT_RULES.md, pre-production): set the real address before App Store submission.
+    // While this is nil, the Support screen shows no privacy-policy link rather than a dead one.
+    public static let url: URL? = nil
 }
 ```
 Its caller in the Support screen uses it directly. The build-setting step in `APP_STORE_RELEASE_CHECKLIST.md` is
@@ -236,7 +237,7 @@ jobs:
           mkdir -p build
           pkg="$RUNNER_TEMP/package"
           mkdir -p "$pkg"
-          cp -R Package.swift Sources Tests "$pkg/"
+          cp -R Package.swift Package.resolved Sources Tests "$pkg/"
           cd "$pkg"
           xcodebuild test -scheme CommenterIOS-Package \
             -destination "$DESTINATION" -derivedDataPath "$DERIVED_DATA_PATH" \

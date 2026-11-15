@@ -1,14 +1,14 @@
 import CommenterAI
 import ComposableArchitecture
 
-extension AIClient: DependencyKey {
-    public static let liveValue = AIClient.live
-    public static let testValue = AIClient { .unavailable(reason: "Apple Intelligence isn't available on this iPhone.") }
+private enum AIClientKey: DependencyKey {
+    static let liveValue = AIClient.live
+    static let testValue = AIClient { .unavailable(reason: AIAvailability.notAvailableReason) }
 }
 
 extension DependencyValues {
     public var aiClient: AIClient {
-        get { self[AIClient.self] }
-        set { self[AIClient.self] = newValue }
+        get { self[AIClientKey.self] }
+        set { self[AIClientKey.self] = newValue }
     }
 }

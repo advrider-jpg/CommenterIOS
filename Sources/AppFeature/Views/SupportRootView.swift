@@ -358,11 +358,13 @@ struct SupportRootView: View {
                 SupportBodyText("Project names, roster data, results, draft comments, backups, and report files stay on this device unless you choose a native file export or share destination.")
                 SupportBodyText("Report Writer does not configure accounts, cloud sync, analytics, telemetry, remote AI, or backend project persistence in this MVP.")
                 SupportBodyText("Clipboard diagnostics are redacted by default. Report Writer removes prepared temporary files after save, share, cancellation, or dismissal, and shows a cleanup error if removal does not succeed.")
-                Link(destination: AppPrivacyPolicy.url) {
-                    Label("Open Privacy Policy", systemImage: "hand.raised")
-                        .font(.footnote.weight(.semibold))
+                if let privacyPolicyURL = AppPrivacyPolicy.url {
+                    Link(destination: privacyPolicyURL) {
+                        Label("Open Privacy Policy", systemImage: "hand.raised")
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .accessibilityIdentifier("privacy-policy-link")
                 }
-                .accessibilityIdentifier("privacy-policy-link")
             }
         }
     }

@@ -28,7 +28,11 @@ extension AppFeature {
 
         case let .tabSelected(tab):
             state.selectedTab = tab
-            return .none
+            // Apple Intelligence can finish downloading or be turned on while the app runs.
+            guard tab == .support else { return .none }
+            return .run { send in
+                await send(.aiAvailabilityLoaded(aiClient.availability()))
+            }
 
         case let .worklistFocusChanged(focus):
             state.worklistFocus = focus

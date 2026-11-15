@@ -4,6 +4,8 @@ public enum AIAvailability: Equatable, Sendable {
     case available
     case unavailable(reason: String)
 
+    public static let notAvailableReason = "Apple Intelligence isn't available on this iPhone."
+
     public var displayText: String {
         switch self {
         case .available: "Available on this iPhone"
@@ -28,7 +30,7 @@ extension AIClient {
         case .unavailable(.deviceNotEligible): .unavailable(reason: "This iPhone doesn't support Apple Intelligence.")
         case .unavailable(.appleIntelligenceNotEnabled): .unavailable(reason: "Apple Intelligence is turned off in Settings.")
         case .unavailable(.modelNotReady): .unavailable(reason: "Apple Intelligence is still downloading.")
-        case .unavailable: .unavailable(reason: "Apple Intelligence isn't available on this iPhone.")
+        case .unavailable: .unavailable(reason: AIAvailability.notAvailableReason)
         }
     }
 }

@@ -39,8 +39,8 @@ final class AppFeatureTests: XCTestCase {
             $0.projects = [summary]
             $0.projectStorageMessage = "1 saved project loaded from local storage."
         }
-        await store.receive(.aiAvailabilityLoaded(.unavailable(reason: "Apple Intelligence isn't available on this iPhone."))) {
-            $0.aiAvailability = .unavailable(reason: "Apple Intelligence isn't available on this iPhone.")
+        await store.receive(.aiAvailabilityLoaded(.unavailable(reason: AIAvailability.notAvailableReason))) {
+            $0.aiAvailability = .unavailable(reason: AIAvailability.notAvailableReason)
         }
     }
 
@@ -73,8 +73,8 @@ final class AppFeatureTests: XCTestCase {
             $0.invalidProjectRecords = [invalid]
             $0.projectStorageMessage = "1 saved project loaded from local storage. 1 local project record could not be loaded and is listed in Support diagnostics."
         }
-        await store.receive(.aiAvailabilityLoaded(.unavailable(reason: "Apple Intelligence isn't available on this iPhone."))) {
-            $0.aiAvailability = .unavailable(reason: "Apple Intelligence isn't available on this iPhone.")
+        await store.receive(.aiAvailabilityLoaded(.unavailable(reason: AIAvailability.notAvailableReason))) {
+            $0.aiAvailability = .unavailable(reason: AIAvailability.notAvailableReason)
         }
     }
 
@@ -106,8 +106,8 @@ final class AppFeatureTests: XCTestCase {
             $0.projectStorageStatus = .loaded
             $0.projectStorageMessage = "Project storage is available and ready."
         }
-        await store.receive(.aiAvailabilityLoaded(.unavailable(reason: "Apple Intelligence isn't available on this iPhone."))) {
-            $0.aiAvailability = .unavailable(reason: "Apple Intelligence isn't available on this iPhone.")
+        await store.receive(.aiAvailabilityLoaded(.unavailable(reason: AIAvailability.notAvailableReason))) {
+            $0.aiAvailability = .unavailable(reason: AIAvailability.notAvailableReason)
         }
     }
 
