@@ -2,7 +2,7 @@
 
 | Claim | Repo evidence |
 | --- | --- |
-| iPhone-first | `TARGETED_DEVICE_FAMILY = 1` in `CommenterIOS.xcodeproj/project.pbxproj`; `docs/ledgers/CORE_RULES.md` says native iPhone-first SwiftUI/TCA app. |
+| iPhone-first | `TARGETED_DEVICE_FAMILY = 1` in `CommenterIOS.xcodeproj/project.pbxproj`; `PROJECT_RULES.md` says native iPhone-first SwiftUI/TCA app. |
 | Education category | `INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education"` in the Xcode project. |
 | Bundle ID | `PRODUCT_BUNDLE_IDENTIFIER = com.commenterios.app` in the app target. |
 | Version number | `MARKETING_VERSION = 1.0.0`; `CURRENT_PROJECT_VERSION = 1`. |

@@ -1,80 +1,34 @@
 # CommenterIOS
 
-Native iPhone-first SwiftUI/TCA rewrite of CommenterV3.
+CommenterIOS is the native iPhone version of the offline teacher report-writing app CommenterV3. Enter a class, record results and observations, generate suggested comment wording from the production comment bank, review it, and export the comments marked **Done**. Everything stays on the device: there is no account, cloud sync, analytics or remote AI.
 
-This repository implements the native iOS port of the offline teacher
-report-writing app in `C:\Commenterv3`; that live checkout remains the product
-source of truth for disputed or newly ported behavior.
+## Teacher use
 
-## Product Contract
+Projects, rosters, results, drafts and reports are saved locally and checked after each save, with recovery copies. Import class lists and results from CSV, XLSX or legacy XLS, using the matching templates the app provides. Export reports as DOCX, XLSX or XLS through the native iOS file and share sheets. Back up and restore a project as a plain JSON file or a password-protected `.cbackup` file.
 
-CommenterIOS must preserve the core CommenterV3 contract:
+Generated wording is deterministic: the same inputs give the same comment. Where Apple's on-device AI is available, it can suggest revisions or drafts, but the teacher previews and approves each one, and AI wording cannot be exported until it passes the app's checks and is approved. A damaged saved project is listed with options to copy its raw data for support or remove it while keeping its recovery copies.
 
-- Offline-first operation.
-- Local-only project, roster, result, draft, report, backup, and recovery data.
-- No account system, cloud sync, analytics SDK, telemetry SDK, remote AI, or
-  backend project persistence. Apple Foundation Models on-device AI may be used
-  only as a local/offline, teacher-reviewed writing layer when the runtime
-  truthfully reports availability.
-- Production comment data comes from the real CommenterV3 production dataset,
-  not sample fixtures.
-- Deterministic generation remains the baseline and fallback even when
-  on-device AI is available.
-- No user-visible save, import, export, generation, or share success state
-  unless the underlying local operation really completed and was verified.
-- No unresolved placeholders in generated or exported report text.
-- AI-generated or AI-revised report text must pass validation and explicit
-  teacher approval before export readiness can be claimed.
-- CSV, XLSX, XLS, DOCX, backup JSON, and local iOS document workflows are MVP
-  requirements, not later work.
+## Development
 
-## Current Status
+The app is SwiftUI with The Composable Architecture, organized as local Swift packages for the domain, comment generation, persistence, import/export, report safety, AI and the design system. The production comment bank is copied from `C:\Commenterv3\client\public\data\comment-engine.json`; see [the dataset copy rule](docs/validation/DATASET_SOURCE_TRANSFORM.md).
 
-This repo contains the native SwiftUI/TCA MVP implementation for the offline
-teacher workflow: bundled production dataset loading, deterministic generation,
-local verified project persistence, recovery snapshots, CSV/XLSX/XLS imports,
-matching CSV/XLSX/XLS teacher templates, DOCX/XLSX/XLS report exports, plaintext
-JSON and password-protected `.cbackup` import/export, deterministic
-teacher-review “Done” gating, support diagnostics, and native iOS document
-workflows for import, export, and share completion. The
-AI foundation includes on-device availability checks, project AI defaults with
-do-not-mention and required-mention constraints, report-specific AI overrides
-for those constraints, Foundation Models revision/draft/critique wiring behind
-compile/runtime gates, report-level AI preview accept/reject flow, an AI review
-queue, cancellable bulk AI preview queueing, evidence-draft previews, local
-safety checks, validation/evaluation fixtures, App Intents that route into the
-requested in-app review area, validation metadata, and teacher approval gates
-before any AI text can become export-ready. Damaged local project records are
-listed with exact raw support-copy and recovery-preserving removal workflows.
+Building and testing needs macOS with Xcode and an iOS simulator. A Windows host can run only Git and document hygiene checks and the dataset-copy check.
 
-`CommenterIOS.xcodeproj` is present. Local Swift package and Xcode app-target
-validation still require dependency resolution plus an Apple toolchain and iOS
-simulator on macOS.
+| Purpose | Command |
+|---|---|
+| Resolve packages | `swift package resolve` |
+| Swift package tests | `swift test` |
+| Build the iOS app | `xcodebuild -project CommenterIOS.xcodeproj -scheme CommenterIOS -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO` |
+| Dataset copy matches CommenterV3 | `python scripts/validate_dataset_source_transform.py` |
+| Whitespace and line endings | `git diff --check` and `git ls-files --eol` |
 
-Start with:
+Pull requests run the same package tests and app build in [iOS CI](.github/workflows/ios-ci.yml).
 
-- [iOS CI and workflow recommendations](docs/IOS_CI_SKILL_RECOMMENDATIONS.md)
-- [Chat handoff](docs/CHAT_HANDOFF.md)
-- [Production MVP plan](docs/PRODUCTION_MVP_PLAN.md)
-- [Scaffold decision](docs/decisions/0001-native-swiftui-tca.md)
-- [Source truth map](docs/source-truth/commenterv3-source-map.md)
-- [Historical initial backlog](docs/backlog/INITIAL_BACKLOG.md)
+## Documentation
 
-## Intended Stack
-
-- SwiftUI
-- The Composable Architecture
-- iPhone-first native HIG UI
-- Local Swift packages for domain, generation, persistence, import/export, and
-  design system
-- File-backed canonical project JSON plus SQLite metadata/index storage
-- Native iOS document picker/share/file export flows
-
-## Source Repository
-
-The current production source of truth is:
-
-`C:\Commenterv3`
-
-Do not port behavior from memory alone. Inspect the live source before
-implementing each feature.
+- [AGENTS.md](AGENTS.md) and [PROJECT_RULES.md](PROJECT_RULES.md): operating and product rules.
+- [Source truth map](docs/source-truth/commenterv3-source-map.md): which CommenterV3 files own each ported behavior.
+- [OSS dependency policy](docs/OSS_DEPENDENCY_POLICY.md): approved packages and limits on custom infrastructure.
+- [Production MVP plan](docs/PRODUCTION_MVP_PLAN.md): MVP scope and release gates.
+- [iOS CI tools](docs/IOS_CI_SKILL_RECOMMENDATIONS.md): CI debugging tools and install commands.
+- [Release](docs/release/): TestFlight and App Store material.

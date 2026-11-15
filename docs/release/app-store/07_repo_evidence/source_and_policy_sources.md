@@ -3,7 +3,7 @@
 Repo files inspected:
 
 - `AGENTS.md`
-- `docs/ledgers/CORE_RULES.md`
+- `PROJECT_RULES.md`
 - `docs/CHAT_HANDOFF.md`
 - `docs/PRODUCTION_MVP_PLAN.md`
 - `docs/OSS_DEPENDENCY_POLICY.md`
