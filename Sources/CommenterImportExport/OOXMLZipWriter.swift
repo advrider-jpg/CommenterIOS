@@ -6,6 +6,8 @@ enum OOXMLZipWriterError: LocalizedError, Equatable {
     case entryTooLarge(String)
     case archiveTooLarge
     case invalidArchive
+    case unreadableArchive(String)
+    case unexpectedContent(String)
     case missingRequiredEntry(String)
 
     var errorDescription: String? {
@@ -18,6 +20,10 @@ enum OOXMLZipWriterError: LocalizedError, Equatable {
             return "The OOXML package is too large."
         case .invalidArchive:
             return "The OOXML package is not a readable ZIP archive."
+        case let .unreadableArchive(detail):
+            return "The OOXML package could not be read as a ZIP archive: \(detail)"
+        case let .unexpectedContent(detail):
+            return "The OOXML package content does not match what was written: \(detail)"
         case let .missingRequiredEntry(path):
             return "The OOXML package is missing a required entry: \(path)"
         }
@@ -140,7 +146,7 @@ enum OOXMLZipWriter {
         } catch let error as OOXMLZipWriterError {
             throw error
         } catch {
-            throw OOXMLZipWriterError.invalidArchive
+            throw OOXMLZipWriterError.unreadableArchive(String(describing: error))
         }
     }
 }

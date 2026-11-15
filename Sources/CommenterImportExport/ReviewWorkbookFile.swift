@@ -19,7 +19,7 @@ public enum ReviewWorkbookFileError: LocalizedError, Equatable {
     case unsupportedFormat(ImportExportFormat)
     case invalidDirectory(String)
     case emptyWrittenFile(URL)
-    case verificationFailed(URL)
+    case verificationFailed(URL, underlying: String?)
     case failedOutputCouldNotBeRemoved(URL)
     case legacyXLSGenerationFailed(String)
 
@@ -31,8 +31,9 @@ public enum ReviewWorkbookFileError: LocalizedError, Equatable {
             return "The review workbook destination is not a directory: \(path)"
         case let .emptyWrittenFile(url):
             return "The review workbook was written but is empty: \(url.lastPathComponent)"
-        case let .verificationFailed(url):
-            return "The review workbook was written but could not be verified: \(url.lastPathComponent)"
+        case let .verificationFailed(url, underlying):
+            let detail = underlying.map { " (\($0))" } ?? ""
+            return "The review workbook was written but could not be verified: \(url.lastPathComponent)\(detail)"
         case let .failedOutputCouldNotBeRemoved(url):
             return "Review workbook preparation failed, and the incomplete or unverified output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
         case let .legacyXLSGenerationFailed(message):
@@ -78,7 +79,7 @@ public func prepareReviewWorkbookFile(
         let byteCount = try verifiedWorkbookSize(url: destination, fileManager: fileManager)
         let readBack = try Data(contentsOf: destination)
         guard readBack == data else {
-            throw ReviewWorkbookFileError.verificationFailed(destination)
+            throw ReviewWorkbookFileError.verificationFailed(destination, underlying: nil)
         }
         try verifyReviewWorkbook(readBack, format: format, expectedRows: rows, forbiddenStrings: forbiddenStrings)
         return PreparedReviewWorkbookFile(url: destination, byteCount: byteCount, format: format, rowCount: rows.count)
@@ -95,7 +96,7 @@ public func prepareReviewWorkbookFile(
         } catch {
             throw ReviewWorkbookFileError.failedOutputCouldNotBeRemoved(destination)
         }
-        throw ReviewWorkbookFileError.verificationFailed(destination)
+        throw ReviewWorkbookFileError.verificationFailed(destination, underlying: error.localizedDescription)
     }
 }
 
@@ -161,13 +162,24 @@ func verifyTabularWorkbookData(
             maximumEntryBytes: 64 * 1024 * 1024,
             maximumTotalUncompressedBytes: 128 * 1024 * 1024
         )
+        guard Set(entries.keys) == requiredXLSXEntries else {
+            throw OOXMLZipWriterError.unexpectedContent("spreadsheet has unexpected parts: \(entries.keys.sorted().joined(separator: ", "))")
+        }
         guard let workbook = entries["xl/workbook.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
-              let sheet = entries["xl/worksheets/sheet1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
-              Set(entries.keys) == requiredXLSXEntries,
-              workbook.contains("name=\"\(xmlEscape(sheetName))\""),
-              inlineStringValues(in: sheet) == expectedRows.flatMap({ $0 })
+              let sheet = entries["xl/worksheets/sheet1.xml"].flatMap({ String(data: $0, encoding: .utf8) })
         else {
-            throw OOXMLZipWriterError.invalidArchive
+            throw OOXMLZipWriterError.unexpectedContent("spreadsheet workbook or sheet is not readable text")
+        }
+        guard workbook.contains("name=\"\(xmlEscape(sheetName))\"") else {
+            throw OOXMLZipWriterError.unexpectedContent("spreadsheet is missing the sheet named \(sheetName)")
+        }
+        let cellValues = inlineStringValues(in: sheet)
+        let expectedValues = expectedRows.flatMap({ $0 })
+        guard cellValues == expectedValues else {
+            let firstDifference = zip(cellValues, expectedValues).firstIndex { $0 != $1 } ?? min(cellValues.count, expectedValues.count)
+            throw OOXMLZipWriterError.unexpectedContent(
+                "spreadsheet cells do not match what was written (\(cellValues.count) cells read, \(expectedValues.count) expected, first difference at cell \(firstDifference + 1))"
+            )
         }
     case .xls:
         try LegacyXLSWorkbookWriter.validateWorkbook(
@@ -199,7 +211,7 @@ private func forbiddenWorkbookExportStrings(project: Project) -> [String] {
 private func assertReportTextsOmitForbiddenStrings(_ reportTexts: [String], forbiddenStrings: [String]) throws {
     for forbidden in forbiddenStrings {
         if reportTexts.contains(where: { $0.contains(forbidden) }) {
-            throw OOXMLZipWriterError.invalidArchive
+            throw OOXMLZipWriterError.unexpectedContent("a report contains private teacher information")
         }
     }
 }

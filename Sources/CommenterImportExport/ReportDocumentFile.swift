@@ -19,7 +19,7 @@ public enum ReportDocumentFileError: LocalizedError, Equatable {
     case unsupportedFormat(ImportExportFormat)
     case invalidDirectory(String)
     case emptyWrittenFile(URL)
-    case verificationFailed(URL)
+    case verificationFailed(URL, underlying: String?)
     case failedOutputCouldNotBeRemoved(URL)
 
     public var errorDescription: String? {
@@ -30,8 +30,9 @@ public enum ReportDocumentFileError: LocalizedError, Equatable {
             return "The report document destination is not a directory: \(path)"
         case let .emptyWrittenFile(url):
             return "The report document was written but is empty: \(url.lastPathComponent)"
-        case let .verificationFailed(url):
-            return "The report document was written but could not be verified: \(url.lastPathComponent)"
+        case let .verificationFailed(url, underlying):
+            let detail = underlying.map { " (\($0))" } ?? ""
+            return "The report document was written but could not be verified: \(url.lastPathComponent)\(detail)"
         case let .failedOutputCouldNotBeRemoved(url):
             return "Report document preparation failed, and the incomplete or unverified output could not be removed: \(url.lastPathComponent). Do not use this file; remove it manually."
         }
@@ -71,7 +72,7 @@ public func prepareReportDocumentFile(
         let byteCount = try verifiedDocumentSize(url: destination, fileManager: fileManager)
         let readBack = try Data(contentsOf: destination)
         guard readBack == data else {
-            throw ReportDocumentFileError.verificationFailed(destination)
+            throw ReportDocumentFileError.verificationFailed(destination, underlying: nil)
         }
         try verifyReportDocumentPackage(readBack, packet: packet, headerText: headerText, forbiddenStrings: forbiddenStrings)
         return PreparedReportDocumentFile(url: destination, byteCount: byteCount, format: format, studentCount: packet.students.count)
@@ -88,7 +89,7 @@ public func prepareReportDocumentFile(
         } catch {
             throw ReportDocumentFileError.failedOutputCouldNotBeRemoved(destination)
         }
-        throw ReportDocumentFileError.verificationFailed(destination)
+        throw ReportDocumentFileError.verificationFailed(destination, underlying: error.localizedDescription)
     }
 }
 
@@ -154,10 +155,12 @@ private func verifyReportDocumentPackage(
         maximumEntryBytes: 64 * 1024 * 1024,
         maximumTotalUncompressedBytes: 128 * 1024 * 1024
     )
+    guard Set(entries.keys) == requiredDOCXEntries else {
+        throw OOXMLZipWriterError.unexpectedContent("Word document has unexpected parts: \(entries.keys.sorted().joined(separator: ", "))")
+    }
     guard let document = entries["word/document.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
           let header = entries["word/header1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
           let footer = entries["word/footer1.xml"].flatMap({ String(data: $0, encoding: .utf8) }),
-          Set(entries.keys) == requiredDOCXEntries,
           document.contains("<w:document"),
           document.contains("<w:body>"),
           document.contains("<w:sectPr>"),
@@ -168,42 +171,42 @@ private func verifyReportDocumentPackage(
           footer.contains("<w:ftr"),
           footer.contains("PAGE")
     else {
-        throw OOXMLZipWriterError.invalidArchive
+        throw OOXMLZipWriterError.unexpectedContent("Word document parts are missing or incomplete")
     }
     guard wordTextValues(in: document) == expectedDocumentTextValues(packet),
           wordTextValues(in: header) == [headerText],
           wordTextValues(in: footer) == ["Page "]
     else {
-        throw OOXMLZipWriterError.invalidArchive
+        throw OOXMLZipWriterError.unexpectedContent("Word document text does not match the report")
     }
     if let summary = packet.summary, !document.contains(documentEscape(summary)) {
-        throw OOXMLZipWriterError.invalidArchive
+        throw OOXMLZipWriterError.unexpectedContent("Word document is missing the summary")
     }
     if packet.summary != nil {
         guard document.contains(documentEscape(packet.title)),
               document.contains(documentEscape(packet.subtitle))
         else {
-            throw OOXMLZipWriterError.invalidArchive
+            throw OOXMLZipWriterError.unexpectedContent("Word document is missing the title or subtitle")
         }
     }
     for student in packet.students {
         guard document.contains(documentEscape(student.displayName)),
               document.contains(documentEscape(student.detail))
         else {
-            throw OOXMLZipWriterError.invalidArchive
+            throw OOXMLZipWriterError.unexpectedContent("Word document is missing a student name or detail line")
         }
         for section in student.sections {
             guard document.contains(documentEscape(section.subject)),
                   document.contains(documentEscape("Achievement: \(section.achievement)"))
             else {
-                throw OOXMLZipWriterError.invalidArchive
+                throw OOXMLZipWriterError.unexpectedContent("Word document is missing a subject or achievement line")
             }
             if let focus = section.focus,
                !document.contains(documentEscape("Focus: \(focus)")) {
-                throw OOXMLZipWriterError.invalidArchive
+                throw OOXMLZipWriterError.unexpectedContent("Word document is missing a focus line")
             }
             for paragraph in section.paragraphs where !document.contains(documentEscape(paragraph)) {
-                throw OOXMLZipWriterError.invalidArchive
+                throw OOXMLZipWriterError.unexpectedContent("Word document is missing a report paragraph")
             }
         }
     }
@@ -233,7 +236,7 @@ private func assertReportParagraphsOmitForbiddenStrings(packet: PreparedReportPa
     }
     for forbidden in forbiddenStrings {
         if paragraphs.contains(where: { $0.contains(forbidden) }) {
-            throw OOXMLZipWriterError.invalidArchive
+            throw OOXMLZipWriterError.unexpectedContent("a report paragraph contains private teacher information")
         }
     }
 }
