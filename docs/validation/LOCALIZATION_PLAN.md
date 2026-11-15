@@ -20,7 +20,7 @@ Required proof before adding another locale:
 - Run a pseudolocalized simulator build.
 - Capture screenshots for project list, worklist, report editor, export, backup,
   and support screens at default and large Dynamic Type.
-- Record the evidence in `docs/ledgers/VALIDATION_LEDGER.md`.
+- Attach the screenshots to the pull request that adds the locale.
 
 Current release status: English-only, with a recorded localization plan and no
 translated-locale claim. This is a no translated-locale claim release posture.

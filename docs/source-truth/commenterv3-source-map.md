@@ -6,7 +6,7 @@ memory alone.
 ## Binding Project Rules
 
 - `C:\Commenterv3\AGENTS.md`
-- `C:\Commenterv3\docs\ledgers\CORE_RULES.md`
+- `C:\Commenterv3\PROJECT_RULES.md`
 - `C:\Commenterv3\HARDENING_NOTES.md`
 
 ## Production Data

@@ -26,5 +26,5 @@ Current evidence:
 
 Run `python scripts\validate_dataset_source_transform.py` after source-data
 updates. A release must fail if the live source is unavailable, the source hash
-changes without ledger updates, or the bundled bytes no longer match the
+changes without this document being updated, or the bundled bytes no longer match the
 documented LF-normalized source bytes.

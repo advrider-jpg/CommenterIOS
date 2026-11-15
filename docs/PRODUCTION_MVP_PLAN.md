@@ -124,7 +124,7 @@ metadata/index work must use GRDB once dependency migration begins; direct
 CSV/XLSX/XLS import, backup JSON import/export, DOCX/XLSX/XLS export, and file
 payload construction. Generic CSV, XLSX, XLS/OLE, DOCX, ZIP/OOXML, and workbook
 handling must use the approved dependencies in `docs/OSS_DEPENDENCY_POLICY.md`
-unless a decision-ledger exception is recorded.
+unless that policy records an exception.
 
 `DesignSystem`
 

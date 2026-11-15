@@ -68,8 +68,8 @@ Six subagents contributed planning lanes:
   starters.
 - Dependency posture: use the packages listed in
   `docs/OSS_DEPENDENCY_POLICY.md`; preserve worker-added packages where possible;
-  do not hand-roll generic infrastructure unless that policy or a later decision
-  ledger entry grants a specific exception.
+  do not hand-roll generic infrastructure unless that policy grants a specific
+  exception.
 - Sequencing: critical path is source audit, domain, generation parity,
   persistence, import/export, iPhone workflow, release validation.
 
