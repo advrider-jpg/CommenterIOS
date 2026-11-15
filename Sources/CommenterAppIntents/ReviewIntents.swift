@@ -30,9 +30,9 @@ import AppIntents
 
 @available(iOS 17.0, macOS 14.0, *)
 public struct OpenReportPreparationIntent: AppIntent {
-    public static var title: LocalizedStringResource = "Open Report Preparation"
-    public static var description = IntentDescription("Opens Report Writer so the teacher can prepare approved reports in the app.")
-    public static var openAppWhenRun = true
+    public static let title: LocalizedStringResource = "Open Report Preparation"
+    public static let description = IntentDescription("Opens Report Writer so the teacher can prepare approved reports in the app.")
+    public static let openAppWhenRun = true
 
     public init() {}
 
