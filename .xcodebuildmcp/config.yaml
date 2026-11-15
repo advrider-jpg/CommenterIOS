@@ -1,0 +1,30 @@
+schemaVersion: 1
+
+# Keep the tool surface focused on the workflows needed to build and verify
+# this iPhone app. The macOS and project-scaffolding workflows are excluded
+# because CommenterIOS is not a Mac app and already has a production project.
+enabledWorkflows:
+  - project-discovery
+  - simulator
+  - simulator-management
+  - device
+  - debugging
+  - ui-automation
+  - swift-package
+  - coverage
+  - utilities
+  - xcode-ide
+
+sessionDefaults:
+  projectPath: "./CommenterIOS.xcodeproj"
+  scheme: "CommenterIOS"
+  configuration: "Debug"
+  platform: "iOS Simulator"
+  useLatestOS: true
+
+# Select a simulator by name only after Xcode 27 lists the runtimes installed
+# on the Mac. Simulator identifiers are machine-specific and must not be
+# committed to the repository.
+showTestTiming: true
+filePathRenderStyle: "tree"
+uiDebuggerGuardMode: "error"

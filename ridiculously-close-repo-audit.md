@@ -2,8 +2,8 @@
 
 > **Historical snapshot (2026-06-12).** This is preserved as the evidence and
 > reasoning from that audit date; it is not the live defect register or current
-> product verdict. Subsequent source changes and dated ledger entries supersede
-> resolved findings. Consult the live checkout and `docs/ledgers/PROJECT_LEDGER.md`
+> product verdict. Subsequent source changes supersede resolved findings. Consult
+> the live checkout, `PROJECT_RULES.md` and the 2026-11-15 audit in `docs/audits/`
 > for current posture.
 
 ## 1. Executive Summary

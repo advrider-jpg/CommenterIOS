@@ -10,8 +10,8 @@ Prefer mature OSS packages and Apple-native APIs over custom generic
 infrastructure. Custom code is allowed for Commenter-specific behavior and for
 small adapters around approved dependencies. Custom parsers, document writers,
 database wrappers, file-flow abstractions, navigation frameworks, or UI
-primitive systems are disallowed unless this file or a later decision ledger
-entry records a specific exception.
+primitive systems are disallowed unless this file records a specific
+exception.
 
 Truthfulness does not mean downgrading required MVP scope to unsupported. It
 means the required workflow must be implemented through real native/OSS-backed
@@ -67,7 +67,7 @@ evaluated before writing or keeping custom generic infrastructure in their area.
 | Area | Candidate | Status | Required proof before use or rejection |
 | --- | --- | --- | --- |
 | XLSX writing | `damuellen/xlsxwriter.swift` or another maintained SwiftPM/libxlsxwriter wrapper | Candidate only | Must build on iOS through SwiftPM without manual host installs, support release CI, and have acceptable license/attribution. If rejected, document why before keeping any custom XLSX writer. |
-| Legacy XLS BIFF parsing/writing | `libxls` or another maintained iOS-compatible option | Candidate only | Must build for iOS, parse BIFF Workbook streams, and pass real fixture tests. If no suitable package exists, keep only the smallest Commenter-specific BIFF adapter on top of OLEKit with fixtures and a decision-ledger exception. |
+| Legacy XLS BIFF parsing/writing | `libxls` or another maintained iOS-compatible option | Candidate only | Must build for iOS, parse BIFF Workbook streams, and pass real fixture tests. If no suitable package exists, keep only the smallest Commenter-specific BIFF adapter on top of OLEKit with fixtures, recorded under Recorded Exceptions below. |
 
 ## Custom-Code Limits
 
@@ -80,7 +80,7 @@ Allowed custom code:
 - Small adapters from approved packages/native APIs into Commenter types.
 - TCA feature reducers and views that express product behavior.
 
-Disallowed custom code unless a decision ledger entry grants an exception:
+Disallowed custom code unless this file grants an exception:
 
 - New CSV parsers.
 - New XLSX parsers.
@@ -92,6 +92,15 @@ Disallowed custom code unless a decision ledger entry grants an exception:
 - Broad design-system primitives that duplicate SwiftUI, SwiftUIX, or
   SwiftUI-Introspect.
 - Giant root features/views that bypass the planned TCA feature tree.
+
+## Recorded Exceptions
+
+- Legacy `.xls` writer: a narrow custom BIFF writer is temporarily allowed
+  because no maintained iOS SwiftPM BIFF writer exists. It is not
+  release-complete until real fixtures exist and its output is verified to
+  open in Excel, Numbers and LibreOffice.
+
+No other custom generic infrastructure has an exception.
 
 ## Required Adapter Boundaries
 
@@ -109,7 +118,7 @@ Disallowed custom code unless a decision ledger entry grants an exception:
 ## Dependency-Audit Gate
 
 Before an agent implements or edits generic infrastructure, it must answer in
-the worklog or decision ledger:
+the pull request description:
 
 1. Which approved package/native API covers this?
 2. If no package is used, which package was checked and why was it rejected?

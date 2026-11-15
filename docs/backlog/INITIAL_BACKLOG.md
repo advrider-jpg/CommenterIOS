@@ -1,9 +1,9 @@
 # Initial Backlog
 
 > Historical bootstrap checklist. It records the original implementation plan,
-> not the live product-completeness verdict. Use `docs/ledgers/PROJECT_LEDGER.md`
-> for current product posture and `docs/ledgers/VALIDATION_LEDGER.md` for dated
-> evidence. Unchecked items below remain unclaimed until their own work is done.
+> not the live product-completeness verdict. Use `PROJECT_RULES.md` for
+> current requirements and `docs/audits/2026-11-15-design-architecture-audit.md`
+> for current status. Unchecked items below remain unclaimed until their own work is done.
 
 ## Epic 0 - Repo Bootstrap
 
