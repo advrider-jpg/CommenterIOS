@@ -138,28 +138,6 @@ final class CSVTemplatesTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: first.url), firstData)
     }
 
-    func testPreparedImportTemplateRemovesOutputWhenVerificationFails() throws {
-        enum ExpectedFailure: Error { case failed }
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CommenterIOSTemplateFailureTests-\(UUID().uuidString)", isDirectory: true)
-
-        XCTAssertThrowsError(try prepareImportTemplateFile(
-            kind: .achievementResults,
-            format: .csv,
-            directory: root,
-            verifyReadBack: { _, _ in throw ExpectedFailure.failed }
-        )) { error in
-            guard case let .verificationFailed(url, underlying)? = error as? ImportTemplateFileError else {
-                return XCTFail("Expected verificationFailed, got \(error)")
-            }
-            XCTAssertEqual(url, root.appendingPathComponent("report_writer_report_details_template.csv"))
-            XCTAssertNotNil(underlying)
-        }
-        XCTAssertFalse(FileManager.default.fileExists(
-            atPath: root.appendingPathComponent("report_writer_report_details_template.csv").path
-        ))
-    }
-
     func testPreparedImportTemplateRejectsUnsupportedFormatsAndNonDirectoryDestinations() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("CommenterIOSTemplateDirectoryTests-\(UUID().uuidString)", isDirectory: true)

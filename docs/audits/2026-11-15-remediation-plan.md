@@ -372,10 +372,10 @@ as today. Checked by reopening with CoreXLSX. Delete the hand-written Spreadshee
 **Legacy XLS writing (issue 36, D5).** Delete `LegacyXLSWorkbookWriter.swift`, the XLS report export option and the
 XLS template option, and their tests.
 
-**One write helper (reviewer B-F18).** `writeVerifiedFile(_ data: Data, to: URL, verify: (Data) throws -> Void)` and
-one `FileExportError` replace the five copied write-then-verify blocks and four error enums. Writes use
-`[.atomic, .completeFileProtectionUnlessOpen]`; the byte-for-byte read-back is dropped; the package reopen check is
-kept. Duplicate XML escapers and forbidden-string lists are deleted.
+**One write helper (reviewer B-F18).** `writeExportFile(_ data: Data, to: URL)` and one `FileExportError` replace
+the copied write blocks and their error enums. Writes use `[.atomic, .completeFileProtectionUnlessOpen]`. The
+byte-for-byte read-back, the package reopen check and the forbidden-string lists for DOCX, XLSX and templates were
+already deleted in PR 1 (owner decision, 15 November); duplicate XML escapers are deleted here.
 
 **Saving (issues 22, 23, 24, 28, 61; D6, D7, D3).**
 - `ProjectStore` becomes an `actor`, created once and provided through the TCA dependency. One file per project,

@@ -120,56 +120,6 @@ final class ReportDocumentFileTests: XCTestCase {
         XCTAssertEqual(files, [])
     }
 
-    func testPrepareReportDocumentFileRejectsReadbackContainingPrivateFields() throws {
-        let root = temporaryRoot()
-        let privateNote = "Private student note must not be exported."
-        var project = fixtureProject()
-        project.roster[0].internalTeacherNote = privateNote
-        project.reports = [
-            readyReport(
-                project: project,
-                result: project.results[0],
-                text: "Generated text should not be exported.",
-                manualEdit: "Manual edit leaked: \(privateNote)",
-                generatedAt: 1
-            )
-        ]
-
-        XCTAssertThrowsError(try prepareReportDocumentFile(project: project, format: .docx, directory: root)) { error in
-            guard case .verificationFailed = error as? ReportDocumentFileError else {
-                return XCTFail("Expected verificationFailed, got \(error)")
-            }
-        }
-
-        let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
-        XCTAssertEqual(files, [])
-    }
-
-    func testPrepareReportDocumentFileRejectsReadbackContainingShortPrivateFields() throws {
-        let root = temporaryRoot()
-        let privateNote = "IEP"
-        var project = fixtureProject()
-        project.roster[0].internalTeacherNote = privateNote
-        project.reports = [
-            readyReport(
-                project: project,
-                result: project.results[0],
-                text: "Generated text should not be exported.",
-                manualEdit: "Manual edit leaked: \(privateNote)",
-                generatedAt: 1
-            )
-        ]
-
-        XCTAssertThrowsError(try prepareReportDocumentFile(project: project, format: .docx, directory: root)) { error in
-            guard case .verificationFailed = error as? ReportDocumentFileError else {
-                return XCTFail("Expected verificationFailed, got \(error)")
-            }
-        }
-
-        let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
-        XCTAssertEqual(files, [])
-    }
-
     func testPrepareReportDocumentFileAllowsRequiredOutputAndDoesNotMistakeMarkupForPrivateData() throws {
         let root = temporaryRoot()
         var project = fixtureProject()

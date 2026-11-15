@@ -121,60 +121,6 @@ final class ReviewWorkbookFileTests: XCTestCase {
         XCTAssertEqual(files, [])
     }
 
-    func testPrepareReviewWorkbookFileRejectsReadbackContainingPrivateFields() throws {
-        for format in [ImportExportFormat.xlsx, .xls] {
-            let root = temporaryRoot()
-            let privateNote = "Private workbook note must not be exported."
-            var project = fixtureProject()
-            project.results[0].internalTeacherNote = privateNote
-            project.reports = [
-                readyReport(
-                    project: project,
-                    result: project.results[0],
-                    text: "Generated text should not be exported.",
-                    manualEdit: "Manual workbook edit leaked: \(privateNote)",
-                    generatedAt: 1
-                )
-            ]
-
-            XCTAssertThrowsError(try prepareReviewWorkbookFile(project: project, format: format, directory: root)) { error in
-                guard case .verificationFailed = error as? ReviewWorkbookFileError else {
-                    return XCTFail("Expected verificationFailed for \(format), got \(error)")
-                }
-            }
-
-            let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
-            XCTAssertEqual(files, [])
-        }
-    }
-
-    func testPrepareReviewWorkbookFileRejectsReadbackContainingShortPrivateFields() throws {
-        for format in [ImportExportFormat.xlsx, .xls] {
-            let root = temporaryRoot()
-            let privateNote = "504"
-            var project = fixtureProject()
-            project.results[0].internalTeacherNote = privateNote
-            project.reports = [
-                readyReport(
-                    project: project,
-                    result: project.results[0],
-                    text: "Generated text should not be exported.",
-                    manualEdit: "Manual workbook edit leaked: \(privateNote)",
-                    generatedAt: 1
-                )
-            ]
-
-            XCTAssertThrowsError(try prepareReviewWorkbookFile(project: project, format: format, directory: root)) { error in
-                guard case .verificationFailed = error as? ReviewWorkbookFileError else {
-                    return XCTFail("Expected verificationFailed for \(format), got \(error)")
-                }
-            }
-
-            let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
-            XCTAssertEqual(files, [])
-        }
-    }
-
     func testReviewWorkbooksAllowRequiredOutputAndDoNotMistakePackageBytesForPrivateData() throws {
         for format in [ImportExportFormat.xlsx, .xls] {
             let root = temporaryRoot()

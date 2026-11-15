@@ -56,7 +56,7 @@ Custom generic infrastructure inventory from the current source scan:
 | Legacy XLS import | `SpreadsheetImportFile.swift` tries the fixture-limited local OLE compound-file extractor first, falls back to `OLEKit` for OLE container reading, then decodes a narrow BIFF subset in custom code. | Temporary risk. This remains narrower than a full XLS reader, and full `.xls` parity needs `libxls`/equivalent evaluation or a recorded exception with fixture and target-app proof. |
 | DOCX generation | `Sources/CommenterImportExport/ReportDocumentFile.swift` hand-assembles WordprocessingML XML entries and uses `OOXMLZipWriter` for packaging. | Policy risk. `SwiftDocX` is not in the manifest and has not replaced this hand-written DOCX layer; keep this only as a temporary bridge until SwiftDocX is evaluated against Commenter fixtures. |
 | XLSX export | `Sources/CommenterImportExport/ReviewWorkbookFile.swift` hand-assembles SpreadsheetML XML entries and uses `OOXMLZipWriter` for packaging. | Policy risk. `libxlsxwriter`/approved XLSX writer evaluation is still required before treating this as release-complete infrastructure. |
-| OOXML ZIP packaging | `Sources/CommenterImportExport/OOXMLZipWriter.swift` imports `ZIPFoundation` and handles duplicate-entry, size, required-entry, and readback validation. | Acceptable small adapter around approved ZIP infrastructure, provided document/workbook XML generation above is tracked separately. |
+| OOXML ZIP packaging | `Sources/CommenterImportExport/OOXMLZipWriter.swift` imports `ZIPFoundation` and handles duplicate-entry and size limits. | Acceptable small adapter around approved ZIP infrastructure, provided document/workbook XML generation above is tracked separately. |
 | Legacy XLS export | `Sources/CommenterImportExport/LegacyXLSWorkbookWriter.swift` hand-writes a narrow OLE compound file and BIFF workbook stream. | Highest remaining policy risk. No mature iOS SwiftPM BIFF writer is currently recorded as suitable; the code must stay fixture-limited and needs decision/validation evidence before release parity is claimed. |
 | SQLite project index | `Sources/CommenterPersistence/SQLiteProjectIndex.swift` imports `GRDB`; no direct `sqlite3` import was found. | Compliant with the approved persistence dependency posture. |
 | Reusable UI helpers | `Sources/DesignSystem` contains small SwiftUI views only; no SwiftUIX or introspection imports were found. | Compliant native SwiftUI posture for the current scan. |
@@ -92,7 +92,7 @@ Product constraints checked:
 - All document and workbook work must remain local/offline and must not transmit
   teacher, student, project, or report data.
 - Every success state must be backed by a real written file, nonzero size,
-  package/readback verification, native export/share completion where relevant,
+  native export/share completion where relevant,
   and target-app open proof for release.
 - Licenses must be permissive enough for App Store distribution and must be
   included in third-party notices.

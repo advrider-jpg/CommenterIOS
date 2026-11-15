@@ -31,6 +31,7 @@ Install as `PROJECT_RULES.md` at the repository root. Read with `AGENTS.md`. The
 
 - Every success shown to the teacher must match a real completed operation: a durable local save, a verified generation result, a verified local file, or a native iOS completion or cancellation result.
 - Generated and exported report text must not contain unresolved placeholders.
+- Exports contain only the fields the export code chooses; the private teacher note is never one of them. After writing a DOCX, XLSX or template file the app confirms only that it exists and is not empty: it does not re-read the file or search report text for private notes (owner decision, 2026-11-15).
 - AI-generated or AI-revised report text is not export-ready until the app validates it and the teacher approves the current text. AI output arrives as a preview: it does not change the comment, mark it Done, save, export or share until the teacher accepts it. Bulk AI produces one preview per comment, can be cancelled, and leaves cancelled or queued comments untouched. App Shortcuts may only open the relevant screen; they never generate, approve, export or share.
 
 ## Dependencies
