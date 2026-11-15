@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      only_testing:
+        description: "Run only this package test (Target/Class/method); skips the app build and screenshots"
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,6 +25,7 @@ env:
 jobs:
   ios-build:
     name: Build iOS app target
+    if: inputs.only_testing == ''
     runs-on: xcode-27
     timeout-minutes: 35
     steps:
@@ -73,6 +79,8 @@ jobs:
       - name: Run unit tests on the iPhone simulator
         # xcodebuild picks the app project when it sits beside Package.swift, so the package
         # tests run from a copy of the package alone, using its own CommenterIOS-Package scheme.
+        env:
+          ONLY_TESTING: ${{ inputs.only_testing }}
         run: |
           set -euo pipefail
           mkdir -p build
@@ -80,7 +88,9 @@ jobs:
           mkdir -p "$pkg"
           cp -R Package.swift Package.resolved Sources Tests "$pkg/"
           cd "$pkg"
-          xcodebuild test -scheme CommenterIOS-Package \
+          only=()
+          if [ -n "$ONLY_TESTING" ]; then only=(-only-testing:"$ONLY_TESTING"); fi
+          xcodebuild test -scheme CommenterIOS-Package ${only[@]+"${only[@]}"} \
             -destination "$DESTINATION" -derivedDataPath "$DERIVED_DATA_PATH" \
             -resultBundlePath "$GITHUB_WORKSPACE/build/UnitTests.xcresult" \
             -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO \
@@ -96,6 +106,7 @@ jobs:
 
   screenshots:
     name: Capture core app screenshots
+    if: inputs.only_testing == ''
     runs-on: xcode-27
     timeout-minutes: 45
     needs: [ios-build, swift-package]

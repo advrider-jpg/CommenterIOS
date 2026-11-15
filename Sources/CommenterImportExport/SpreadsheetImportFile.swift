@@ -100,13 +100,19 @@ public enum SpreadsheetImportFile {
             throw SpreadsheetImportFileError.fileTooLarge(maxImportBytes / 1024)
         }
         do {
-            _ = try OOXMLZipWriter.storedEntries(
+            let debugEntries = try OOXMLZipWriter.storedEntries(
                 data,
                 maximumEntryBytes: maxWorkbookEntryBytes,
                 maximumTotalUncompressedBytes: maxWorkbookUncompressedBytes,
                 maximumEntryCount: maxWorkbookEntryCount
             )
+            print("[DEBUG-x7k2] entries: \(debugEntries.keys.sorted()) sizes: \(debugEntries.mapValues(\.count))") // [DEBUG-x7k2]
+            for name in ["xl/workbook.xml", "xl/_rels/workbook.xml.rels", "xl/worksheets/sheet1.xml"] { // [DEBUG-x7k2]
+                let text = debugEntries[name].flatMap { String(data: $0, encoding: .utf8) } ?? "<missing or not UTF-8>" // [DEBUG-x7k2]
+                print("[DEBUG-x7k2] \(name) first 400: \(text.prefix(400))") // [DEBUG-x7k2]
+            } // [DEBUG-x7k2]
         } catch {
+            print("[DEBUG-x7k2] storedEntries failed: \(error)") // [DEBUG-x7k2]
             throw SpreadsheetImportFileError.unreadableWorkbook(label)
         }
 
@@ -114,6 +120,7 @@ public enum SpreadsheetImportFile {
         do {
             file = try XLSXFile(data: data)
         } catch {
+            print("[DEBUG-x7k2] XLSXFile(data:) failed: \(error)") // [DEBUG-x7k2]
             throw SpreadsheetImportFileError.unreadableWorkbook(label)
         }
 
@@ -147,8 +154,10 @@ public enum SpreadsheetImportFile {
         } catch let error as CSVParserError {
             throw error
         } catch let error as SpreadsheetImportFileError {
+            print("[DEBUG-x7k2] import check failed: \(error)") // [DEBUG-x7k2]
             throw error
         } catch {
+            print("[DEBUG-x7k2] CoreXLSX parse failed: \(error)") // [DEBUG-x7k2]
             throw SpreadsheetImportFileError.unreadableWorkbook(label)
         }
 
