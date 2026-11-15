@@ -144,9 +144,11 @@ private func xmlData(_ xml: String) -> Data {
 }
 
 private func worksheetXML(sheetRows: [[String]]) -> String {
-    let rows = sheetRows.enumerated().map { rowIndex, values in
+    // Explicit String types: GRDB, visible here through CommenterPersistence, also accepts string
+    // interpolation and has its own joined(), and Swift 6.4 otherwise infers GRDB's SQL type.
+    let rows: String = sheetRows.enumerated().map { rowIndex, values -> String in
         let rowNumber = rowIndex + 1
-        let cells = values.enumerated().map { columnIndex, value in
+        let cells: String = values.enumerated().map { columnIndex, value -> String in
             let reference = "\(columnName(columnIndex + 1))\(rowNumber)"
             return #"<c r="\#(reference)" t="inlineStr"><is><t xml:space="preserve">\#(xmlEscape(value))</t></is></c>"#
         }.joined()
