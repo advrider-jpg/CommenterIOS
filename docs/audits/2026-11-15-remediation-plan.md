@@ -82,7 +82,7 @@ end of Section 8. Status: PR 1 in progress.
 ### 4.1 Design
 
 **Toolchain and packages (issues 1, 2, 32 first half).**
-- `Package.swift`: `swift-tools-version: 6.2`; `platforms: [.iOS(.v27)]` only. Dependencies switch from `exact:` to
+- `Package.swift`: `swift-tools-version: 6.4`; `platforms: [.iOS(.v27)]` only. Dependencies switch from `exact:` to
   `.upToNextMinor(from:)`: TCA `1.26.2`, GRDB `7.12.0`, ZIPFoundation `0.9.20`, CoreXLSX `0.14.2`, OLEKit `0.3.1`,
   CodableCSV `0.6.7` (GRDB, OLEKit and CodableCSV are removed in PR 2; bumping them now keeps PR 1 compiling).
 - Delete the `CommenterIOSApp` executable product and target; move `Sources/CommenterIOSApp/` to `App/`,
