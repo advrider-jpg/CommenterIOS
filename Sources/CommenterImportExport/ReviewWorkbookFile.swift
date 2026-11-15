@@ -176,7 +176,8 @@ func verifyTabularWorkbookData(
         let cellValues = inlineStringValues(in: sheet)
         let expectedValues = expectedRows.flatMap({ $0 })
         guard cellValues == expectedValues else {
-            let firstDifference = zip(cellValues, expectedValues).firstIndex { $0 != $1 } ?? min(cellValues.count, expectedValues.count)
+            let firstDifference = zip(cellValues, expectedValues).enumerated().first { $0.element.0 != $0.element.1 }?.offset
+                ?? min(cellValues.count, expectedValues.count)
             throw OOXMLZipWriterError.unexpectedContent(
                 "spreadsheet cells do not match what was written (\(cellValues.count) cells read, \(expectedValues.count) expected, first difference at cell \(firstDifference + 1))"
             )
